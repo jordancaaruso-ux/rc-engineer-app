@@ -19,6 +19,8 @@ export type EngineerMessageContextSnapshot = {
   model?: string;
   /** The follow-up buttons the Engineer picked for this answer (nextQuestions.ts). */
   nextQuestions?: string[];
+  /** What each setup-change link in the answer opens (sheetLinks.ts): only the ones it used. */
+  sheetLinks?: Record<string, { runId: string; sinceRunId: string }>;
 };
 
 export type EngineerRatingInput = {

@@ -642,6 +642,11 @@ model Car {
   notes              String?
   setupSheetTemplate String?  // legacy: "awesomatix_a800rr" | null; prefer setupSheetModelId
   setupSheetModelId  String?
+  /// The driver's own names for boxes on this car's sheet that the app cannot read yet, typed under
+  /// an Engineer answer's setup-change link (founder, 2026-09-25: "their car at once, offered to the
+  /// chassis after his OK"). `{ "<box key>": { "name": "front roll bar", "at": "<ISO>" } }` - see
+  /// src/lib/engineer/carSheetNames.ts. Never copied to the chassis without the founder's review.
+  sheetBoxNamesJson  Json?
   createdAt          DateTime @default(now())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)

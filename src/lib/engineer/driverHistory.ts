@@ -11,7 +11,15 @@ import { matchDriverNameInQuestions } from "@/lib/engineer/nameMatch";
 import { driverKey, driversOnSheets } from "@/lib/engineer/rivals";
 import type { EngineerPayloadBlock } from "@/lib/engineer/payload";
 import { describeRangeDates, type EngineerRangeScope } from "@/lib/engineer/rangeScope";
-import { readSheet, readableSetupKey, sheetMostlyUnread } from "@/lib/engineer/setupDiff";
+import {
+  driverNamedRows,
+  readSheet,
+  readableSetupKey,
+  sheetMostlyUnread,
+  unnamedUnreadCount,
+} from "@/lib/engineer/setupDiff";
+import type { SheetLinkTarget } from "@/lib/engineer/sheetLinks";
+import { readCarSheetNames } from "@/lib/engineer/carSheetNames";
 import {
   getAverageTopN,
   getBestLap,
@@ -74,7 +82,8 @@ const RUN_SELECT = {
   lapTimes: true,
   lapSession: true,
   ...FIELD_RUN_SELECT,
-  car: { select: { name: true, chassis: true } },
+  // The car's name, and the driver's own names for boxes the app cannot read (carSheetNames.ts).
+  car: { select: { name: true, chassis: true, sheetBoxNamesJson: true } },
   track: { select: { name: true } },
   tireType: { select: { displayName: true, modelCode: true } },
   setupSnapshot: { select: { data: true } },
@@ -233,7 +242,7 @@ export async function countRunsInRange(userId: string, scope: EngineerRangeScope
 export function toHistoryRun(r: Row, zone: string | null, field: FieldPace | null = null): HistoryRun {
   const laps = primaryLapRowsFromRun(r);
   const stint = getDisplayFiveMinuteStint(laps, readFiveMinStartLap(r.lapSession));
-  const sheet = readSheet(r.setupSnapshot?.data);
+  const sheet = readSheet(r.setupSnapshot?.data, readCarSheetNames(r.car?.sheetBoxNamesJson));
   return {
     id: r.id,
     dateYmd: localYmd(r, zone),
@@ -265,6 +274,7 @@ export function toHistoryRun(r: Row, zone: string | null, field: FieldPace | nul
     unconfirmed: r.unconfirmedAt != null,
     tuning: sheet.read,
     unread: sheet.unread,
+    ...(sheet.names ? { names: sheet.names } : {}),
     field,
   };
 }
@@ -274,17 +284,18 @@ export function toHistoryRun(r: Row, zone: string | null, field: FieldPace | nul
  * filled boxes it cannot. Null when that run's sheet is empty.
  */
 export function lastSetupOf(last: Row, zone: string | null): Parameters<typeof renderHistoryBlock>[0]["lastSetup"] {
-  const sheet = readSheet(last.setupSnapshot?.data);
-  const unread = Object.keys(sheet.unread).length;
-  if (Object.keys(sheet.read).length === 0 && unread === 0) return null;
+  const sheet = readSheet(last.setupSnapshot?.data, readCarSheetNames(last.car?.sheetBoxNamesJson));
+  if (Object.keys(sheet.read).length === 0 && Object.keys(sheet.unread).length === 0) return null;
+  // Boxes the driver has named on this car show under their name; only the rest are unknown.
+  const named = driverNamedRows(sheet);
+  const unread = unnamedUnreadCount(sheet);
   return {
     carName: last.car?.name ?? last.car?.chassis ?? null,
     dateYmd: localYmd(last, zone),
-    rows: Object.entries(sheet.read)
-      .map(([k, v]) => `${readableSetupKey(k)}: ${v}`)
-      .sort(),
+    rows: [...Object.entries(sheet.read).map(([k, v]) => `${readableSetupKey(k)}: ${v}`), ...named].sort(),
     unread,
-    partly: sheetMostlyUnread(sheet),
+    partly: sheetMostlyUnread(sheet) && unread > 0,
+    ...(named.length > 0 ? { named: true } : {}),
   };
 }
 
@@ -357,12 +368,14 @@ export async function buildDriverHistoryBlocks(params: {
   const questions = [params.question, ...(params.earlierQuestions ?? [])];
   const rivalName = matchDriverNameInQuestions(questions, driversOnSheets(runs).map((d) => d.name))?.name ?? null;
   const scopeLabel = await describeScope(params.scope, carIds, rows, event);
+  const sheetLinks = new Map<string, SheetLinkTarget>();
   const content = renderHistoryBlock({
     scopeLabel,
     runs,
     omittedOlder,
     lastSetup,
     rival: rivalName ? driverKey(rivalName) : null,
+    sheetLinks,
   });
   if (!content) return [];
 
@@ -370,7 +383,14 @@ export async function buildDriverHistoryBlocks(params: {
   // linked to the runs shown, plus the driver's loose imports that fall on the same days at the
   // range's track. A failed read drops the block, never the range.
   const laps = await buildRangeLapsBlock(params.userId, rows, params.scope, zone, scopeLabel, questions).catch(() => null);
-  return [{ id: "driver-history", cacheStable: false, content: laps ? `${content}\n\n${laps}` : content }];
+  return [
+    {
+      id: "driver-history",
+      cacheStable: false,
+      content: laps ? `${content}\n\n${laps}` : content,
+      ...(sheetLinks.size > 0 ? { sheetLinks: Object.fromEntries(sheetLinks) } : {}),
+    },
+  ];
 }
 
 async function buildRangeLapsBlock(

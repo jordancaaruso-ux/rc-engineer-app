@@ -1,4 +1,13 @@
-import { UNREAD_BOXES_NOTE, changedWords, diffSheet, notVisibleLines, partlyVisibleLine } from "@/lib/engineer/setupDiff";
+import {
+  DRIVER_NAMED_NOTE,
+  SHEET_LINKS_NOTE,
+  UNREAD_BOXES_NOTE,
+  changedWords,
+  diffSheet,
+  notVisibleLines,
+  partlyVisibleLine,
+} from "@/lib/engineer/setupDiff";
+import { addSheetLink, type SheetLinkTarget } from "@/lib/engineer/sheetLinks";
 import { lapRankShort, lapRankWords, type FieldPace } from "@/lib/engineer/fieldPace";
 import { renderRivalSection, renderRivalsSummary } from "@/lib/engineer/rivals";
 
@@ -66,6 +75,8 @@ export type HistoryRun = {
   tuning: Record<string, string>;
   /** Every other box with something in it (setupDiff `readSheet`); absent = none. */
   unread?: Record<string, string>;
+  /** The driver's own names for some of those boxes on this car (carSheetNames.ts); absent = none. */
+  names?: Record<string, string>;
   /** Your pace against the session's field, from the timing sheet; null when there is none. */
   field: FieldPace | null;
 };
@@ -452,7 +463,15 @@ function adjustedTop5(run: HistoryRun, adj: TyreAdjustments): number | null {
   return a && a.top5 != null && run.top5 != null ? run.top5 - a.top5 : null;
 }
 
-export function renderRunLines(runs: HistoryRun[], adj: TyreAdjustments = new Map()): string[] {
+export function renderRunLines(
+  runs: HistoryRun[],
+  adj: TyreAdjustments = new Map(),
+  /**
+   * Filled with a link for each change on boxes the Engineer cannot read (sheetLinks.ts). Absent,
+   * the words carry no link — the tests and the frozen eval fixtures read that way.
+   */
+  sheetLinks?: Map<string, SheetLinkTarget>
+): string[] {
   const multiCar = new Set(runs.map((r) => r.carId)).size > 1;
   const multiTrack = new Set(runs.map((r) => r.trackName)).size > 1;
   const lastByCar = new Map<string, HistoryRun>();
@@ -521,13 +540,20 @@ export function renderRunLines(runs: HistoryRun[], adj: TyreAdjustments = new Ma
       moves.push(`gap to the quickest lap vs previous run: ${fmtDelta(run.field.gapBestToP1 - prev.field.gapBestToP1)}`);
     }
     const eqMove = moves.length > 0 ? `  (${moves.join("; ")})` : "";
-    const words = changedWords(change, MAX_CHANGES_LISTED);
+    // Boxes it cannot read link to where the driver can see them (founder, 2026-09-24).
+    const link =
+      sheetLinks && change.unread > 0 ? addSheetLink(sheetLinks, { runId: run.id, sinceRunId: prev.id }) : null;
+    const words = changedWords(change, MAX_CHANGES_LISTED, link);
     lines.push(words == null ? `    no setup change${eqMove}` : `    changed: ${words}${eqMove}`);
   }
   return lines;
 }
 
-const sheetOf = (run: HistoryRun) => ({ read: run.tuning, unread: run.unread ?? {} });
+const sheetOf = (run: HistoryRun) => ({
+  read: run.tuning,
+  unread: run.unread ?? {},
+  ...(run.names ? { names: run.names } : {}),
+});
 
 /** Whether a "changed" line counts boxes the Engineer cannot read — the block then says what they are. */
 function anyUnreadChange(runs: HistoryRun[]): boolean {
@@ -537,6 +563,18 @@ function anyUnreadChange(runs: HistoryRun[]): boolean {
     const prev = lastByCar.get(carKey);
     lastByCar.set(carKey, run);
     if (prev && (diffSheet(sheetOf(prev), sheetOf(run))?.unread ?? 0) > 0) return true;
+  }
+  return false;
+}
+
+/** Whether a "changed" line names a box the driver named — the block then says what that means. */
+function anyNamedChange(runs: HistoryRun[]): boolean {
+  const lastByCar = new Map<string, HistoryRun>();
+  for (const run of runs) {
+    const carKey = run.carId ?? "unknown";
+    const prev = lastByCar.get(carKey);
+    lastByCar.set(carKey, run);
+    if (prev && (diffSheet(sheetOf(prev), sheetOf(run))?.named ?? 0) > 0) return true;
   }
   return false;
 }
@@ -575,15 +613,28 @@ export function renderHistoryBlock(params: {
    * (`unread`; `partly` when those are most of the sheet — setupDiff `sheetMostlyUnread`). Null
    * when that run's sheet is empty.
    */
-  lastSetup: { carName: string | null; dateYmd: string; rows: string[]; unread?: number; partly?: boolean } | null;
+  lastSetup: {
+    carName: string | null;
+    dateYmd: string;
+    rows: string[];
+    unread?: number;
+    partly?: boolean;
+    /** Some rows are boxes the driver named (carSheetNames.ts) — the section then says what that means. */
+    named?: boolean;
+  } | null;
   /** A driver named in the question (rivals.ts `driverKey`), for a VS section; null for none. */
   rival?: string | null;
+  /** Filled with the links on boxes the Engineer cannot read (sheetLinks.ts); absent = no links. */
+  sheetLinks?: Map<string, SheetLinkTarget>;
 }): string | null {
   const { runs } = params;
   if (runs.length === 0) return null;
   const parts: string[] = [];
   const sets = reportableSets(groupTyreSets(runs));
   const adj = tyreAdjustments(sets);
+  // Rendered first: the header says what a link is only when a line carries one.
+  const runLines = renderRunLines(runs, adj, params.sheetLinks);
+  const namedNote = anyNamedChange(runs);
 
   const multiCar = new Set(runs.map((r) => r.carId)).size > 1;
   const omitted =
@@ -595,6 +646,8 @@ export function renderHistoryBlock(params: {
       `DRIVER DATA — RUNS IN A RANGE. The driver chose this range: ${params.scopeLabel}. ${runs.length} run${runs.length === 1 ? "" : "s"} shown, earliest first.${omitted} Nothing outside this range is attached; the driver's other runs are not visible here.`,
       `"changed" is what moved on the setup sheet since that same ${multiCar ? "physical car's" : "car's"} previous run in this list. A run with no "changed" line has nothing filled in on one side: that is unknown, not unchanged. "tyre run N" is the Nth run on that set of rubber; a "?" means the driver was not sure how old the set was.`,
       ...(anyUnreadChange(runs) ? [UNREAD_BOXES_NOTE] : []),
+      ...(params.sheetLinks && params.sheetLinks.size > 0 ? [SHEET_LINKS_NOTE] : []),
+      ...(namedNote ? [DRIVER_NAMED_NOTE] : []),
       // Only when a front/rear run is in the range, so an on-road block is unchanged.
       ...(runs.some((r) => r.frontTyreName)
         ? [
@@ -618,7 +671,7 @@ export function renderHistoryBlock(params: {
         : []),
       "",
       "RUNS",
-      ...renderRunLines(runs, adj),
+      ...runLines,
     ].join("\n")
   );
 
@@ -649,6 +702,8 @@ export function renderHistoryBlock(params: {
         "",
         ...setup.rows,
         ...(setup.partly ? ["", partlyVisibleLine(setup.unread ?? 0)] : []),
+        // Said once: the header above already has it when a changed line named a box.
+        ...(setup.named && !namedNote ? ["", DRIVER_NAMED_NOTE] : []),
       ].join("\n")
     );
   } else if (setup && (setup.unread ?? 0) > 0) {

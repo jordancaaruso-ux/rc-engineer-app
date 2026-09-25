@@ -77,17 +77,50 @@ export const MIN_READABLE_BOXES = 20;
  * A sheet split by what the Engineer is shown: `read` is `tuningValues`; `unread` is every other box
  * with something in it — a box on a chassis sheet the app has not learned yet ("text20"), or one it
  * never shows (tyres, battery, notes).
+ *
+ * `names` are the driver's own names for unread boxes on this car (carSheetNames.ts, founder
+ * 2026-09-25: "their car at once"). A named box stays in `unread` — the app still cannot read the
+ * chassis's sheet, so whether the sheet counts as read (`sheetMostlyUnread`) does not move — but it
+ * is SHOWN, under the driver's name, instead of counted as a box not shown.
  */
-export type SheetRead = { read: Record<string, string>; unread: Record<string, string> };
+export type SheetRead = {
+  read: Record<string, string>;
+  unread: Record<string, string>;
+  names?: Record<string, string>;
+};
 
-export function readSheet(data: unknown): SheetRead {
+export function readSheet(data: unknown, names?: Readonly<Record<string, string>> | null): SheetRead {
   const read: Record<string, string> = {};
   const unread: Record<string, string> = {};
   for (const [key, raw] of Object.entries(normalizeSetupData(data))) {
     const value = fmtSetupValue(raw);
     if (value) (isEngineerSetupKey(key) ? read : unread)[key] = value;
   }
-  return { read, unread };
+  // Only boxes this sheet leaves unread take a driver's name: one the app reads keeps the app's.
+  const named = Object.entries(names ?? {}).filter(([key, name]) => name.trim() && !(key in read));
+  return named.length > 0 ? { read, unread, names: Object.fromEntries(named) } : { read, unread };
+}
+
+/** A box the driver named, as the blocks print it: `front roll bar (named by the driver)`. */
+export function driverNamedLabel(name: string): string {
+  return `${name.trim()} (named by the driver)`;
+}
+
+/** What "(named by the driver)" means — printed once in a block that shows one. */
+export const DRIVER_NAMED_NOTE = `"(named by the driver)" is a box on a sheet the app cannot read yet that the driver has named themselves: what the box is comes from the driver.`;
+
+/** The unread boxes the driver has named, as setup rows: `front roll bar (named by the driver): 1.4`. */
+export function driverNamedRows(sheet: SheetRead): string[] {
+  const names = sheet.names ?? {};
+  return Object.entries(sheet.unread)
+    .filter(([key]) => names[key])
+    .map(([key, value]) => `${driverNamedLabel(names[key])}: ${value}`);
+}
+
+/** Filled boxes the app cannot read and the driver has not named — what "not shown here" counts. */
+export function unnamedUnreadCount(sheet: SheetRead): number {
+  const names = sheet.names ?? {};
+  return Object.keys(sheet.unread).filter((key) => !names[key]).length;
 }
 
 /**
@@ -234,30 +267,55 @@ function listChanges(prev: Record<string, string>, next: Record<string, string>)
  * On a sheet it can barely read (`sheetMostlyUnread`) every box counts, so "no setup change" is
  * said only when nothing on the sheet moved.
  */
-export function diffSheet(prev: SheetRead, next: SheetRead): { changes: string[]; unread: number } | null {
+export function diffSheet(
+  prev: SheetRead,
+  next: SheetRead
+): { changes: string[]; unread: number; named?: number } | null {
   const filled = (s: SheetRead) => Object.keys(s.read).length + Object.keys(s.unread).length;
   if (filled(prev) === 0 || filled(next) === 0) return null;
   if (!sheetMostlyUnread(prev) && !sheetMostlyUnread(next)) {
     const changes = diffTuning(prev.read, next.read);
     return changes == null ? null : { changes, unread: 0 };
   }
+  // A box the driver has named on this car is a change by that name; the rest are counted.
+  const names = { ...(prev.names ?? {}), ...(next.names ?? {}) };
   let unread = 0;
-  for (const key of new Set([...Object.keys(prev.unread), ...Object.keys(next.unread)])) {
-    if (!sameSetupValue(prev.unread[key], next.unread[key])) unread++;
+  const named: string[] = [];
+  for (const key of [...new Set([...Object.keys(prev.unread), ...Object.keys(next.unread)])].sort()) {
+    if (sameSetupValue(prev.unread[key], next.unread[key])) continue;
+    if (names[key]) named.push(`${driverNamedLabel(names[key])} ${prev.unread[key] ?? "—"} → ${next.unread[key] ?? "—"}`);
+    else unread++;
   }
-  return { changes: listChanges(prev.read, next.read), unread };
+  const changes = [...listChanges(prev.read, next.read), ...named];
+  return named.length > 0 ? { changes, unread, named: named.length } : { changes, unread };
 }
 
-/** "pinion 39 → 40, and 3 boxes not shown here" — null when nothing moved ("no setup change"). */
-export function changedWords(change: { changes: string[]; unread: number }, maxListed: number): string | null {
+/**
+ * "pinion 39 → 40, and 3 boxes not shown here" — null when nothing moved ("no setup change").
+ *
+ * `link` (sheetLinks.ts) turns the boxes into a Markdown link to them on the driver's own sheet:
+ * "and [3 boxes not shown here](#sheet-4f9k2m)". Without one the words are exactly as before.
+ */
+export function changedWords(
+  change: { changes: string[]; unread: number },
+  maxListed: number,
+  link?: string | null
+): string | null {
   const { changes, unread } = change;
   if (changes.length === 0 && unread === 0) return null;
   const shown = changes.slice(0, maxListed).join(", ");
   const more = changes.length > maxListed ? `, +${changes.length - maxListed} more` : "";
   if (unread === 0) return `${shown}${more}`;
-  const boxes = `${unread} ${unread === 1 ? "box" : "boxes"} not shown here`;
+  const words = `${unread} ${unread === 1 ? "box" : "boxes"} not shown here`;
+  const boxes = link ? `[${words}](#${link})` : words;
   return changes.length > 0 ? `${shown}${more}, and ${boxes}` : `only ${boxes}`;
 }
 
 /** The sentence a block adds when one of its "changed" lines counts boxes the Engineer cannot read. */
 export const UNREAD_BOXES_NOTE = `"boxes not shown here" are boxes on a sheet the app cannot read yet: something in them moved, but not which setting or which way.`;
+
+/**
+ * The fact a block adds when those words are links (sheetLinks.ts). What to DO with a link is the
+ * prompt's; this says only what one is.
+ */
+export const SHEET_LINKS_NOTE = `Each link on those words, (#sheet-…), opens the driver's own sheet with those boxes ringed, before and after, where the driver can say what each box is.`;

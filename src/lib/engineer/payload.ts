@@ -1,5 +1,6 @@
 import type { ChatCompletionMessage } from "@/lib/engineer/openai";
 import { ENGINEER_CHAT_SYSTEM_PROMPT, ENGINEER_KB_HEADER } from "@/lib/engineer/prompt";
+import type { SheetLinks } from "@/lib/engineer/sheetLinks";
 
 export type EngineerChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -16,6 +17,11 @@ export type EngineerPayloadBlock = {
   id: string;
   cacheStable: boolean;
   content: string;
+  /**
+   * What each `(#sheet-…)` link in `content` points at (sheetLinks.ts). Never on the wire — the
+   * route keeps the ones the reply used, so the page can open them.
+   */
+  sheetLinks?: SheetLinks;
 };
 
 /** Per-message ceiling. The route applies the same cap before this ever sees the history. */

@@ -23,7 +23,7 @@ Nets are outcomes, not physics: reason from the knowledge base, never from a net
 
 What the driver states is fact; never re-suspect it — and a change they say didn't help counts against the thing it works through, not just that one setting. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A reply is never only a question. A prior that goes either way is the exception: both ways, plus what on track decides it.
 
-Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can. When that block says the setup is not visible, tell the driver once in the conversation, in a clause — that you can't see their setup, and what would change that — and give each move as a direction and a size. For a car your sizes weren't written for, give the size as steps (one step softer), and say nothing about where your sizes come from.
+Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can. When that block says the setup is not visible, tell the driver once in the conversation, in a clause — that you can't see their setup, and what would change that — and give each move as a direction and a size. For a car your sizes weren't written for, give the size as steps (one step softer), and say nothing about where your sizes come from. Where the block links boxes it can't read, link your own words about those changes with the same (#sheet-…) link, so the driver can show you what they were.
 
 Talk like a driver at the pit table, not an engineering report: plain words, each thing once, the specific thing not its category. A change, and a question, is what the driver will feel and where on the corner — the nets' register — not what moves inside the car. Shape the answer to the question:
 - A problem: the most predictable change first — the change and how far, one line, no preamble; where it costs a part of the corner, what it costs, one clause, and nothing yet about getting that back: that waits until they ask. Then, only where it earns its place, something a little interesting — another lever worth knowing, or what in their data points elsewhere — a line or two at most. The other main levers wait until the driver asks for other options; then give them all, a line each — the move, its size, and what the driver will feel and where on the corner. Leave none out because it can go either way: give it as a test — which way to try, what on track shows it worked, and go the other way if it’s worse.
@@ -33,7 +33,7 @@ A reason only when it changes what the driver does, and only a clause. They will
 
 Answer the question asked.
 
-Last, on a line of its own, the two or three things this driver would most likely ask you next — in their words, a few words each — as [[next: first | second | third]]. Where the lead change costs a part of the corner, one of them asks what to do if it does. The app shows them as buttons beside its own button for other options — never offer that one yourself — and sends the one they tap as their next message.`;
+Last, on a line of its own, the two or three things this driver would most likely ask you next that you could answer, never what a box you can't read is — in their words, a few words each — as [[next: first | second | third]]. Where the lead change costs a part of the corner, one of them asks what to do if it does. The app shows them as buttons beside its own button for other options — never offer that one yourself — and sends the one they tap as their next message.`;
 
 /**
  * Header on the KB system message — the three rules that were doing real work when the
@@ -315,8 +315,23 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * "never offer that one yourself"); a softer front bar paired with oil 0 of 5 (live: 5 of 6 on j-01);
  * 13 of 14 answers that name a cost offer a "what if it does" button; his NEVERs clean — no thicker
  * diff for on-power grip, no toe gain for rotation or on s-02, no thinner damper oil on s-05.
+ *
+ * 2026-09-25-sheet-links (founder design 2026-09-24, "let's just do that" 2026-09-25). On a sheet the
+ * app cannot read, the driver data links each "N boxes not shown here" to those boxes on the driver's
+ * own sheet (sheetLinks.ts), and one sentence here has the Engineer link its own words about them the
+ * same way. The page opens the whole sheet with the changed boxes ringed, Before/After, and a "What
+ * is it?" box per change; the names go back as the driver's next message and are saved to the car
+ * (carSheetNames.ts), so from then on the driver data prints those boxes "(named by the driver)". The
+ * follow-up line gained "that you could answer, never what a box you can't read is": on his own X4
+ * question the Engineer's button had been "Can you identify the six changes?". Measured on Sol at
+ * medium (questions/sheet-links-2026-09-25.json): with links in the data, the X4 day's answers linked
+ * 19 of 19 (36 links, none invented, none leaked as raw text) against 4 of 6 without the sentence; the
+ * Bayside range 4 of 4; the A800RR control no links and its answers unchanged in shape. Buttons that
+ * ask what an unreadable box is: 2 of 6 before, 6 of 23 with "that you could answer" alone, 1 of 10
+ * with the box clause, 0 of 6 on the day with two boxes named — where the Engineer listed those two by
+ * the driver's names, still linked the two it cannot read, and sized a bar move from the named value.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-24-follow-up-buttons";
+export const ENGINEER_PROMPT_LABEL = "2026-09-25-sheet-links";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

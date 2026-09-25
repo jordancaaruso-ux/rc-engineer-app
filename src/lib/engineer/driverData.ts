@@ -5,9 +5,13 @@ import { isSplitTireRun } from "@/lib/tires/runTireEnds";
 import { normalizeTireFitment } from "@/lib/tires/tireFitment";
 import { normalizeSetupData } from "@/lib/runSetup";
 import {
+  DRIVER_NAMED_NOTE,
+  SHEET_LINKS_NOTE,
   UNREAD_BOXES_NOTE,
   changedWords,
   diffSheet,
+  driverNamedRows,
+  unnamedUnreadCount,
   fmtSetupValue as fmtValue,
   leversNotOnSheet,
   notVisibleLines,
@@ -40,6 +44,8 @@ import { driverKey, driversOnSheets, renderRivalSection, renderRivalsSummary, ty
 import { lapsFigures, lapsRivalNames, lapsTrackMoveByRun, renderLapsBlock, type LapsSession } from "@/lib/engineer/lapsBlock";
 import { loadLapsSessions } from "@/lib/engineer/lapsLoad";
 import { againstRunBefore, type DayRunPace } from "@/lib/engineer/againstRunBefore";
+import { addSheetLink, type SheetLinkTarget } from "@/lib/engineer/sheetLinks";
+import { readCarSheetNames } from "@/lib/engineer/carSheetNames";
 
 /**
  * Driver-data blocks: the driver's own latest session, its setup, the rest of that day, and
@@ -169,6 +175,8 @@ async function loadRun(userId: string, runId: string | null) {
           carClass: true,
           setupSheetTemplate: true,
           setupSheetModel: { select: { slug: true, discipline: true, schemaJson: true } },
+          // The driver's own names for boxes the app cannot read (carSheetNames.ts).
+          sheetBoxNamesJson: true,
         },
       },
       track: { select: { name: true, gripTags: true, layoutTags: true } },
@@ -344,11 +352,14 @@ function buildSetupSheetBlock(
 ): string {
   const data = normalizeSetupData(run.setupSnapshot?.data);
   const car = run.car?.name ?? run.car?.chassis ?? "this car";
-  const sheet = readSheet(data);
+  const sheet = readSheet(data, readCarSheetNames(run.car?.sheetBoxNamesJson));
   const values = sheet.read;
-  const rows = Object.entries(values)
-    .slice(0, MAX_SETUP_ROWS)
-    .map(([key, value]) => `${readableKey(key)}: ${value}`);
+  // Boxes the app cannot read that the driver has named on this car show under their name.
+  const named = driverNamedRows(sheet);
+  const rows = [
+    ...Object.entries(values).map(([key, value]) => `${readableKey(key)}: ${value}`),
+    ...named,
+  ].slice(0, MAX_SETUP_ROWS);
 
   if (rows.length === 0) {
     const filled = Math.max(filledBoxCount(data), ...sameCarDay.map((r) => filledBoxCount(r.setupSnapshot?.data)));
@@ -356,8 +367,10 @@ function buildSetupSheetBlock(
   }
 
   // A sheet the Engineer can read a box or two of — the gearing and the motor on an Xray X4 —
-  // is said to be one, so those rows are not taken for the whole car (2026-09-24).
-  const partly = sheetMostlyUnread(sheet);
+  // is said to be one, so those rows are not taken for the whole car (2026-09-24). Once the driver
+  // has named every box the app cannot read, nothing on it is unknown any more.
+  const unnamed = unnamedUnreadCount(sheet);
+  const partly = sheetMostlyUnread(sheet) && unnamed > 0;
   const ratio = spurOverPinion(values);
   const missing = leversNotOnSheet(levers, [...chassisSheetKeys(run), ...Object.keys(values)]);
   return [
@@ -368,7 +381,8 @@ function buildSetupSheetBlock(
     ...(ratio
       ? ["", `spur ÷ pinion: ${ratio} (the final drive ratio is this multiplied by the car's internal ratio, which is not on the sheet)`]
       : []),
-    ...(partly ? ["", partlyVisibleLine(Object.keys(sheet.unread).length)] : []),
+    ...(partly ? ["", partlyVisibleLine(unnamed)] : []),
+    ...(named.length > 0 ? ["", DRIVER_NAMED_NOTE] : []),
     ...(missing.length > 0
       ? ["", `NO BOX ON THIS CAR'S SETUP SHEET FOR: ${missing.join(", ")}. A manufacturer's sheet lists what adjusts on the car.`]
       : []),
@@ -427,7 +441,7 @@ function loadRunsAround(userId: string, carIds: string[], centre: number) {
       lapTimes: true,
       lapSession: true,
       ...FIELD_RUN_SELECT,
-      car: { select: { name: true } },
+      car: { select: { name: true, sheetBoxNamesJson: true } },
       setupSnapshot: { select: { data: true } },
     },
   });
@@ -478,7 +492,11 @@ function buildDayBlock(
   /** The track's movement per run (lapsBlock.ts): the other drivers against their own day. */
   trackMoveByRun: Map<string, number>,
   /** Each run's own laps in LAPS: the average without slow laps. */
-  cleanAverageByRun: Map<string, number>
+  cleanAverageByRun: Map<string, number>,
+  /** Filled with a link for each change on boxes the Engineer cannot read (sheetLinks.ts); absent = no links. */
+  sheetLinks?: Map<string, SheetLinkTarget>,
+  /** The setup block above already said what "(named by the driver)" means — say it once. */
+  namedNoteShown = false
 ): string | null {
   if (day.length < 2) return null;
   const multiCar = new Set(day.map((r) => r.carId)).size > 1;
@@ -522,6 +540,7 @@ function buildDayBlock(
   const dayPaces = [...paces.values()];
   let anyAgainst = false;
   let anyUnread = false;
+  let anyNamed = false;
   // Each run's previous run on the same car today, in the order they were on track.
   const runOnTrackBefore = new Map<string, DayRun>();
   const byCar = new Map<string, DayRun[]>();
@@ -561,15 +580,23 @@ function buildDayBlock(
     lines.push(bits.join("  "));
 
     const prev = predecessorOf.get(run.id);
-    const change = prev ? diffSheet(readSheet(prev.setupSnapshot?.data), readSheet(run.setupSnapshot?.data)) : null;
+    // One car either side (founder call 2026-09-01), so one set of the driver's box names.
+    const names = readCarSheetNames(run.car?.sheetBoxNamesJson);
+    const change = prev
+      ? diffSheet(readSheet(prev.setupSnapshot?.data, names), readSheet(run.setupSnapshot?.data, names))
+      : null;
     // Nothing filled in on one side — unknown, not unchanged: no "changed" line.
     if (prev && change != null) {
       const prevDay = fmtLocalDate(prev, zone);
       const thisDay = fmtLocalDate(run, zone);
       const since = prevDay !== thisDay ? ` since the run of ${prevDay}` : "";
-      const words = changedWords(change, MAX_CHANGES_LISTED);
+      // Boxes it cannot read link to where the driver can see them (founder, 2026-09-24).
+      const link =
+        sheetLinks && change.unread > 0 ? addSheetLink(sheetLinks, { runId: run.id, sinceRunId: prev.id }) : null;
+      const words = changedWords(change, MAX_CHANGES_LISTED, link);
       lines.push(words == null ? `    no setup change${since}` : `    changed${since}: ${words}`);
       if (change.unread > 0) anyUnread = true;
+      if (change.named) anyNamed = true;
     }
     // Today only: the track's movement and the tyres' measured drop are the day's own. "The run
     // before" is the one on track before it, by the clock the app shows: a run filed later from the
@@ -631,6 +658,8 @@ function buildDayBlock(
     `"changed" is what moved on the setup sheet since that same car's previous run. A run`,
     `with nothing filled in on one side has no "changed" line: that is unknown, not unchanged.`,
     ...(anyUnread ? [UNREAD_BOXES_NOTE] : []),
+    ...(sheetLinks && sheetLinks.size > 0 ? [SHEET_LINKS_NOTE] : []),
+    ...(anyNamed && !namedNoteShown ? [DRIVER_NAMED_NOTE] : []),
     ...(day.some((r) => fieldByRun.has(r.id))
       ? [
           `"quickest lap of 7, 0.30 clear" or "3rd-quickest lap of 12, +0.21 to the quickest" ranks your best lap among the`,
@@ -767,7 +796,8 @@ export async function buildDriverDataBlocks(params: {
   const levers = await loadNets({ discipline: "touring" })
     .then((n) => n.entries.map((e) => ({ parameter: e.parameter, label: e.label.toLowerCase() })))
     .catch(() => [] as Array<{ parameter: string; label: string }>);
-  parts.push(buildSetupSheetBlock(run, levers, day.filter((r) => r.carId === run.carId)));
+  const setupBlock = buildSetupSheetBlock(run, levers, day.filter((r) => r.carId === run.carId));
+  parts.push(setupBlock);
 
   // The day's timed sessions, every lap of every driver (lapsBlock.ts) — loaded before the day
   // block, which takes the track's movement from them. A failed read just drops what uses them.
@@ -782,6 +812,7 @@ export async function buildDriverDataBlocks(params: {
     cleanAverageByRun.set(s.linkedRunId, clean);
     lapsOfRun.set(s.linkedRunId, mine.laps.length);
   }
+  const sheetLinks = new Map<string, SheetLinkTarget>();
   const dayBlock = buildDayBlock(
     run,
     day,
@@ -789,7 +820,9 @@ export async function buildDriverDataBlocks(params: {
     zone,
     fieldByRun,
     lapsTrackMoveByRun(lapsSessions),
-    cleanAverageByRun
+    cleanAverageByRun,
+    sheetLinks,
+    setupBlock.includes(DRIVER_NAMED_NOTE)
   );
   if (dayBlock) parts.push(dayBlock);
 
@@ -823,5 +856,12 @@ export async function buildDriverDataBlocks(params: {
   if (comparable) parts.push(comparable);
 
   if (parts.length === 0) return [];
-  return [{ id: "driver-data", cacheStable: false, content: parts.join("\n\n") }];
+  return [
+    {
+      id: "driver-data",
+      cacheStable: false,
+      content: parts.join("\n\n"),
+      ...(sheetLinks.size > 0 ? { sheetLinks: Object.fromEntries(sheetLinks) } : {}),
+    },
+  ];
 }

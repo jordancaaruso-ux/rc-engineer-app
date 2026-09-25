@@ -403,6 +403,9 @@ export function SheetFillSurface({
   storageKey,
   readOnly = false,
   onPlanLoaded,
+  rings,
+  ringsMuted = false,
+  initialPage,
 }: {
   /** Returns an image of one page; the page number is appended as `page=`. */
   pageImageUrl: string;
@@ -442,6 +445,16 @@ export function SheetFillSurface({
   readOnly?: boolean;
   /** The plan, once it arrives — callers convert values against it (see sheetSurfaceValues). */
   onPlanLoaded?: (plan: SheetFillPlan) => void;
+  /**
+   * Boxes to ring and number on the paper — the changes a setup-change link opens (founder,
+   * 2026-09-24: the whole sheet "with the changed boxes ringed"). A grouped row is ringed once, round
+   * all its options. Read-only sheets only; nothing else draws on the paper.
+   */
+  rings?: ReadonlyArray<{ key: string; number: number }>;
+  /** Draw the rings in grey rather than yellow — the Before side of a flip, so the side is plain. */
+  ringsMuted?: boolean;
+  /** The page to open on — the page the first ring is on, when that is not page 1. */
+  initialPage?: number;
 }) {
   const finePointer = useFinePointer();
 
@@ -478,7 +491,7 @@ export function SheetFillSurface({
     ? (showAlternate && alternateValues ? alternateValues : initialValues ?? values)
     : values;
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => (initialPage && initialPage > 0 ? Math.floor(initialPage) : 1));
 
   /** The page's shape, learned when its picture loads: height as a multiple of width. */
   const [pageRatio, setPageRatio] = useState(0);
@@ -1297,6 +1310,35 @@ export function SheetFillSurface({
 
   const pageBoxes = useMemo(() => boxes.filter((b) => b.pageNumber === page), [boxes, page]);
 
+  /**
+   * Each ringed key on this page as one rectangle. A grouped parameter prints as several option
+   * boxes sharing its key, and the change is which of them carries the mark, so the ring goes round
+   * the whole row — the same union `changedBoxRegion` crops to.
+   */
+  const pageRings = useMemo(() => {
+    if (!readOnly || !rings || rings.length === 0) return [];
+    const numberByKey = new Map(rings.map((r) => [r.key, r.number] as const));
+    const byKey = new Map<string, { key: string; number: number; x: number; y: number; right: number; bottom: number }>();
+    for (const b of pageBoxes) {
+      const number = numberByKey.get(b.key);
+      if (number == null) continue;
+      const seen = byKey.get(b.key);
+      byKey.set(
+        b.key,
+        seen
+          ? {
+              ...seen,
+              x: Math.min(seen.x, b.x),
+              y: Math.min(seen.y, b.y),
+              right: Math.max(seen.right, b.x + b.width),
+              bottom: Math.max(seen.bottom, b.y + b.height),
+            }
+          : { key: b.key, number, x: b.x, y: b.y, right: b.x + b.width, bottom: b.y + b.height }
+      );
+    }
+    return [...byKey.values()];
+  }, [readOnly, rings, pageBoxes]);
+
   /** Where the hovered box's name goes, in the stage's own unscaled pixels. Null = show nothing. */
   const hoverName = useMemo(() => {
     if (!finePointer || !hoverKey || !fitted.width) return null;
@@ -1546,6 +1588,53 @@ export function SheetFillSurface({
                     )
                   ) : null}
                 </button>
+              );
+            })
+          : null}
+
+        {/*
+          The rings: drawn OUTSIDE each box, because a sheet box is a few pixels tall at the fitted
+          size and a border inside it would swallow the value. Their widths are divided by the zoom,
+          so pinching in makes the box bigger and never the ring or its number.
+        */}
+        {fitted.width > 0
+          ? pageRings.map((r) => {
+              const z = view.zoom || 1;
+              const badge = 16 / z;
+              // A box against the right edge carries its number on the left, where it can be seen.
+              const badgeLeft = r.right > 0.9;
+              return (
+                <div
+                  key={`ring:${r.key}`}
+                  aria-hidden
+                  data-sheet-ring={r.number}
+                  className="pointer-events-none absolute z-10 rounded-[2px]"
+                  style={{
+                    left: r.x * fitted.width,
+                    top: r.y * fitted.height,
+                    width: Math.max((r.right - r.x) * fitted.width, 5),
+                    height: Math.max((r.bottom - r.y) * fitted.height, 5),
+                    boxShadow: ringsMuted
+                      ? `0 0 0 ${1.5 / z}px rgba(107, 103, 95, 0.95), 0 0 0 ${4 / z}px rgba(149, 148, 147, 0.35)`
+                      : `0 0 0 ${1.5 / z}px rgba(138, 106, 0, 0.95), 0 0 0 ${4 / z}px rgba(255, 214, 10, 0.75)`,
+                    background: ringsMuted ? "rgba(149, 148, 147, 0.14)" : "rgba(255, 214, 10, 0.18)",
+                  }}
+                >
+                  <span
+                    className="absolute rounded-full bg-foreground text-center font-bold text-background"
+                    style={{
+                      ...(badgeLeft ? { right: "100%", marginRight: 5 / z } : { left: "100%", marginLeft: 5 / z }),
+                      top: "50%",
+                      width: badge,
+                      height: badge,
+                      marginTop: -badge / 2,
+                      fontSize: 10 / z,
+                      lineHeight: `${badge}px`,
+                    }}
+                  >
+                    {r.number}
+                  </span>
+                </div>
               );
             })
           : null}

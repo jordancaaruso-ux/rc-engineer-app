@@ -36,6 +36,8 @@ export async function persistEngineerChatExchange(params: {
   promptVersion?: string;
   model?: string;
   nextQuestions?: string[];
+  /** The setup-change links the answer used (sheetLinks.ts). */
+  sheetLinks?: EngineerMessageContextSnapshot["sheetLinks"];
 }): Promise<PersistedChatExchange> {
   const threadId = await getOrCreateThread({
     userId: params.userId,
@@ -53,6 +55,8 @@ export async function persistEngineerChatExchange(params: {
     ...(params.model ? { model: params.model } : {}),
     // Kept with the answer so a conversation reopened from History still offers them.
     ...(params.nextQuestions && params.nextQuestions.length > 0 ? { nextQuestions: params.nextQuestions } : {}),
+    // Same reason: a link in an answer reopened from History still opens the runs it was about.
+    ...(params.sheetLinks && Object.keys(params.sheetLinks).length > 0 ? { sheetLinks: params.sheetLinks } : {}),
   };
 
   await prisma.engineerChatMessage.create({

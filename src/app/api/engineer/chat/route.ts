@@ -25,6 +25,7 @@ import { persistEngineerChatExchange } from "@/lib/engineer/persistExchange";
 import type { EngineerMessageContextSnapshot } from "@/lib/engineer/types";
 import { ENGINEER_OPENAI_UNAVAILABLE_MESSAGE, engineerOpenAiUserMessage } from "@/lib/openAiRetry";
 import { notifyAdminsOfAiOutage } from "@/lib/aiUsage/notifyAiOutage";
+import { sheetLinksUsedIn, type SheetLinks } from "@/lib/engineer/sheetLinks";
 
 const MAX_MESSAGE_CHARS = 4096;
 
@@ -101,6 +102,7 @@ async function maybePersistEngineerReply(params: {
   source?: string;
   model?: string;
   nextQuestions?: string[];
+  sheetLinks?: SheetLinks;
 }): Promise<EngineerChatFeedbackPayload | null> {
   const userQuestion = [...params.messages].reverse().find((m) => m.role === "user")?.content ?? "";
   if (!userQuestion.trim() || !params.reply.trim()) return null;
@@ -117,6 +119,7 @@ async function maybePersistEngineerReply(params: {
       source: params.source,
       model: params.model,
       nextQuestions: params.nextQuestions,
+      sheetLinks: params.sheetLinks,
     });
   } catch (err) {
     console.error("[api/engineer/chat] persist exchange failed", err);
@@ -305,6 +308,11 @@ export async function POST(request: Request) {
     // (unitsBlock.ts); a metric driver gets none, and their request is unchanged.
     const payloadBlocks = [...engineerUnitsBlocks(await unitSystemForRequest(user.id)), ...driverBlocks];
 
+    // What each "(#sheet-…)" link in the driver data opens (sheetLinks.ts). The page gets them before
+    // the first word, so a link is live while the answer is still arriving; the answer keeps the
+    // ones it used.
+    const sheetLinks: SheetLinks = Object.assign({}, ...driverBlocks.map((b) => b.sheetLinks ?? {}));
+
     if (useStream) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -321,6 +329,7 @@ export async function POST(request: Request) {
           };
           try {
             send("status", { phase: "preparing" });
+            if (Object.keys(sheetLinks).length > 0) send("links", { links: sheetLinks });
             send("status", { phase: "thinking" });
             const tools = toolContext
               ? {
@@ -343,6 +352,7 @@ export async function POST(request: Request) {
               completionTokens: out.usage?.completionTokens ?? 0,
               cachedPromptTokens: out.usage?.cachedPromptTokens ?? 0,
             });
+            const usedLinks = sheetLinksUsedIn(out.reply, sheetLinks);
             const feedback = isDemo
               ? null
               : await maybePersistEngineerReply({
@@ -356,10 +366,12 @@ export async function POST(request: Request) {
                   source: "llm",
                   model: out.model,
                   nextQuestions: out.nextQuestions,
+                  sheetLinks: usedLinks,
                 });
             send("done", {
               reply: out.reply,
               nextQuestions: out.nextQuestions,
+              sheetLinks: usedLinks,
               resolvedFocus: null,
               anchor: null,
               feedback,
@@ -400,6 +412,7 @@ export async function POST(request: Request) {
       cachedPromptTokens: out.usage?.cachedPromptTokens ?? 0,
     });
 
+    const usedLinks = sheetLinksUsedIn(out.reply, sheetLinks);
     const feedback = isDemo
       ? null
       : await maybePersistEngineerReply({
@@ -413,12 +426,14 @@ export async function POST(request: Request) {
           source: "llm",
           model: out.model,
           nextQuestions: out.nextQuestions,
+          sheetLinks: usedLinks,
         });
 
     return NextResponse.json({
       contextJson: null,
       reply: out.reply,
       nextQuestions: out.nextQuestions,
+      sheetLinks: usedLinks,
       resolvedFocus: null,
       anchor: null,
       feedback,

@@ -203,7 +203,8 @@ async function main() {
   }
   for (const c of cars) {
     await prisma.car.create({
-      data: { ...strip(c), id: newId(c.id), userId: DEMO_USER_ID, notes: c.notes ? scrub(c.notes) : c.notes },
+      // The driver's own names for boxes on their sheet stay with their car; the demo's car starts without.
+      data: { ...strip(c), id: newId(c.id), userId: DEMO_USER_ID, notes: c.notes ? scrub(c.notes) : c.notes, sheetBoxNamesJson: undefined },
     });
   }
   for (const ts of tireSets) {

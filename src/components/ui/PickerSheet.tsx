@@ -47,7 +47,7 @@ import {
  * Returns `null` where `visualViewport` isn't available — the sheet then falls
  * back to plain `inset-0`, which is correct everywhere without a soft keyboard.
  */
-function useVisualViewportBox(active: boolean): { top: number; height: number } | null {
+export function useVisualViewportBox(active: boolean): { top: number; height: number } | null {
   const [box, setBox] = useState<{ top: number; height: number } | null>(null);
   useEffect(() => {
     if (!active) {

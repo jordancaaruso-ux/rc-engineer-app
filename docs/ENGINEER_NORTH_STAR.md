@@ -40,7 +40,12 @@ the car fast, and they ask when they want more.
 - **Follow-up buttons** (since 2026-09-24): every reply ends with the two or three things this
   driver would most likely ask next, which the app shows as buttons under the newest answer beside
   its own **Other options**; a tap sends. Where the lead change costs a part of the corner, one of
-  them asks what to do if it does. When the Engineer asks where, its buttons are the answers.
+  them asks what to do if it does. When the Engineer asks where, its buttons are the answers. A button
+  is only a question the Engineer could answer, and never what a box it cannot read is (2026-09-25).
+- **Setup-change links** (since 2026-09-25): on a sheet the app cannot read, the Engineer's words
+  about a change it cannot identify are a link. A tap opens the driver's whole sheet with the changed
+  boxes ringed, Before/After, and a "What is it?" box per change; the names come back as the driver's
+  next message and are saved to that car, so later answers read those boxes by the driver's names.
 - **What a change does** ("what does more rear droop do"): the feel and where on the corner, in
   the nets' register — what the driver will feel, not what moves inside the car; other levers
   only if the Engineer would truly reach for them, at most two.
@@ -171,6 +176,31 @@ Each of these was deleted or declined for a reason. They return only through the
   blind audit for anything user-visible.
 
 ## Changelog
+
+- **2026-09-25 — setup-change links** (founder design 2026-09-24; "I think we just do the full approved
+  design before the freeze"). He hit it live on his own IF15II: "Can you identify the six changes?" —
+  "No… the app would need to map your IF15II setup sheet", and the Engineer's own button had offered
+  that dead end. Now, on a sheet the app cannot read:
+  - The driver data links each "N boxes not shown here" to those boxes (`sheetLinks.ts`; a handle from
+    the run's id, saved with the answer so History reopens it). One prompt sentence has the Engineer link
+    its own words the same way. A readable sheet (A800RR) carries no links: its payload is unchanged.
+  - A tap opens `EngineerSheetChanges`: the whole sheet (`SheetFillSurface`, read-only) with the changed
+    boxes ringed and numbered in reading order, a Before/After switch that flips values on one sheet,
+    and a "What is it?" box per change the Engineer cannot read (a box it reads is listed by name).
+  - "Tell the Engineer" sends "Before my 14:06 run I changed the front roll bar 1.2 → 1.4 and…" and
+    saves the names to THAT car (`Car.sheetBoxNamesJson`; his 09-25 answer: "their car at once, offered
+    to the chassis after his OK" — the chassis half is not built). From then on the driver data prints
+    those boxes "(named by the driver)", as rows and in "changed" lines, and counts only the rest as not
+    shown. Naming never makes a sheet count as readable.
+  - The follow-up line: "that you could answer, never what a box you can't read is".
+
+  Measured on Sol at medium, 51 calls (~US$1.30), `questions/sheet-links-2026-09-25.json`: the X4 test
+  day linked in 19 of 19 answers (36 links, none invented, none shown as raw text) against 4 of 6 with
+  the links in the data but no sentence; the Bayside range 4 of 4; the A800RR control no links, same
+  shape. Buttons asking what an unreadable box is: 2 of 6 before, 6 of 23 with "that you could answer"
+  alone, 1 of 10 with the box clause, 0 of 6 once two boxes were named. Driven in the app on the scratch
+  X4 driver: answer → link → ringed sheet → Before → names → Tell → the Engineer answered with the names.
+  Label `2026-09-25-sheet-links`.
 
 - **2026-09-24, evening — a driver on °F** (founder: "let's build a switch for Imperial units", "one
   simple switch"). The Settings units switch (°C · km/h or °F · mph) reaches the Engineer as one

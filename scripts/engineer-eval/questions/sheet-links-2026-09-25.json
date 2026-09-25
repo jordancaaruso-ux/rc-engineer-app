@@ -1,0 +1,97 @@
+{
+  "about": "Setup-change links (founder design 2026-09-24, build 2026-09-25). xl-* run on private-x4live-links (the X4 '26 test day, a sheet the Engineer reads 5 boxes of) and, xl-01/xl-05 only, on run-with-setup (an A800RR it reads in full: the control). rl-* run on private-partly-links (his Bayside May-June read as an X4 would be). xl-02 is Jordan's own live question from 25 Sep; the Engineer's own button on it was the dead end 'Can you identify the six changes?'. xn-* run on private-x4live-named: the same day after the driver named the two 14:06 boxes (front spring, front roll bar), so the Engineer reads them by the driver's names.",
+  "contexts": [
+    "private-x4live-links"
+  ],
+  "cases": [
+    {
+      "id": "xl-01",
+      "shape": "day",
+      "source": "mockup question 09-24",
+      "turns": [
+        "What setup changes worked best today?"
+      ]
+    },
+    {
+      "id": "xl-02",
+      "shape": "day",
+      "source": "Jordan, live, 25 Sep",
+      "turns": [
+        "what setup changes have i made today"
+      ]
+    },
+    {
+      "id": "xl-03",
+      "shape": "day",
+      "source": "Claude",
+      "turns": [
+        "Why was 14:20 my quickest run?"
+      ]
+    },
+    {
+      "id": "xl-04",
+      "shape": "day",
+      "source": "Claude",
+      "turns": [
+        "Did whatever I changed before 14:34 make it worse?"
+      ]
+    },
+    {
+      "id": "xl-05",
+      "shape": "problem",
+      "source": "Claude",
+      "turns": [
+        "It pushes in the middle of the corner. What should I change?"
+      ]
+    },
+    {
+      "id": "xl-06",
+      "shape": "day-then-names",
+      "source": "the Tell the Engineer message, as the app writes it",
+      "turns": [
+        "what setup changes have i made today",
+        "Before my 14:06 run I changed the front roll bar 1.2 → 1.4 and the front spring C=2.3 → C=2.5."
+      ]
+    },
+    {
+      "id": "rl-01",
+      "shape": "range",
+      "source": "Claude",
+      "turns": [
+        "Which of my setup changes at Bayside helped most?"
+      ]
+    },
+    {
+      "id": "rl-02",
+      "shape": "range",
+      "source": "Claude",
+      "turns": [
+        "What did I change on the Sunday in May, and did it work?"
+      ]
+    },
+    {
+      "id": "xn-01",
+      "shape": "day-named",
+      "source": "Claude",
+      "turns": [
+        "What setup changes worked best today?"
+      ]
+    },
+    {
+      "id": "xn-02",
+      "shape": "day-named",
+      "source": "Jordan, live, 25 Sep",
+      "turns": [
+        "what setup changes have i made today"
+      ]
+    },
+    {
+      "id": "xn-03",
+      "shape": "problem-named",
+      "source": "Claude",
+      "turns": [
+        "I want more steering in the middle of the corner. What should I change?"
+      ]
+    }
+  ]
+}

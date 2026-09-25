@@ -1,0 +1,11 @@
+{
+  "about": "sheet-links follow-up buttons, try 2: the shipped 09-25 wording still offered unanswerable buttons on blind cars (\"What changed before 14:06?\", \"What do the ringed boxes show?\"): 6 of 23 answers across the X4 day and the Bayside range.",
+  "edits": [
+    {
+      "block": "prompt",
+      "find": "the two or three things this driver would most likely ask you next that you could answer —",
+      "replace": "the two or three things this driver would most likely ask you next that you could answer, never what a box you can't read is —",
+      "why": "name the one kind of unanswerable button seen"
+    }
+  ]
+}

@@ -12,6 +12,7 @@ import { EngineerRunPicker } from "@/components/engineer/EngineerRunPicker";
 import { EngineerStarterQuestions } from "@/components/engineer/EngineerStarterQuestions";
 import { EngineerSubjectBar } from "@/components/engineer/EngineerSubjectBar";
 import { EngineerThinkingIndicator } from "@/components/engineer/EngineerThinkingIndicator";
+import { EngineerSheetChanges } from "@/components/engineer/EngineerSheetChanges";
 import { Button } from "@/components/ui/Button";
 import { EngineerMarkdown } from "@/components/ui/EngineerMarkdown";
 import { Eyebrow } from "@/components/ui/panel";
@@ -42,6 +43,7 @@ import {
   type EngineerStarterQuestion,
 } from "@/lib/engineerStarterQuestions";
 import { useUnits } from "@/components/providers/UnitsProvider";
+import { hideUnfinishedLink, readSheetLinks, type SheetLinkTarget, type SheetLinks } from "@/lib/engineer/sheetLinks";
 
 /**
  * The Engineer chat: the conversation card and the history card, the subject bar, the starter
@@ -65,6 +67,7 @@ type RatingContext = {
   runId?: string | null;
   compareRunId?: string | null;
   nextQuestions?: string[];
+  sheetLinks?: SheetLinks;
 };
 
 type ChatMessage = {
@@ -74,6 +77,8 @@ type ChatMessage = {
   ratingContext?: RatingContext;
   /** The follow-up buttons the Engineer picked for this answer. */
   nextQuestions?: string[];
+  /** What each setup-change link in this answer opens (sheetLinks.ts). */
+  sheetLinks?: SheetLinks;
 };
 
 function stringList(value: unknown): string[] {
@@ -105,14 +110,20 @@ const HISTORY_PREVIEW_COUNT = 3;
 
 async function readSseStream(
   res: Response,
-  handlers: { onToken?: (text: string) => void; onStatus?: (phase: string) => void }
-): Promise<{ reply: string; nextQuestions: string[]; feedback: EngineerChatFeedback | null }> {
+  handlers: {
+    onToken?: (text: string) => void;
+    onStatus?: (phase: string) => void;
+    /** The setup-change links this answer may use, before its first word (sheetLinks.ts). */
+    onLinks?: (links: SheetLinks) => void;
+  }
+): Promise<{ reply: string; nextQuestions: string[]; sheetLinks: SheetLinks; feedback: EngineerChatFeedback | null }> {
   const reader = res.body?.getReader();
   if (!reader) throw new Error("Stream had no body");
   const decoder = new TextDecoder();
   let buffer = "";
   let reply = "";
   let nextQuestions: string[] = [];
+  let sheetLinks: SheetLinks = {};
   let feedback: EngineerChatFeedback | null = null;
 
   while (true) {
@@ -136,9 +147,12 @@ async function readSseStream(
         handlers.onToken?.(data.t);
       } else if (event === "status" && typeof data.phase === "string") {
         handlers.onStatus?.(data.phase);
+      } else if (event === "links") {
+        handlers.onLinks?.(readSheetLinks(data.links));
       } else if (event === "done") {
         if (typeof data.reply === "string" && data.reply.trim()) reply = data.reply;
         nextQuestions = stringList(data.nextQuestions);
+        sheetLinks = readSheetLinks(data.sheetLinks);
         if (data.feedback && typeof data.feedback === "object") {
           const fb = data.feedback as Record<string, unknown>;
           if (typeof fb.threadId === "string" && typeof fb.assistantMessageId === "string") {
@@ -158,7 +172,7 @@ async function readSseStream(
     }
   }
 
-  return { reply, nextQuestions, feedback };
+  return { reply, nextQuestions, sheetLinks, feedback };
 }
 
 function mapApiMessages(
@@ -176,6 +190,7 @@ function mapApiMessages(
         messageId: typeof m.id === "string" ? m.id : undefined,
         ratingContext: m.ratingContext,
         nextQuestions: stringList(m.ratingContext?.nextQuestions),
+        sheetLinks: readSheetLinks(m.ratingContext?.sheetLinks),
       });
     } else {
       out.push({ role, content });
@@ -254,6 +269,10 @@ export function EngineerChatPanel({
   const [rangeOptions, setRangeOptions] = useState<EngineerRangeOptions | null>(null);
   const [rangeOptionsErr, setRangeOptionsErr] = useState<string | null>(null);
   const [rangeCount, setRangeCount] = useState<number | null>(null);
+  // The setup-change link the driver tapped (sheetLinks.ts): the two runs whose boxes are on show.
+  const [sheetTarget, setSheetTarget] = useState<SheetLinkTarget | null>(null);
+  const openSheetLink = useCallback((_handle: string, target: SheetLinkTarget) => setSheetTarget(target), []);
+  const closeSheetLink = useCallback(() => setSheetTarget(null), []);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   // The transcript follows the newest words as they arrive. `stickToBottom` drops to false the
   // moment the driver scrolls up to re-read an earlier answer, and comes back the moment they
@@ -573,9 +592,11 @@ export function EngineerChatPanel({
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           throw new Error(body.error ?? `HTTP ${res.status}`);
         }
-        const { reply, nextQuestions, feedback } = await readSseStream(res, {
+        const { reply, nextQuestions, sheetLinks, feedback } = await readSseStream(res, {
           onStatus: (phase) => setStatusPhase(phase),
           onToken: (t) => applyAssistant((prev) => ({ ...prev, content: prev.content + t })),
+          // Live while the answer is still arriving; the finished answer keeps the ones it used.
+          onLinks: (links) => applyAssistant((prev) => ({ ...prev, sheetLinks: links })),
         });
         applyAssistant((prev) => ({
           ...prev,
@@ -583,6 +604,7 @@ export function EngineerChatPanel({
           messageId: feedback?.assistantMessageId,
           ratingContext: feedback?.ratingContext,
           nextQuestions,
+          sheetLinks: Object.keys(sheetLinks).length > 0 ? sheetLinks : prev.sheetLinks,
         }));
         if (feedback?.threadId) setThreadId(feedback.threadId);
         void refreshThreads();
@@ -701,7 +723,10 @@ export function EngineerChatPanel({
                       {m.role === "user" ? "You" : "Engineer"}
                     </div>
                     {m.role === "assistant" && m.content ? (
-                      <EngineerMarkdown>{m.content}</EngineerMarkdown>
+                      <EngineerMarkdown sheetLinks={m.sheetLinks} onOpenSheetLink={openSheetLink}>
+                        {/* A link still arriving shows its words, not its brackets (sheetLinks.ts). */}
+                        {sending && idx === messages.length - 1 ? hideUnfinishedLink(m.content) : m.content}
+                      </EngineerMarkdown>
                     ) : pending ? (
                       <EngineerThinkingIndicator statusPhase={statusPhase} />
                     ) : (
@@ -874,6 +899,13 @@ export function EngineerChatPanel({
           </div>
         </div>
       </SurfaceCard>
+
+      <EngineerSheetChanges
+        target={sheetTarget}
+        onClose={closeSheetLink}
+        onTell={(message) => void send(message)}
+        disabled={panelBusy}
+      />
 
       {/* The history card. At lg it is the left column and always open; on a phone it is a
           closed row you tap, so the chat card is the last thing before the dock. `self-start`

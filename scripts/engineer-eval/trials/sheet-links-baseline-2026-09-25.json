@@ -1,0 +1,17 @@
+{
+  "about": "BASELINE for sheet-links 2026-09-25: the shipped prompt with the two 09-25 edits taken back out (no link sentence; follow-up buttons without 'that you could answer'). The driver data still carries the links.",
+  "edits": [
+    {
+      "block": "prompt",
+      "find": " Where the block links boxes it can't read, link your own words about those changes with the same (#sheet-…) link, so the driver can show you what they were.",
+      "replace": "",
+      "why": "remove the link sentence"
+    },
+    {
+      "block": "prompt",
+      "find": "the two or three things this driver would most likely ask you next that you could answer —",
+      "replace": "the two or three things this driver would most likely ask you next —",
+      "why": "remove the answerable clause"
+    }
+  ]
+}
