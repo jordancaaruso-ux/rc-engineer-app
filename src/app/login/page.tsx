@@ -93,18 +93,31 @@ function LoginForm() {
   const signingUp = inApp && mode === "signup" && !connecting;
   const emailRef = useRef<HTMLInputElement | null>(null);
 
+  // In the app both need the build that carries the phone's sheets; build 1 stays email-only.
+  // While linking, the provider being linked is the one thing that can't sign in.
+  const showApple =
+    configLoaded && appleSignIn && (!inApp || nativeSocial) && connecting !== "apple";
+  const showGoogle =
+    configLoaded &&
+    (inApp ? nativeSocial && googleNative !== null : googleOAuthConfigured) &&
+    connecting !== "google";
+  const showSocial = showApple || showGoogle;
+
   const from = searchParams.get("from") || "/";
   const callbackUrl = from.startsWith("/") ? from : "/";
 
   /**
-   * Switching to sign-up changes the heading AND the button, and puts the cursor in the email box —
+   * Switching to sign-up changes the heading AND the buttons, so the tap visibly does something —
    * with only the heading changing, the founder couldn't tell anything had happened (2026-09-24).
-   * The focus runs inside the tap itself, which is what lets iOS raise the keyboard.
+   * With Apple and Google on screen it stops there: jumping into the email box with the keyboard
+   * up made them feel second to email, when someone may well want to sign up with Apple (founder,
+   * 2026-09-25). Email-only (build 1) still puts the cursor in the box, its one way in. The focus
+   * runs inside the tap itself, which is what lets iOS raise the keyboard.
    */
   function switchMode(next: "signin" | "signup"): void {
     setError(null);
     setMode(next);
-    emailRef.current?.focus();
+    if (!showSocial) emailRef.current?.focus();
   }
 
   /** A stranger's email. The website points at the plans; the app offers its own sign-up. */
@@ -329,16 +342,6 @@ function LoginForm() {
     setPending(false);
   }
 
-  // In the app both need the build that carries the phone's sheets; build 1 stays email-only.
-  // While linking, the provider being linked is the one thing that can't sign in.
-  const showApple =
-    configLoaded && appleSignIn && (!inApp || nativeSocial) && connecting !== "apple";
-  const showGoogle =
-    configLoaded &&
-    (inApp ? nativeSocial && googleNative !== null : googleOAuthConfigured) &&
-    connecting !== "google";
-  const showSocial = showApple || showGoogle;
-
   return (
     <div className="door-dark relative flex min-h-[100dvh] w-full flex-1 flex-col items-center justify-center overflow-hidden bg-background px-5 py-12">
       {/* The signed-out family's shared scene (2026-08-15): the baked drivers-meeting photo
@@ -380,7 +383,7 @@ function LoginForm() {
               className="tap-active mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-white bg-white px-4 py-3 text-[15px] font-semibold text-black transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <AppleMark />
-              Continue with Apple
+              {signingUp ? "Sign up with Apple" : "Continue with Apple"}
             </button>
           ) : null}
 
@@ -392,7 +395,7 @@ function LoginForm() {
               className={`tap-active ${showApple ? "mt-3" : "mt-6"} flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60`}
             >
               <GoogleMark />
-              Continue with Google
+              {signingUp ? "Sign up with Google" : "Continue with Google"}
             </button>
           ) : null}
 
