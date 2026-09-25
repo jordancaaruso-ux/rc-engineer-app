@@ -507,7 +507,8 @@ export function LogRunWizardBottomBar({
             ) : null}
           </div>
 
-          {/* One-tap step ticks — icons always shown, current in yellow.
+          {/* One-tap step ticks — icons always shown, current filled in ink
+              (was yellow ink until the 2026-09-25 open-tab call — see `.nav-tick`).
               V9: a dashed −21° seam between Setup and Laps marks the
               pre-run → post-run boundary. */}
           <div className="flex" role="tablist" aria-label="Log run steps">
@@ -530,7 +531,7 @@ export function LogRunWizardBottomBar({
                     onClick={() => jump(s.id)}
                     className={cn(
                       "tap-active flex min-w-0 flex-1 touch-manipulation items-center justify-center py-1.5 transition-colors duration-150",
-                      cur ? "text-primary-ink" : st?.done ? "text-foreground/85" : "text-muted-foreground"
+                      cur ? "text-foreground" : st?.done ? "text-foreground/85" : "text-muted-foreground"
                     )}
                   >
                     <span className="relative shrink-0">
@@ -602,7 +603,7 @@ export function LogRunWizardBottomBar({
                   <span
                     className={cn(
                       "shrink-0 font-sans text-[12.5px]",
-                      r.go === current ? "font-bold text-primary-ink" : "text-muted-foreground"
+                      r.go === current ? "font-bold text-foreground" : "text-muted-foreground"
                     )}
                   >
                     {r.label}

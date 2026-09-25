@@ -75,7 +75,7 @@ export const BottomNav = memo(function BottomNav() {
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "tap-active flex h-[46px] min-w-0 flex-col items-center justify-center gap-[3px] touch-manipulation transition-colors duration-150",
-                    active ? "text-primary-ink" : "text-muted-foreground"
+                    active ? "text-foreground" : "text-muted-foreground"
                   )}
                 >
                   <span className="relative shrink-0">

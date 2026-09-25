@@ -950,7 +950,7 @@ export function EngineerChatPanel({
                           </div>
                           {showPreview ? (
                             <p className="mt-1 line-clamp-2 text-[12px] leading-[1.45] text-muted-foreground">
-                              <span aria-hidden className="mr-1 text-primary-ink">✦</span>
+                              <span aria-hidden className="mr-1 text-primary">✦</span>
                               {t.answerPreview}
                             </p>
                           ) : null}

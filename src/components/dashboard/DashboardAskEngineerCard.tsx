@@ -73,7 +73,7 @@ export function DashboardAskEngineerCard({
         onFocus={() => setStopped(true)}
         className="tap-active mt-1.5 flex items-center gap-2.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5 transition hover:border-primary-ink/30"
       >
-        <span aria-hidden className="shrink-0 text-primary-ink">
+        <span aria-hidden className="shrink-0 text-primary">
           ✦
         </span>
         {/* Keyed so React remounts it on every turn and the fade replays. `.rc-fade` is

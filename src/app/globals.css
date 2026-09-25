@@ -44,12 +44,17 @@
    * (2026-08-11.) In dark these hold exactly the values that were previously
    * hard-coded at ~60 call sites, so none of this moves the charcoal app.
    *
-   * `primary-ink` is yellow doing a FOREGROUND job — the active rail item, the
-   * nav-sector tick, eyebrow ticks, the pace line, focus rings. `primary` stays
-   * the FILL, always beneath dark text. On charcoal one value serves both, which
-   * is why they were ever the same token; on paper #FFD60A is 1.4:1 against the
-   * card and cannot be ink at all. Never use `primary` as a text or stroke
-   * colour — that is what this is for.
+   * `primary-ink` is yellow doing a FOREGROUND job — eyebrow ticks, the pace
+   * line, focus rings. `primary` stays the FILL, always beneath dark text. On
+   * charcoal one value serves both, which is why they were ever the same token;
+   * on paper #FFD60A is 1.4:1 against the card and cannot be ink at all. Never
+   * use `primary` as a text or stroke colour — that is what this is for.
+   *
+   * One exception, a founder call (2026-09-25): the marks that say where you are
+   * — the nav tick, the sector under the page title, the Engineer ✦ — are the
+   * brand yellow itself. On paper #8A6A00 read as brown on exactly the marks
+   * meant to carry the brand. They are shapes, never words, and the open tab's
+   * word and icon went to ink with them, so nothing yellow has to be read.
    *
    * `gain` is the improvement green (a lap got faster). It was the literal
    * #4FD089 in 25 files. It carries data, so it has to clear contrast on both
@@ -315,8 +320,10 @@
        does nothing on a white card.
 
    The yellow does not invert. #FFD60A is 1.4:1 on this card, so it survives only
-   as a FILL under dark text (12.6:1) — buttons, the log-run circle, chips. Every
-   foreground use resolves through `--color-primary-ink` to #8A6A00 (4.9:1).
+   as a FILL under dark text (12.6:1) — buttons, the log-run circle, chips — and
+   as the where-you-are marks (nav tick, title sector, Engineer ✦; founder call
+   2026-09-25, see `.nav-tick`). Every other foreground use resolves through
+   `--color-primary-ink` to #8A6A00 (4.9:1).
 --------------------------------------------------------------------------- */
 :root[data-theme="light"] {
   color-scheme: light;
@@ -912,17 +919,20 @@ html[data-native="true"] .web-only {
 }
 
 /*
- * The active mark, shared by both platforms: 28×2, primary-ink, with a glow that
- * only exists in dark. `primary-ink` and never `primary` — this is yellow doing a
- * foreground job, and #FFD60A is 1.4:1 on paper.
+ * The active mark, shared by both platforms: 28×2, the brand yellow, with a glow
+ * that only exists in dark. It was `primary-ink` until 2026-09-25, when the founder
+ * picked "brand yellow and black words" off a bench of the real screens: on paper
+ * #8A6A00 read as brown. #FFD60A is 1.4:1 on paper, which a 2px mark survives and a
+ * word does not — so the open tab's icon and label are ink (`BottomNav`,
+ * `.top-rail-item`) and the tick alone carries the yellow.
  */
 .nav-tick {
   display: block;
   width: 28px;
   height: 2px;
   border-radius: 9999px;
-  background-color: rgb(var(--color-primary-ink));
-  box-shadow: 0 0 10px 1px rgb(var(--color-primary-ink) / 0.4);
+  background-color: rgb(var(--color-primary));
+  box-shadow: 0 0 10px 1px rgb(var(--color-primary) / 0.4);
 }
 
 :root[data-theme="light"] .nav-tick {
@@ -1106,9 +1116,10 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
   color: rgb(var(--color-foreground));
 }
 
+/* Ink, not `primary-ink` (2026-09-25): the tick under the tab is the yellow — see `.nav-tick`. */
 .top-rail-item[data-active="true"] {
   background-color: rgb(var(--color-elevate) / 0.05);
-  color: rgb(var(--color-primary-ink));
+  color: rgb(var(--color-foreground));
   font-weight: 700;
 }
 
@@ -1183,7 +1194,7 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
 }
 
 .top-rail-utility[data-active="true"] {
-  color: rgb(var(--color-primary-ink));
+  color: rgb(var(--color-foreground));
   background-color: rgb(var(--color-elevate) / 0.05);
 }
 
@@ -1773,7 +1784,9 @@ html[data-nav-pending] .page {
    Slot width comes from `--title-nav-count` (set by AppShell from MOBILE_NAV.length),
    NOT a hardcoded 20%. It was 20% while the dock had five destinations; Teams became
    the sixth and its tick resolved to `left: 100%`, off the end of the title. The
-   fallback keeps the rule honest if the variable is ever missing. */
+   fallback keeps the rule honest if the variable is ever missing.
+
+   The brand yellow, not `primary-ink`, since 2026-09-25 — the same call as `.nav-tick`. */
 .page-title::before {
   content: "";
   position: absolute;
@@ -1783,7 +1796,7 @@ html[data-nav-pending] .page {
   height: 4px;
   width: calc(100% / var(--title-nav-count, 5));
   left: calc(var(--title-nav-sector, 0) * (100% / var(--title-nav-count, 5)));
-  background: rgb(var(--color-primary-ink));
+  background: rgb(var(--color-primary));
   transform: skewX(-21deg);
   transition: left 0.34s cubic-bezier(0.3, 0.9, 0.35, 1);
 }
@@ -1849,13 +1862,14 @@ html[data-nav-pending] .page {
 
 /* The compact echo of `.page-title`'s −21° sector, for the scrolled state. It and the title's
    own sector were removed and restored together on 2026-09-05, and they must stay coupled:
-   keeping one without the other makes the mark appear or vanish purely on scroll position. */
+   keeping one without the other makes the mark appear or vanish purely on scroll position.
+   The same goes for its colour. */
 .title-condenser .title-condenser-mark {
   flex: none;
   width: 14px;
   height: 5px;
   border-radius: 1px;
-  background: rgb(var(--color-primary-ink));
+  background: rgb(var(--color-primary));
   transform: skewX(-21deg);
 }
 
