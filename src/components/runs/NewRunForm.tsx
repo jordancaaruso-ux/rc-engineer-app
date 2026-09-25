@@ -1005,6 +1005,8 @@ export function NewRunForm(props: {
   } | null>(null);
   /** Lets the track sheet's "add a track that isn't listed" open the chip below it, prefilled. */
   const newTrackRowRef = useRef<InlineNewTrackRowHandle>(null);
+  /** The same door on the New event panel's own track picker. */
+  const newEventTrackRowRef = useRef<InlineNewTrackRowHandle>(null);
   const [loadSetupSelection, setLoadSetupSelection] = useState("");
   const [loadOtherSetupSelection, setLoadOtherSetupSelection] = useState("");
   const [setupSource, setSetupSource] = useState<SetupSource>("previous_runs");
@@ -5304,11 +5306,12 @@ export function NewRunForm(props: {
             <div className="inset-panel p-3 space-y-2">
               <div className="inset-panel-deep p-2">
                 <Eyebrow dot="muted" className="mb-1">Track (required)</Eyebrow>
-                <SearchableSelect
-                  aria-label="Event track"
-                  placeholder="— Select track"
-                  clearable
-                  clearLabel="— Select track"
+                {/* The same picker and "New track" chip as the run's own Track step. This was a
+                    plain list with no way to add, so a driver whose track was missing had to leave
+                    the event half-made, add the track further down the form, and come back
+                    (founder 2026-09-25). */}
+                <TrackCombobox
+                  tracks={tracksList}
                   value={newEventTrackId}
                   onChange={(next) => {
                     setNewEventTrackId(next);
@@ -5317,10 +5320,29 @@ export function NewRunForm(props: {
                     setNewEventDirection("");
                     setEventError(null);
                   }}
-                  options={tracksList.map((t) => ({
-                    value: t.id,
-                    label: `${t.name}${t.location ? ` (${t.location})` : ""}`,
-                  }))}
+                  favouriteTrackIds={favouriteTrackIds}
+                  favouriteTracks={favouriteTracks}
+                  nearby={nearbyTrackSuggestions}
+                  placeholder="Select track…"
+                  aria-label="Event track"
+                  onCreateRequest={(query) => newEventTrackRowRef.current?.openWith(query)}
+                />
+                <InlineNewTrackRow
+                  ref={newEventTrackRowRef}
+                  className="mt-2"
+                  onCreated={(t) => {
+                    // Merge rather than skip: on a duplicate name the row hands back the
+                    // *existing* track, with the timing URLs it already carries.
+                    setTracksList((prev) =>
+                      prev.some((x) => x.id === t.id)
+                        ? prev.map((x) => (x.id === t.id ? { ...x, ...t } : x))
+                        : [...prev, t]
+                    );
+                    setNewEventTrackId(t.id);
+                    setNewEventLayoutId("");
+                    setNewEventDirection("");
+                    setEventError(null);
+                  }}
                 />
                 {newEventTrackId ? (
                   <div className="mt-2">
