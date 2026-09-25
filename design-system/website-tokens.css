@@ -1,0 +1,78 @@
+/* jrcdynamics.com (the public website) — its look as it is live.
+
+   The website is one static page (ui_kits/website/index.html) styled inline; it has no
+   stylesheet of its own. These variables name the values that page uses so a new design can
+   use the same ones. Kept by hand in design-system/website-tokens.css: when the live page
+   changes colour or type, change this file with it.
+
+   The website is DARK. The app is light paper. Do not bring either look to the other. */
+:root {
+  /* Grounds, in the order the page uses them */
+  --web-ground: #171614;          /* page, hero, header */
+  --web-section-warm: #262119;    /* log, teams */
+  --web-section-alt: #201F1C;     /* engineer, demo */
+  --web-section-pricing: #1D1C19; /* pricing */
+  --web-paper: #EAE3D5;           /* the light break sections: problem, session, founder */
+  --web-paper-ink: #171614;       /* text on paper */
+  --web-paper-text: rgba(18, 17, 16, 0.66);
+  --web-paper-dim: rgba(18, 17, 16, 0.55); /* the quieter words of a headline on paper */
+  --web-paper-label: #5E5E58;
+  --web-paper-hairline: rgba(18, 17, 16, 0.14);
+  --web-cta-ground: #FFD60A;      /* the closing "Start keeping track." band */
+  --web-footer: #0A0A09;
+
+  /* Text on dark */
+  --web-text: #EDE8DF;            /* headlines and body */
+  --web-lead: #AFAFA6;            /* lead paragraphs, list items */
+  --web-lead-hero: #B4B4AB;
+  --web-lead-soft: #A5A59C;       /* demo lead, footer links, ghost buttons */
+  --web-numbers-soft: #CFCBC2;    /* secondary figures, history rows */
+  --web-label: #78786F;           /* mono eyebrows, "AUD / month", fine print */
+  --web-text-faint: #67675F;      /* rail links, timestamps */
+
+  /* Yellow — the brand colour, the one accent */
+  --web-yellow: #FFD60A;
+  --web-yellow-hover: #FFE45C;
+  --web-yellow-fill: rgba(255, 214, 10, 0.07);
+  --web-yellow-border: rgba(255, 214, 10, 0.4);
+
+  /* Surfaces */
+  --web-card: #232220;
+  --web-card-border: #33322E;
+  --web-hero-card: #1E1D1B;
+  --web-hairline: #34332F;        /* borders, secondary button edge */
+  --web-rule: rgba(255, 255, 255, 0.09); /* rule under a card's header */
+  --web-rule-row: rgba(255, 255, 255, 0.06);
+  --web-card-shadow: 0 34px 64px -30px rgba(0, 0, 0, 0.8);
+  --web-card-shadow-deep: 0 46px 90px -34px rgba(0, 0, 0, 0.85);
+
+  /* Data */
+  --web-gain: #4FD089;            /* faster */
+  --web-loss: #F0705F;            /* slower */
+  --web-series-1: #EDE8DF;
+  --web-series-2: #9A9A92;
+  --web-series-3: #6E6E67;
+  --web-series-4: #55554F;
+
+  /* Type: three families, each with one job */
+  --web-font-body: "Sora", system-ui, sans-serif;               /* body, buttons, lists */
+  --web-font-display: "Space Grotesk", "Sora", sans-serif;      /* H1, H2, pull quotes, card titles */
+  --web-font-label: "JetBrains Mono", ui-monospace, monospace;  /* eyebrows, labels, every number */
+
+  --web-h1: clamp(2.4rem, 5.6vw, 4.3rem);    /* 700, line-height .98, -0.025em */
+  --web-h2: clamp(2rem, 4.2vw, 3.4rem);      /* 700, line-height 1.03, -0.035em, balanced */
+  --web-h2-big: clamp(2.4rem, 5.2vw, 4.2rem);
+  --web-cta-h: clamp(2.6rem, 7vw, 5.4rem);
+  --web-pull: clamp(1.25rem, 2.4vw, 1.85rem); /* Space Grotesk 500, line-height 1.22 */
+  --web-lead-size: clamp(1rem, 1.35vw, 1.15rem); /* Sora, line-height 1.6 */
+  --web-eyebrow: 10px;                         /* mono, 0.14–0.18em, uppercase */
+
+  /* Layout */
+  --web-max: 1360px;
+  --web-gutter: clamp(1.25rem, 5vw, 4.5rem);
+  --web-section-pad: clamp(6rem, 13vh, 10rem);
+  --web-column-gap: clamp(2.75rem, 5vw, 5rem);
+  --web-radius-button: 9px;
+  --web-radius-card: 16px;
+  --web-ease: cubic-bezier(.2, .6, .2, 1);   /* reveal: fade up 22px over .8s */
+}

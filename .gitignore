@@ -142,3 +142,6 @@ onboarding-friction-prod/
 
 # "Import your last runs" range drive (regenerate with scripts/dev-import-range-shots.ts)
 import-range-shots/
+
+# Claude Design bundle, rebuilt by scripts/design-system/build.tsx
+/design-system/out/

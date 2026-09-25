@@ -1,0 +1,42 @@
+<!-- @dsCard group="Website" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Website type</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+<link rel="stylesheet" href="../tokens/website.css" />
+<style>
+  body { margin: 0; padding: 32px; background: var(--web-ground); color: var(--web-text); font-family: var(--web-font-body); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .spec { font-family: var(--web-font-label); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--web-label); margin: 0 0 8px; }
+  .row + .row { margin-top: 30px; }
+  h1, h2 { margin: 0; font-family: var(--web-font-display); font-weight: 700; text-wrap: balance; }
+  h1 { font-size: 4.3rem; line-height: .98; letter-spacing: -0.025em; max-width: 34rem; }
+  h2 { font-size: 3.4rem; line-height: 1.03; letter-spacing: -0.035em; }
+  em { font-style: normal; color: var(--web-yellow); }
+  .pull { font-family: var(--web-font-display); font-weight: 500; font-size: 1.85rem; line-height: 1.22; letter-spacing: -0.015em; margin: 0; max-width: 32ch; }
+  .lead { font-size: 1.15rem; color: var(--web-lead); max-width: 38rem; margin: 0; text-wrap: pretty; }
+  .eyebrow { font-family: var(--web-font-label); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--web-label); }
+  .num { font-family: var(--web-font-label); font-size: 2.6rem; letter-spacing: -0.03em; }
+  .num small { font-size: 12px; letter-spacing: .14em; color: var(--web-label); margin-left: 8px; }
+  .lap { font-family: var(--web-font-label); font-size: 17px; }
+  .lap .g { color: var(--web-gain); font-size: 12px; margin-left: 10px; }
+</style>
+</head>
+<body>
+<div class="row"><p class="spec">H1 · Space Grotesk 700 · clamp(2.4rem, 5.6vw, 4.3rem) · lh .98 · −0.025em</p>
+  <h1>Your race engineer, <em>in your pocket.</em></h1></div>
+<div class="row"><p class="spec">H2 · Space Grotesk 700 · clamp(2rem, 4.2vw, 3.4rem) · lh 1.03 · −0.035em · accent words yellow</p>
+  <h2>Easy enough that <em>you'll actually use it.</em></h2></div>
+<div class="row"><p class="spec">Pull quote · Space Grotesk 500 · clamp(1.25rem, 2.4vw, 1.85rem) · lh 1.22</p>
+  <p class="pull">Notes lose, every time.</p></div>
+<div class="row"><p class="spec">Lead · Sora 400 · clamp(1rem, 1.35vw, 1.15rem) · lh 1.6 · #AFAFA6</p>
+  <p class="lead">Log a run in a minute. Ask what to change next — the answer is built from your own setups and lap times, not the internet.</p></div>
+<div class="row"><p class="spec">Eyebrow · JetBrains Mono 10px · 0.14–0.18em · uppercase · #78786F</p>
+  <span class="eyebrow">02 · Log the run</span></div>
+<div class="row"><p class="spec">Numbers · always JetBrains Mono</p>
+  <div class="num">$9.99<small>AUD / MONTH</small></div>
+  <div class="lap">12.384<span class="g">−0.212</span></div></div>
+</body>
+</html>

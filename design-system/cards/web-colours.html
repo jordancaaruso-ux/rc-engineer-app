@@ -1,0 +1,49 @@
+<!-- @dsCard group="Website" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Website colours</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+<link rel="stylesheet" href="../tokens/website.css" />
+<style>
+  body { margin: 0; padding: 28px; background: var(--web-ground); color: var(--web-text); font-family: var(--web-font-body); -webkit-font-smoothing: antialiased; }
+  .h { font-family: var(--web-font-label); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--web-label); margin: 0 0 10px; }
+  section + section { margin-top: 22px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .sw { display: flex; gap: 10px; align-items: center; }
+  .chip { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--web-hairline); flex: none; }
+  .nm { font-size: 13px; font-weight: 600; }
+  .hx { font-family: var(--web-font-label); font-size: 11px; color: var(--web-lead); }
+  .nt { font-size: 11px; color: var(--web-label); }
+</style>
+</head>
+<body>
+<section><p class="h">Grounds · dark page, alternating dark sections, paper breaks</p><div class="grid">
+  <div class="sw"><div class="chip" style="background:#171614"></div><div><div class="nm">Page</div><div class="hx">#171614</div><div class="nt">hero, header</div></div></div>
+  <div class="sw"><div class="chip" style="background:#262119"></div><div><div class="nm">Warm section</div><div class="hx">#262119</div><div class="nt">log, teams</div></div></div>
+  <div class="sw"><div class="chip" style="background:#201F1C"></div><div><div class="nm">Alt section</div><div class="hx">#201F1C</div><div class="nt">engineer, demo</div></div></div>
+  <div class="sw"><div class="chip" style="background:#1D1C19"></div><div><div class="nm">Pricing</div><div class="hx">#1D1C19</div></div></div>
+  <div class="sw"><div class="chip" style="background:#EAE3D5"></div><div><div class="nm">Paper break</div><div class="hx">#EAE3D5</div><div class="nt">problem, session, founder</div></div></div>
+  <div class="sw"><div class="chip" style="background:#FFD60A"></div><div><div class="nm">Closing band</div><div class="hx">#FFD60A</div><div class="nt">"Start keeping track."</div></div></div>
+  <div class="sw"><div class="chip" style="background:#0A0A09"></div><div><div class="nm">Footer</div><div class="hx">#0A0A09</div></div></div>
+</div></section>
+<section><p class="h">Text</p><div class="grid">
+  <div class="sw"><div class="chip" style="background:#EDE8DF"></div><div><div class="nm">Text</div><div class="hx">#EDE8DF</div><div class="nt">headlines, body</div></div></div>
+  <div class="sw"><div class="chip" style="background:#AFAFA6"></div><div><div class="nm">Lead</div><div class="hx">#AFAFA6</div><div class="nt">lead paragraphs, lists</div></div></div>
+  <div class="sw"><div class="chip" style="background:#78786F"></div><div><div class="nm">Label</div><div class="hx">#78786F</div><div class="nt">mono eyebrows, fine print</div></div></div>
+  <div class="sw"><div class="chip" style="background:#67675F"></div><div><div class="nm">Faint</div><div class="hx">#67675F</div><div class="nt">rail, timestamps</div></div></div>
+</div></section>
+<section><p class="h">Accent · yellow is the only colour</p><div class="grid">
+  <div class="sw"><div class="chip" style="background:#FFD60A"></div><div><div class="nm">Yellow</div><div class="hx">#FFD60A</div><div class="nt">accent words, primary button, dashes</div></div></div>
+  <div class="sw"><div class="chip" style="background:#FFE45C"></div><div><div class="nm">Yellow hover</div><div class="hx">#FFE45C</div><div class="nt">link hover</div></div></div>
+</div></section>
+<section><p class="h">Surfaces and data</p><div class="grid">
+  <div class="sw"><div class="chip" style="background:#232220;border-color:#33322E"></div><div><div class="nm">Card</div><div class="hx">#232220 / #33322E</div></div></div>
+  <div class="sw"><div class="chip" style="background:#34332F"></div><div><div class="nm">Hairline</div><div class="hx">#34332F</div></div></div>
+  <div class="sw"><div class="chip" style="background:#4FD089"></div><div><div class="nm">Faster</div><div class="hx">#4FD089</div></div></div>
+  <div class="sw"><div class="chip" style="background:#F0705F"></div><div><div class="nm">Slower</div><div class="hx">#F0705F</div></div></div>
+</div></section>
+</body>
+</html>

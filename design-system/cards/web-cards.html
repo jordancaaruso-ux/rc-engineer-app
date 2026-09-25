@@ -1,0 +1,63 @@
+<!-- @dsCard group="Website" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Website cards and pricing</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+<link rel="stylesheet" href="../tokens/website.css" />
+<style>
+  body { margin: 0; padding: 28px; background: var(--web-section-pricing); color: var(--web-text); font-family: var(--web-font-body); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; align-items: start; }
+  .card { background: var(--web-card); border: 1px solid var(--web-card-border); border-radius: 16px; box-shadow: var(--web-card-shadow); overflow: hidden; }
+  .card.pro { border-color: rgba(255,214,10,.4); }
+  .hd { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-bottom: 1px solid var(--web-rule);
+    font-family: var(--web-font-label); font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--web-label); }
+  .tick { width: 3px; height: 12px; background: var(--web-yellow); border-radius: 1px; }
+  .bd { padding: 18px; }
+  .tier { font-family: var(--web-font-label); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--web-label); display: flex; gap: 8px; align-items: center; }
+  .badge { font-size: 8.5px; padding: 2px 6px; border-radius: 4px; background: rgba(255,214,10,.14); border: 1px solid rgba(255,214,10,.3); color: var(--web-yellow); }
+  .tag { font-family: var(--web-font-display); font-weight: 600; font-size: 1.2rem; letter-spacing: -0.02em; margin: 6px 0 12px; }
+  .price { font-family: var(--web-font-label); font-size: 2.3rem; letter-spacing: -0.03em; }
+  .price small { font-size: 11px; letter-spacing: .14em; color: var(--web-label); margin-left: 6px; }
+  .spec { margin: 14px 0; border-radius: 9px; padding: 10px 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09); font-size: 13px; color: var(--web-lead); }
+  .pro .spec { background: rgba(255,214,10,.06); border-color: rgba(255,214,10,.25); }
+  ul { list-style: none; padding: 0; margin: 0; font-size: 14px; color: var(--web-lead); }
+  li { display: flex; gap: 10px; padding: 5px 0; }
+  li .y { color: var(--web-yellow); } li.no { color: #7C7C73; } li.no .y { color: #5E5E58; }
+  .row { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--web-rule-row); font-size: 14px; }
+  .row .t { font-family: var(--web-font-label); } .row .g { font-family: var(--web-font-label); color: var(--web-gain); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="hd"><span class="tick"></span>Session · Run 3</div>
+    <div class="bd">
+      <div class="row" style="border-top:0"><span>Best lap</span><span class="t">12.384</span></div>
+      <div class="row"><span>Avg top 5</span><span class="t">12.471</span></div>
+      <div class="row"><span>vs run 2</span><span class="g">−0.212</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="bd">
+      <div class="tier">Notebook</div>
+      <div class="tag">The smart race notebook.</div>
+      <div class="price">$9.99<small>AUD / MONTH</small></div>
+      <div class="spec">Runs kept · All of them</div>
+      <ul><li><span class="y">—</span>Unlimited run logging</li><li><span class="y">—</span>A taste of the Engineer — one question a day</li><li class="no"><span class="y">×</span>Laptime Analysis</li></ul>
+    </div>
+  </div>
+  <div class="card pro">
+    <div class="bd">
+      <div class="tier">Race Engineer <span class="badge">Full engineer</span></div>
+      <div class="tag">The full race engineer.</div>
+      <div class="price">$19.99<small>AUD / MONTH</small></div>
+      <div class="spec">Engineer questions · 100 a month</div>
+      <ul><li><span class="y">—</span>The Engineer</li><li><span class="y">—</span>Everything in Notebook</li></ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!-- @dsCard group="Website" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Website buttons</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+<link rel="stylesheet" href="../tokens/website.css" />
+<style>
+  body { margin: 0; padding: 28px; background: var(--web-ground); color: var(--web-text); font-family: var(--web-font-body); -webkit-font-smoothing: antialiased; }
+  .spec { font-family: var(--web-font-label); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--web-label); margin: 0 0 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  section + section { margin-top: 26px; }
+  a { text-decoration: none; display: inline-flex; align-items: center; gap: .45rem; font-weight: 600; white-space: nowrap; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: #171614; animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+  .primary { background: #FFD60A; border: 1px solid #FFD60A; color: #171614; border-radius: 9px; font-size: 15px; padding: 1rem 1.9rem; }
+  .primary.sm { font-size: 13px; padding: .55rem .9rem; border-radius: 7px; }
+  .ghost { border: 1px solid #34332F; color: #A5A59C; border-radius: 9px; font-size: 15px; padding: 1rem 1.4rem; }
+  .ghost.sm { font-size: 13px; padding: .55rem .9rem; border-radius: 7px; }
+  .price { border: 1px solid #34332F; color: #EDE8DF; border-radius: 9px; font-size: 14px; padding: .8rem 1.4rem; }
+  .demo { background: rgba(255,214,10,.07); border: 1px solid rgba(255,214,10,.45); color: #FFD60A; border-radius: 9px; font-size: 15px; padding: 1rem 1.6rem; }
+  .onyellow { background: #FFD60A; padding: 24px; border-radius: 14px; }
+  .ink { background: #171614; color: #FFD60A; border-radius: 9px; font-size: 15px; padding: .95rem 1.7rem; }
+  .inkline { border: 1px solid rgba(18,17,16,.4); color: #171614; border-radius: 9px; font-size: 15px; padding: .95rem 1.7rem; }
+</style>
+</head>
+<body>
+<section><p class="spec">Primary · yellow, leads with a pulsing dot · hero 15px / header 13px</p>
+  <div class="row"><a class="primary" href="#"><span class="dot"></span>Get started</a><a class="primary sm" href="#"><span class="dot"></span>Try the demo</a></div></section>
+<section><p class="spec">Secondary · ghost with hairline</p>
+  <div class="row"><a class="ghost" href="#">Sign in</a><a class="ghost sm" href="#">Sign in</a><a class="price" href="#">Choose Notebook</a></div></section>
+<section><p class="spec">Demo · yellow words on a yellow tint</p>
+  <div class="row"><a class="demo" href="#">Open the demo</a></div></section>
+<section><p class="spec">On the yellow closing band</p>
+  <div class="row onyellow"><a class="ink" href="#">Get started</a><a class="inkline" href="#">Try the demo</a></div></section>
+</body>
+</html>
