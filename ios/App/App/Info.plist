@@ -67,5 +67,17 @@
 	<string>Save pictures from the app to your Photos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Finds tracks near you and pins a new track where you're standing.</string>
+	<!-- Google's sign-in sheet returns to the app through this scheme: the iOS OAuth client id,
+	     reversed. Without it the Google SDK kills the app the moment "Continue with Google" is
+	     tapped. Keep it in step with GOOGLE_IOS_CLIENT_ID on Vercel (docs/TESTFLIGHT.md, 7b). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.356745213725-8v0hj31827799d12njilqct28k1hd3cs</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

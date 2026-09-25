@@ -89,7 +89,13 @@ export async function nativeSocialSignIn(
         familyName: result.profile?.familyName ?? null,
       };
     } else {
-      const { result } = await SocialLogin.login({ provider: "google", options: { nonce } });
+      // `forcePrompt` makes every tap a fresh sign-in. Without it the plugin hands back the Google
+      // session it kept from last time, whose token carries that sign-in's nonce, so the server
+      // refuses it: a driver who signed out could never sign back in with Google.
+      const { result } = await SocialLogin.login({
+        provider: "google",
+        options: { nonce, forcePrompt: true },
+      });
       if (result.responseType !== "online") throw new Error("Google sign-in didn't finish.");
       payload = { provider, idToken: result.idToken };
     }
