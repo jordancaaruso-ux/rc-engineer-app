@@ -18,9 +18,16 @@ export function isNativePlatform(): boolean {
   return Capacitor.isNativePlatform();
 }
 
+/**
+ * The plugin comes back inside an object, never bare. A Capacitor plugin is a Proxy that answers
+ * every property with a native-method wrapper, `then` included, so an async function returning it
+ * hands its promise a "thenable": the promise calls `PushNotifications.then()`, the shell answers
+ * "not implemented", and the await never settles. That is how Enable sat on "Enabling…" with no
+ * iOS prompt on the first real device (2026-09-25), and why no token had ever registered.
+ */
 async function loadPlugin() {
   const { PushNotifications } = await import("@capacitor/push-notifications");
-  return PushNotifications;
+  return { PushNotifications };
 }
 
 const REGISTRATION_TIMEOUT_MS = 15_000;
@@ -30,7 +37,7 @@ const REGISTRATION_TIMEOUT_MS = 15_000;
  * granted — callers that need the prompt should use `enableNativePush`.
  */
 async function registerForToken(): Promise<string> {
-  const PushNotifications = await loadPlugin();
+  const { PushNotifications } = await loadPlugin();
 
   return new Promise<string>((resolve, reject) => {
     let settled = false;
@@ -119,7 +126,7 @@ async function persistToken(token: string): Promise<void> {
 
 /** Current permission state without prompting. */
 export async function nativePushPermission(): Promise<"granted" | "denied" | "prompt"> {
-  const PushNotifications = await loadPlugin();
+  const { PushNotifications } = await loadPlugin();
   const { receive } = await PushNotifications.checkPermissions();
   return receive === "granted" ? "granted" : receive === "denied" ? "denied" : "prompt";
 }
@@ -129,7 +136,7 @@ export async function nativePushPermission(): Promise<"granted" | "denied" | "pr
  * the user declined — callers should surface that rather than retrying.
  */
 export async function enableNativePush(): Promise<boolean> {
-  const PushNotifications = await loadPlugin();
+  const { PushNotifications } = await loadPlugin();
   const { receive } = await PushNotifications.requestPermissions();
   if (receive !== "granted") return false;
 
@@ -150,7 +157,7 @@ export async function refreshNativePushToken(): Promise<void> {
 
 /** Forget this device server-side. The OS-level permission is left untouched. */
 export async function disableNativePush(): Promise<void> {
-  const PushNotifications = await loadPlugin();
+  const { PushNotifications } = await loadPlugin();
   const token = cachedToken();
 
   await PushNotifications.unregister().catch(() => {});
