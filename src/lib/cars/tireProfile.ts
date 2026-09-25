@@ -1,13 +1,25 @@
 import { parseDiscipline } from "@/lib/cars/carClasses";
+import type { TireEndBox } from "@/lib/tires/tireFitment";
 
 /**
- * What a car's discipline means for its TIRES — which slice of the catalog it shops from, and
- * whether the Tires step asks for one tire or a front and a rear.
+ * What a car's discipline means for its TIRES — which slice of the catalog it shops from, whether
+ * the Tires step asks for one tire or a front and a rear, and which boxes each end carries.
  *
  * Why this exists (founder call, 2026-09-19): the catalog went past touring, and a touring driver
  * was being handed 584 off-road tires while an off-road driver had nowhere to say that a mounted
  * tire is a wheel, a tire and an insert glued together, front and rear being different products
  * that wear at different rates. The log-run form now reads differently depending on the car.
+ *
+ * Founder call, 2026-09-25: "every discipline should have the required boxes to fill their
+ * tires", built the way off-road was. The boxes per class come from what the manufacturers' own
+ * setup sheets ask (all 232 chassis sheets in the app, read 2026-09-25):
+ *
+ * - Touring and front-wheel drive: one tire. Most sheets print a single tire line.
+ * - 1/12, 1/10 pan, formula and 1/8 on-road: a front and a rear, each with its DIAMETER — nearly
+ *   every one of their sheets that names tires asks it, because foam is trued down run by run.
+ * - Off-road, 1/10 and 1/8: a front and a rear, each with insert and wheel.
+ * - Every front/rear end also gets the one free-text Modifications box (side-wall glue, trued,
+ *   holes — the driver's own words; 2026-09-19 ruling).
  *
  * The `bucket` is the COARSE catalog slice (`TireType.discipline`), not the race class — founder
  * call 2026-09-18: "1/10 offroad is fine for now, they can search for stuff". A class whose tires
@@ -26,36 +38,45 @@ export type TireProfile = {
   bucket: TireBucket | null;
   /** Front and rear are logged separately, each with its own run count. */
   split: boolean;
-  /** Each end also carries the glued-set details: insert, wheel, modifications. */
-  extras: boolean;
+  /**
+   * The boxes each end carries beside its tire, in screen order. Only meaningful when `split` —
+   * a one-tire car logs the tire alone. Empty = the tire and its count, nothing else.
+   */
+  boxes: readonly TireEndBox[];
 };
 
 /** A car nothing can place, or a class with nothing tire-specific yet: today's form, whole list. */
-export const NO_TIRE_PROFILE: TireProfile = { bucket: null, split: false, extras: false };
+export const NO_TIRE_PROFILE: TireProfile = { bucket: null, split: false, boxes: [] };
 
-const TOURING: TireProfile = { bucket: "touring", split: false, extras: false };
-const OFFROAD_10TH: TireProfile = { bucket: "offroad-10th", split: true, extras: true };
+const OFFROAD_BOXES: readonly TireEndBox[] = ["insert", "wheel", "mods"];
+const FOAM_BOXES: readonly TireEndBox[] = ["diameter", "mods"];
+
+const TOURING: TireProfile = { bucket: "touring", split: false, boxes: [] };
+const OFFROAD_10TH: TireProfile = { bucket: "offroad-10th", split: true, boxes: OFFROAD_BOXES };
 /** Off-road, but no tires imported for the scale yet — front/rear form over the whole list. */
-const OFFROAD_UNCATALOGUED: TireProfile = { bucket: null, split: true, extras: true };
+const OFFROAD_UNCATALOGUED: TireProfile = { bucket: null, split: true, boxes: OFFROAD_BOXES };
+/** 1/12, 1/10 and 1/8 pan, formula, 1/8 on-road: front and rear, each trued to a diameter. */
+const ONROAD_FRONT_REAR: TireProfile = { bucket: null, split: true, boxes: FOAM_BOXES };
+/**
+ * 1/5 GT: no chassis in the app to read a sheet from. Front and rear (the widths differ), and
+ * Modifications only — a guess to confirm with Jordan, not a sheet's answer.
+ */
+const GT_5TH: TireProfile = { bucket: null, split: true, boxes: ["mods"] };
 
 /**
  * One explicit row per class id, so adding a class to `RACE_CLASSES` without deciding its tires
  * fails `tireProfile.test.ts` instead of silently falling through to "whole list".
- *
- * Pan cars, formula and GT run a different front and rear too (founder ruling 2026-09-16), but
- * they have no catalog and their foam-tire details are not the off-road ones — they stay on the
- * single-tire form until that is designed. Flip `split` here when it is.
  */
 const PROFILE_BY_CLASS: Readonly<Record<string, TireProfile>> = {
   // Onroad
   touring: TOURING,
   fwd: TOURING,
-  "pan-10th": NO_TIRE_PROFILE,
-  "pan-12th": NO_TIRE_PROFILE,
-  "gt-8th": NO_TIRE_PROFILE,
-  "pan-8th": NO_TIRE_PROFILE,
-  "gt-5th": NO_TIRE_PROFILE,
-  formula: NO_TIRE_PROFILE,
+  "pan-10th": ONROAD_FRONT_REAR,
+  "pan-12th": ONROAD_FRONT_REAR,
+  "gt-8th": ONROAD_FRONT_REAR,
+  "pan-8th": ONROAD_FRONT_REAR,
+  "gt-5th": GT_5TH,
+  formula: ONROAD_FRONT_REAR,
   "other-onroad": NO_TIRE_PROFILE,
   // Offroad
   "buggy-2wd": OFFROAD_10TH,

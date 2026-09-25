@@ -1,15 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  EMPTY_TIRE_FITMENT_END,
   STOCK_INSERT,
   TIRE_FITMENT_MODS_MAX,
   TIRE_FITMENT_NAME_MAX,
+  formatTireDiameterMm,
   formatTireFitmentEnd,
   normalizeTireFitment,
+  parseTireDiameterMm,
   recentFitmentValues,
+  tireEndBoxesToShow,
+  tireFitmentEndHasContent,
   tireFitmentHasContent,
   withTireFitmentEnd,
+  type TireFitmentEnd,
 } from "./tireFitment";
+
+const end = (over: Partial<TireFitmentEnd>): TireFitmentEnd => ({ ...EMPTY_TIRE_FITMENT_END, ...over });
 
 test("text is trimmed, squeezed and capped", () => {
   const out = normalizeTireFitment({
@@ -28,7 +36,7 @@ test("an empty end is dropped and an empty value is null — never a hollow obje
   assert.equal(normalizeTireFitment({ front: { insert: "  ", wheel: "", mods: null } }), null);
   assert.deepEqual(
     normalizeTireFitment({ front: { insert: "" }, rear: { wheel: "Mono" } }),
-    { rear: { insert: null, wheel: "Mono", mods: null } }
+    { rear: end({ wheel: "Mono" }) }
   );
 });
 
@@ -42,33 +50,75 @@ test("there are no vent-hole number fields — holes are words in the one box", 
     rear: { insert: "Stock", holeMm: 2.5, holeCount: 3, mods: "3 extra holes, trimmed insert" },
   });
   assert.deepEqual(out, {
-    rear: { insert: "Stock", wheel: null, mods: "3 extra holes, trimmed insert" },
+    rear: end({ insert: "Stock", mods: "3 extra holes, trimmed insert" }),
   });
 });
 
+test("a diameter reads what a driver types: a decimal point or comma, with or without mm", () => {
+  assert.equal(parseTireDiameterMm("42.5"), 42.5);
+  assert.equal(parseTireDiameterMm("42,5"), 42.5);
+  assert.equal(parseTireDiameterMm(" 42.5 mm "), 42.5);
+  assert.equal(parseTireDiameterMm("42."), 42);
+  assert.equal(parseTireDiameterMm(41), 41);
+  // A caliper reads to 0.01 mm; more than that is noise.
+  assert.equal(parseTireDiameterMm(42.567), 42.57);
+});
+
+test("a diameter that can't be a mounted tire is dropped, not stored", () => {
+  for (const raw of ["", "  ", "4", "300", "1.65", "abc", "42.5.1", "-42", null, undefined, true, {}]) {
+    assert.equal(parseTireDiameterMm(raw), null, String(raw));
+  }
+});
+
+test("an end with only a diameter is kept, and reads as words", () => {
+  const out = normalizeTireFitment({ front: { diameterMm: "40.5" }, rear: { diameterMm: 43 } });
+  assert.deepEqual(out, { front: end({ diameterMm: 40.5 }), rear: end({ diameterMm: 43 }) });
+  assert.equal(tireFitmentEndHasContent(out?.front), true);
+  assert.equal(formatTireFitmentEnd(out?.front), "40.5 mm diameter");
+  assert.equal(
+    formatTireFitmentEnd(end({ diameterMm: 42.25, mods: "side walls glued" })),
+    "42.25 mm diameter · side walls glued"
+  );
+  assert.equal(formatTireDiameterMm(42), "42");
+});
+
 test("setting one end keeps the other; clearing an end's last value drops it", () => {
-  const start = { front: { insert: "Stock", wheel: null, mods: null } };
-  const both = withTireFitmentEnd(start, "rear", { insert: null, wheel: "Mono", mods: null });
+  const start = { front: end({ insert: "Stock" }) };
+  const both = withTireFitmentEnd(start, "rear", end({ wheel: "Mono" }));
   assert.deepEqual(both, {
-    front: { insert: "Stock", wheel: null, mods: null },
-    rear: { insert: null, wheel: "Mono", mods: null },
+    front: end({ insert: "Stock" }),
+    rear: end({ wheel: "Mono" }),
   });
-  const cleared = withTireFitmentEnd(both, "front", { insert: null, wheel: null, mods: null });
-  assert.deepEqual(cleared, { rear: { insert: null, wheel: "Mono", mods: null } });
+  const cleared = withTireFitmentEnd(both, "front", end({}));
+  assert.deepEqual(cleared, { rear: end({ wheel: "Mono" }) });
   assert.equal(tireFitmentHasContent(withTireFitmentEnd(cleared, "rear", null)), false);
 });
 
 test("an end reads as words, without doubling a noun the driver already typed", () => {
   assert.equal(
-    formatTireFitmentEnd({ insert: "Stock", wheel: "Mono", mods: "3 extra holes" }),
+    formatTireFitmentEnd(end({ insert: "Stock", wheel: "Mono", mods: "3 extra holes" })),
     "Stock insert · Mono wheel · 3 extra holes"
   );
   assert.equal(
-    formatTireFitmentEnd({ insert: "AKA red inserts", wheel: "JC Mono Wheel", mods: null }),
+    formatTireFitmentEnd(end({ insert: "AKA red inserts", wheel: "JC Mono Wheel" })),
     "AKA red inserts · JC Mono Wheel"
   );
-  assert.equal(formatTireFitmentEnd({ insert: null, wheel: null, mods: null }), null);
+  assert.equal(formatTireFitmentEnd(end({})), null);
   assert.equal(formatTireFitmentEnd(null), null);
+});
+
+test("the boxes shown are the class's own, plus any that already hold a value", () => {
+  // A pan car asks for diameter and modifications only.
+  assert.deepEqual(tireEndBoxesToShow(["diameter", "mods"], {}), ["diameter", "mods"]);
+  // Off-road keeps its order: insert, wheel, then modifications.
+  assert.deepEqual(tireEndBoxesToShow(["mods", "wheel", "insert"], null), ["insert", "wheel", "mods"]);
+  // A run that logged an insert keeps showing it, whatever its car races now.
+  assert.deepEqual(
+    tireEndBoxesToShow(["diameter", "mods"], { rear: end({ insert: "Stock" }) }),
+    ["insert", "diameter", "mods"]
+  );
+  assert.deepEqual(tireEndBoxesToShow([], { front: end({ diameterMm: 40 }) }), ["diameter"]);
+  assert.deepEqual(tireEndBoxesToShow([], {}), []);
 });
 
 test("the own list is newest first, one spelling per thing, across both ends", () => {

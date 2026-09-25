@@ -7,6 +7,7 @@ import type { TireBucket } from "@/lib/cars/tireProfile";
 import {
   EMPTY_TIRE_FITMENT_END,
   withTireFitmentEnd,
+  type TireEndBox,
   type TireFitment,
   type TireFitmentEndKey,
 } from "@/lib/tires/tireFitment";
@@ -14,17 +15,19 @@ import type { LastRunTires, TireStintValue } from "@/lib/tires/tireStintValue";
 
 /**
  * The Tires step for a car that logs its front and rear apart — off-road (founder rulings
- * 2026-09-19). Front block, then rear block, on one screen: a driver sees the whole car at once
- * and cannot forget the end that is out of sight, which is what a Front | Rear switch would cost.
+ * 2026-09-19), and since 2026-09-25 the pan cars, formula and 1/8 on-road too, each end with the
+ * boxes its class's setup sheets ask for (`TireProfile.boxes`). Front block, then rear block, on
+ * one screen: a driver sees the whole car at once and cannot forget the end that is out of sight,
+ * which is what a Front | Rear switch would cost.
  *
  * Each end is the ordinary tire panel in its compact form, so every rule about how a tire's age
  * answers itself is the same one a touring car gets — run once per end, over that end's own last
  * run. Fronts and rears wear at different rates and are replaced at different times, so neither
  * count is ever inferred from the other.
  *
- * The insert / wheel / modifications row rides between the tire and its count. It belongs to the
- * END, not to the tire: swapping the tread leaves it alone, because a driver who changes tire
- * nearly always mounts it on the wheel and insert they always use.
+ * The boxes row (insert, wheel, diameter, modifications) rides between the tire and its count. It
+ * belongs to the END, not to the tire: swapping the tread leaves it alone, because a driver who
+ * changes tire nearly always mounts it on the wheel and insert they always use.
  *
  * No event spec-tire lock here yet — a controlled tire is one compound, and an off-road control
  * tire is a front AND a rear. Logged in docs/NOT_YET_BUILT.md.
@@ -44,7 +47,7 @@ export function RunSplitTireSelectionPanel({
   rear,
   fitment,
   onFitmentChange,
-  showExtras,
+  boxes,
   carId,
   bucket,
   resetSignal,
@@ -56,8 +59,8 @@ export function RunSplitTireSelectionPanel({
   rear: TireEndSelection;
   fitment: TireFitment;
   onFitmentChange: (next: TireFitment) => void;
-  /** Whether this car's ends carry an insert / wheel / modifications row at all. */
-  showExtras: boolean;
+  /** The boxes each end carries beside its tire (`tireEndBoxesToShow`). Empty = the tire alone. */
+  boxes: readonly TireEndBox[];
   carId?: string | null;
   bucket?: TireBucket | null;
   resetSignal?: string | number | null;
@@ -69,9 +72,12 @@ export function RunSplitTireSelectionPanel({
     inserts: [],
     wheels: [],
   });
+  // The own-list pickers need the driver's recent inserts and wheels; a class that shows neither
+  // box (a pan car's diameter + modifications) never asks for them.
+  const needsOwnLists = boxes.includes("insert") || boxes.includes("wheel");
 
   useEffect(() => {
-    if (!showExtras) return;
+    if (!needsOwnLists) return;
     let cancelled = false;
     fetch("/api/tire-fitment/recent", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -85,7 +91,7 @@ export function RunSplitTireSelectionPanel({
     return () => {
       cancelled = true;
     };
-  }, [showExtras]);
+  }, [needsOwnLists]);
 
   // What is on the form right now leads the saved list, so a name typed for one end is a tap for
   // the other straight away — before anything has been saved.
@@ -117,9 +123,10 @@ export function RunSplitTireSelectionPanel({
       onPrefillClear={onPrefillClear}
       prefillFieldClass={prefillFieldClass}
     >
-      {showExtras ? (
+      {boxes.length > 0 ? (
         <TireFitmentRow
           endName={key === "front" ? "Front" : "Rear"}
+          boxes={boxes}
           value={fitment[key] ?? EMPTY_TIRE_FITMENT_END}
           onChange={(next) => {
             onPrefillClear?.();

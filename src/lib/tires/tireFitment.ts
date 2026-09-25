@@ -16,10 +16,16 @@
  *   specific") — a driver writes "3 extra holes, trimmed insert" in their own words. Do not add
  *   structured hole fields.
  *
+ * Founder call, 2026-09-25: every class gets the boxes its own setup sheets ask for. Foam and
+ * on-road front/rear classes (1/12, 1/10 pan, formula, 1/8 on-road) true their tires down, and
+ * nearly every one of their manufacturers' sheets asks the DIAMETER of each end — so an end also
+ * carries `diameterMm`. Which boxes a class shows is `TireProfile.boxes` (`tireProfile.ts`).
+ *
  * Nothing here is ever required, and none of it decides whether the rubber changed: the tire's
  * own run count does that (`deriveTireStint.ts`). These values simply ride along — they carry to
  * the next run with the tire and stay put when the tire is swapped, because a driver who changes
- * tread nearly always mounts it on the same wheel and insert they always use.
+ * tread nearly always mounts it on the same wheel and insert they always use. A diameter carries
+ * too: the driver changes it when they true the tires.
  *
  * Pure, like `tirePrep.ts`: the form, both run routes and the read surfaces share one normaliser.
  */
@@ -29,6 +35,8 @@ export type TireFitmentEndKey = "front" | "rear";
 export type TireFitmentEnd = {
   insert: string | null;
   wheel: string | null;
+  /** Mounted diameter in millimetres, as trued. Foam and on-road front/rear classes. */
+  diameterMm: number | null;
   /** Free text: insert modifications, vent holes — whatever the driver wants remembered. */
   mods: string | null;
 };
@@ -38,7 +46,16 @@ export type TireFitment = {
   rear?: TireFitmentEnd;
 };
 
-export const EMPTY_TIRE_FITMENT_END: TireFitmentEnd = { insert: null, wheel: null, mods: null };
+export const EMPTY_TIRE_FITMENT_END: TireFitmentEnd = {
+  insert: null,
+  wheel: null,
+  diameterMm: null,
+  mods: null,
+};
+
+/** A box an end can carry beside its tire, in the order the Tires step shows them. */
+export type TireEndBox = "insert" | "wheel" | "diameter" | "mods";
+export const TIRE_END_BOXES: readonly TireEndBox[] = ["insert", "wheel", "diameter", "mods"];
 
 /** The insert that came with the tire. Always offered, so it is never listed among the recents. */
 export const STOCK_INSERT = "Stock";
@@ -46,14 +63,68 @@ export const STOCK_INSERT = "Stock";
 export const TIRE_FITMENT_NAME_MAX = 60;
 export const TIRE_FITMENT_MODS_MAX = 200;
 
+/**
+ * Bounds for a mounted diameter. A trued 1/12 front sits near 38 mm and a 1/5 GT tire past
+ * 110 mm; anything outside this is a typo (a width, or inches), and is dropped, not stored.
+ */
+export const TIRE_DIAMETER_MIN_MM = 10;
+export const TIRE_DIAMETER_MAX_MM = 250;
+
 function cleanText(raw: unknown, max: number): string | null {
   if (typeof raw !== "string") return null;
   const text = raw.replace(/\s+/g, " ").trim().slice(0, max).trim();
   return text || null;
 }
 
+/**
+ * A diameter from a number or from what a driver typed: "42.5", "42,5" (a decimal comma), or
+ * "42.5 mm". Kept to two decimals — a caliper reads to 0.01 mm. Null when blank or out of range.
+ */
+export function parseTireDiameterMm(raw: unknown): number | null {
+  let n: number;
+  if (typeof raw === "number") {
+    n = raw;
+  } else if (typeof raw === "string") {
+    const text = raw.trim().replace(/\s*mm$/i, "").replace(",", ".");
+    if (!/^\d+(\.\d*)?$|^\.\d+$/.test(text)) return null;
+    n = Number(text);
+  } else {
+    return null;
+  }
+  if (!Number.isFinite(n) || n < TIRE_DIAMETER_MIN_MM || n > TIRE_DIAMETER_MAX_MM) return null;
+  return Math.round(n * 100) / 100;
+}
+
+/** "42.5", "42", "41.25" — no trailing zeros, no unit. */
+export function formatTireDiameterMm(mm: number): string {
+  return String(Math.round(mm * 100) / 100);
+}
+
+function endBoxHasContent(end: TireFitmentEnd | null | undefined, box: TireEndBox): boolean {
+  if (!end) return false;
+  if (box === "diameter") return end.diameterMm != null;
+  return Boolean(end[box]);
+}
+
 export function tireFitmentEndHasContent(end: TireFitmentEnd | null | undefined): boolean {
-  return Boolean(end && (end.insert || end.wheel || end.mods));
+  return TIRE_END_BOXES.some((box) => endBoxHasContent(end, box));
+}
+
+/**
+ * The boxes the Tires step shows: the ones the car's class asks for, plus any that already hold
+ * a value. Data wins over the class, as it does for front/rear itself (`isSplitTireRun`): a run
+ * that logged an insert keeps showing it even if its car has since been re-classed.
+ */
+export function tireEndBoxesToShow(
+  classBoxes: readonly TireEndBox[],
+  fitment: TireFitment | null | undefined
+): TireEndBox[] {
+  return TIRE_END_BOXES.filter(
+    (box) =>
+      classBoxes.includes(box) ||
+      endBoxHasContent(fitment?.front, box) ||
+      endBoxHasContent(fitment?.rear, box)
+  );
 }
 
 export function tireFitmentHasContent(fitment: TireFitment | null | undefined): boolean {
@@ -67,6 +138,7 @@ export function normalizeTireFitmentEnd(raw: unknown): TireFitmentEnd | null {
   const end: TireFitmentEnd = {
     insert: cleanText(rec.insert, TIRE_FITMENT_NAME_MAX),
     wheel: cleanText(rec.wheel, TIRE_FITMENT_NAME_MAX),
+    diameterMm: parseTireDiameterMm(rec.diameterMm),
     mods: cleanText(rec.mods, TIRE_FITMENT_MODS_MAX),
   };
   return tireFitmentEndHasContent(end) ? end : null;
@@ -109,6 +181,7 @@ export function formatTireFitmentEnd(end: TireFitmentEnd | null | undefined): st
   const parts = [
     end.insert ? withNoun(end.insert, "insert") : null,
     end.wheel ? withNoun(end.wheel, "wheel") : null,
+    end.diameterMm != null ? `${formatTireDiameterMm(end.diameterMm)} mm diameter` : null,
     end.mods,
   ].filter((p): p is string => Boolean(p));
   return parts.length > 0 ? parts.join(" · ") : null;

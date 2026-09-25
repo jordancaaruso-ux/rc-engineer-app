@@ -46,6 +46,7 @@ import { tireProfileForDiscipline } from "@/lib/cars/tireProfile";
 import { RunSplitTireSelectionPanel } from "@/components/runs/RunSplitTireSelectionPanel";
 import {
   normalizeTireFitment,
+  tireEndBoxesToShow,
   tireFitmentHasContent,
   type TireFitment,
 } from "@/lib/tires/tireFitment";
@@ -1793,6 +1794,11 @@ export function NewRunForm(props: {
    */
   const splitTiresActive =
     tireProfile.split || Boolean(frontTire.typeId) || tireFitmentHasContent(tireFitment);
+  /** Each end's boxes beside its tire: the class's own, plus any the form already holds a value in. */
+  const tireBoxes = useMemo(
+    () => tireEndBoxesToShow(tireProfile.boxes, tireFitment),
+    [tireProfile.boxes, tireFitment]
+  );
   /**
    * Picking a DIFFERENT car that is known to run one tire drops whatever front the form was
    * holding — it belonged to the car just left. The wizard's cross-class swap already reloads
@@ -5656,7 +5662,7 @@ export function NewRunForm(props: {
                 }}
                 fitment={tireFitment}
                 onFitmentChange={setTireFitment}
-                showExtras={tireProfile.extras || tireFitmentHasContent(tireFitment)}
+                boxes={tireBoxes}
                 carId={carId}
                 bucket={tireProfile.bucket}
                 resetSignal={carId}
