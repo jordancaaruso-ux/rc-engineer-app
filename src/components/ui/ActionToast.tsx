@@ -37,12 +37,18 @@ const FADE_MS = 200;
 
 export function ActionToast({
   message,
+  title = null,
   action,
   onDismiss,
   raised = false,
 }: {
   /** Null hides the toast. Changing the message restarts the timer. */
   message: string | null;
+  /**
+   * A bold first line above the message. A notification that lands while the app is open
+   * (`CapacitorPushBridge`) carries its own title, and "Team invite" says more than the body alone.
+   */
+  title?: string | null;
   action?: ToastAction | null;
   onDismiss: () => void;
   /**
@@ -96,7 +102,10 @@ export function ActionToast({
           shown ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
         )}
       >
-        <span className="min-w-0 flex-1 text-[13px] text-foreground">{message}</span>
+        <span className="min-w-0 flex-1 text-[13px] text-foreground">
+          {title ? <span className="block font-semibold">{title}</span> : null}
+          {message}
+        </span>
         {action ? (
           <button
             type="button"

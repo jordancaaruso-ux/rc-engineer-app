@@ -71,6 +71,11 @@ const config: CapacitorConfig = {
        */
       backgroundColor: "#FFD60A",
     },
+    /*
+     * No `PushNotifications.presentationOptions`, on purpose. A notification that arrives while
+     * the app is open is drawn by the web app instead (`CapacitorPushBridge`), which reaches the
+     * builds already installed; setting options here as well would show each one twice.
+     */
   },
 };
 

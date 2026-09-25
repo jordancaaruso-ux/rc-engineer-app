@@ -121,7 +121,10 @@ Already wired in this repo:
    ```
 
 4. Apply the migration: `prisma/migrations/20260720120000_add_native_push_device/` (via `migrate deploy` — never `db push` against prod).
-5. Verify: Settings → **Enable notifications** (accept the iOS prompt) → **Send test**.
+5. Verify: Settings → **Enable notifications** (accept the iOS prompt) → **Send test**. The test
+   lands while the app is open, so it shows as a toast at the bottom of the app, not as an iOS
+   banner: iOS hands an open app its notifications, and `CapacitorPushBridge` draws them (the shell
+   sets no `presentationOptions`). The lock-screen banner only shows while the app is closed.
 
 > **Environment gotcha:** `APNS_PRODUCTION=1` targets `api.push.apple.com`, used by **TestFlight and App Store builds**. Only a build run directly from Xcode onto a device uses the sandbox host. A token minted in one environment is rejected by the other with `BadDeviceToken` — if test pushes silently do nothing, check this first.
 
