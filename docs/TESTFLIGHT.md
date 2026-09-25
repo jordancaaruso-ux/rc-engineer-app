@@ -44,11 +44,10 @@ archive for TestFlight.
 
 ### Owed before submitting for review (found 2026-09-23)
 
-- ~~Google sign-in inside the shell~~ **built 2026-09-24** (live once main deploys). Offering Google
-  means Apple requires Sign in with Apple too, and it can't finish in the app anyway: Google hands off
-  to Safari, which comes back without the app's PKCE cookie (Auth.js `InvalidCheck`, seen on the
-  first device build). `/api/auth/config-hint` reports Google off in the shell, so the form is email
-  + code only and drops "Back to home".
+- ~~Google sign-in inside the shell~~ **built 2026-09-24**, then replaced 2026-09-25 by the phone's
+  own Apple and Google sheets from build 2 (section 7b). The web redirect can't finish in the app:
+  Google hands off to Safari, which comes back without the app's PKCE cookie (Auth.js
+  `InvalidCheck`, seen on the first device build). Build 1 stays email + code only.
 - ~~Signed out, the shell lands on `/welcome`~~ **built 2026-09-24** (live once main deploys). The
   pitch carries plan prices and Join buttons; `middleware.ts` now sends the shell's `/` and
   `/welcome` to `/login`. Every other price path in the app goes through `/join` or `/billing`,
@@ -127,6 +126,45 @@ Already wired in this repo:
    sets no `presentationOptions`). The lock-screen banner only shows while the app is closed.
 
 > **Environment gotcha:** `APNS_PRODUCTION=1` targets `api.push.apple.com`, used by **TestFlight and App Store builds**. Only a build run directly from Xcode onto a device uses the sandbox host. A token minted in one environment is rejected by the other with `BadDeviceToken` — if test pushes silently do nothing, check this first.
+
+## 7b. Sign in with Apple and Google (built 2026-09-25, build 2)
+
+The app signs in with the phone's own sheets (`@capgo/capacitor-social-login`; Facebook/Twitter
+switched off in `capacitor.config.ts`, so their SDKs never ship). The website gets "Continue with
+Apple" too (`/api/auth/apple/start` → Apple → `/api/auth/apple/callback`); its Google button stays
+the Auth.js redirect. Code: `src/lib/auth/social/` (the rule is in `socialSignInLogic.ts`).
+
+**No second accounts.** An Apple/Google identity opens an account only if it is already linked, or
+its verified email matches one exactly. Anything else (Hide My Email, a different Google address)
+goes to `/login/connect`: "Create my account" (app only; the website's new people go to the plans)
+or "I already have an account", which signs in once and links the identity
+(`/api/auth/social/finish`). Delete account revokes Apple's token (Apple's rule).
+
+Portal setup (Apple Developer + Google Cloud):
+
+- App ID `com.rcengineer.app`: Sign in with Apple capability (primary App ID). The repo's
+  `App.entitlements` carries `com.apple.developer.applesignin`.
+- Services ID `com.rcengineer.web`, grouped under that App ID, so Apple gives the same `sub` in the
+  app and on the website. Domains `jrcdynamics.com`, `www.`, `beta.`; Return URLs
+  `https://www.jrcdynamics.com/api/auth/apple/callback` and the beta equivalent.
+- A Sign in with Apple key (.p8): signs the token exchange and the revoke.
+- Sign in with Apple for Email Communication: `jrcdynamics.com` + `send.jrcdynamics.com` (the SES
+  return path), or mail to Hide My Email addresses is dropped.
+- Google Cloud, same project as the website's client: an **iOS** OAuth client for the bundle id. Its
+  reversed id (`com.googleusercontent.apps.…`) must be a URL scheme in `Info.plist`, or Google's
+  sheet crashes the app when tapped. Keep it in step with `GOOGLE_IOS_CLIENT_ID`.
+
+Vercel (Production):
+
+```
+APPLE_SIGNIN_KEY_ID=<10-char key id>
+APPLE_SIGNIN_PRIVATE_KEY=<contents of the .p8>   # sensitive; literal \n escapes are handled
+APPLE_SIGNIN_SERVICES_ID=com.rcengineer.web      # optional, this is the default
+GOOGLE_IOS_CLIENT_ID=<….apps.googleusercontent.com>
+```
+
+`APPLE_TEAM_ID` defaults to `APNS_TEAM_ID`. Apple stays hidden until its key is set; Google in the
+app until `GOOGLE_IOS_CLIENT_ID` is; and both stay hidden in any build without the plugin.
 
 ## 8. WKWebView session smoke test
 

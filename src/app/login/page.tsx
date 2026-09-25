@@ -8,30 +8,24 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { JrcMark } from "@/components/brand/JrcMark";
 import { DoorScene } from "@/components/brand/DoorScene";
 import { buttonLinkClassName, primaryButtonClassName } from "@/components/ui/ButtonLink";
+import { AppleMark, GoogleMark } from "@/components/auth/ProviderMarks";
+import {
+  nativeSocialAvailable,
+  nativeSocialSignIn,
+  type NativeSocialConfig,
+} from "@/lib/auth/nativeSocialClient";
+import { providerLabel, type SocialProvider } from "@/lib/auth/social/socialSignInLogic";
 
-/** Official Google "G" mark — multicolor, reads cleanly on the dark surface button. */
-function GoogleMark(): ReactNode {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-      <path
-        fill="#4285F4"
-        d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
-      />
-      <path
-        fill="#34A853"
-        d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.859-3.048.859-2.344 0-4.328-1.583-5.036-3.71H.957v2.332A8.997 8.997 0 0 0 9 18z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
-      />
-      <path
-        fill="#EA4335"
-        d="M9 3.58c1.321 0 2.508.454 3.44 1.346l2.582-2.581C13.463.892 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
-      />
-    </svg>
-  );
-}
+/**
+ * Words for the short codes Apple/Google sign-in sends back here on failure
+ * (`/api/auth/apple/callback`). The iPhone app shows the server's own sentence instead.
+ */
+const SOCIAL_ERRORS: Record<string, string> = {
+  social: "That sign-in didn't go through. Please try again.",
+  "social-taken": "That Apple or Google account is connected to a different Trackside account.",
+  "social-denied": "This account can't sign in here.",
+  "social-no-email": "Apple didn't share a verified email with us. Sign in with your email instead.",
+};
 
 /**
  * What a stranger sees instead of a code box. `/join` is the pricing page and is deliberately
@@ -76,6 +70,17 @@ function LoginForm() {
   const [configLoaded, setConfigLoaded] = useState(false);
   const [inApp, setInApp] = useState(false);
   const [demoReady, setDemoReady] = useState(false);
+  const [appleSignIn, setAppleSignIn] = useState(false);
+  const [googleNative, setGoogleNative] = useState<NativeSocialConfig["google"]>(null);
+  /** The app build carries the phone's own Apple/Google sheets (build 2 onward). */
+  const [nativeSocial, setNativeSocial] = useState(false);
+  /**
+   * "I already have an account" from `/login/connect`: sign in once, and the Apple/Google identity
+   * waiting there is linked to the account (`from` already points at `/api/auth/social/finish`).
+   */
+  const connectParam = searchParams.get("connect");
+  const connecting: SocialProvider | null =
+    connectParam === "apple" || connectParam === "google" ? connectParam : null;
   /**
    * Sign up exists only inside the iPhone/Android app (2026-09-24, founder: "sign in, with a thing
    * that says don't have an account?"). The website's way in is paying at /join; the app may not
@@ -85,7 +90,7 @@ function LoginForm() {
   const [mode, setMode] = useState<"signin" | "signup">(
     searchParams.get("mode") === "signup" ? "signup" : "signin"
   );
-  const signingUp = inApp && mode === "signup";
+  const signingUp = inApp && mode === "signup" && !connecting;
   const emailRef = useRef<HTMLInputElement | null>(null);
 
   const from = searchParams.get("from") || "/";
@@ -128,14 +133,21 @@ function LoginForm() {
   const accessCode = searchParams.get("code")?.trim() ?? "";
 
   useEffect(() => {
-    if (searchParams.get("error") === "AccessDenied") {
+    const code = searchParams.get("error");
+    if (code === "AccessDenied") {
       setError(
         openSignup
           ? "That sign-in didn't go through. Please try again."
           : noAccount()
       );
+    } else if (code && SOCIAL_ERRORS[code]) {
+      setError(SOCIAL_ERRORS[code]);
     }
   }, [searchParams, openSignup, noAccount]);
+
+  useEffect(() => {
+    setNativeSocial(nativeSocialAvailable());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,9 +160,15 @@ function LoginForm() {
           openSignup?: boolean;
           nativeShell?: boolean;
           demoReady?: boolean;
+          appleSignIn?: boolean;
+          googleNative?: NativeSocialConfig["google"];
         };
         if (cancelled) return;
         if (hint.googleOAuthConfigured === true) setGoogleOAuthConfigured(true);
+        if (hint.appleSignIn === true) setAppleSignIn(true);
+        if (hint.googleNative?.iosClientId && hint.googleNative.serverClientId) {
+          setGoogleNative(hint.googleNative);
+        }
         if (hint.openSignup === true) setOpenSignup(true);
         if (hint.nativeShell === true) setInApp(true);
         if (hint.demoReady === true) setDemoReady(true);
@@ -262,6 +280,7 @@ function LoginForm() {
    * the address before the OAuth hop (self-serve signup in one round-trip).
    */
   async function onGoogleSignIn() {
+    if (inApp) return onNativeSignIn("google");
     setError(null);
     const normalized = email.trim().toLowerCase();
     setPending(true);
@@ -273,7 +292,52 @@ function LoginForm() {
     }
   }
 
-  const showGoogle = configLoaded && googleOAuthConfigured;
+  /**
+   * The website sends the browser to Apple (`/api/auth/apple/start`); the app opens the phone's
+   * own Apple sheet. Either way no account is made for an identity nobody can place: that goes to
+   * `/login/connect` ("new, or already have an account?").
+   */
+  function onAppleSignIn() {
+    if (inApp) return void onNativeSignIn("apple");
+    setError(null);
+    setPending(true);
+    window.location.assign(`/api/auth/apple/start?${new URLSearchParams({ from: callbackUrl })}`);
+  }
+
+  async function onNativeSignIn(provider: SocialProvider) {
+    setError(null);
+    setPending(true);
+    try {
+      const result = await nativeSocialSignIn(
+        provider,
+        { apple: appleSignIn, google: googleNative },
+        callbackUrl
+      );
+      if ("next" in result) {
+        // A full navigation: the next hop is Auth.js setting the session cookie. The buttons stay
+        // disabled while the page leaves.
+        window.location.assign(result.next);
+        return;
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : "That sign-in didn't go through. Please try again."
+      );
+    }
+    setPending(false);
+  }
+
+  // In the app both need the build that carries the phone's sheets; build 1 stays email-only.
+  // While linking, the provider being linked is the one thing that can't sign in.
+  const showApple =
+    configLoaded && appleSignIn && (!inApp || nativeSocial) && connecting !== "apple";
+  const showGoogle =
+    configLoaded &&
+    (inApp ? nativeSocial && googleNative !== null : googleOAuthConfigured) &&
+    connecting !== "google";
+  const showSocial = showApple || showGoogle;
 
   return (
     <div className="door-dark relative flex min-h-[100dvh] w-full flex-1 flex-col items-center justify-center overflow-hidden bg-background px-5 py-12">
@@ -298,22 +362,41 @@ function LoginForm() {
           style={{ "--rc-delay": "170ms" } as CSSProperties}
         >
           <h1 className="page-title text-center">
-            {signingUp ? "Create your account" : "Sign in"}
+            {connecting
+              ? `Sign in to connect ${providerLabel(connecting)}`
+              : signingUp
+                ? "Create your account"
+                : "Sign in"}
           </h1>
+
+          {showApple ? (
+            <button
+              type="button"
+              onClick={onAppleSignIn}
+              disabled={pending}
+              // Apple's design rules for this button, on a dark background: white, with black
+              // words and logo in the system font, and at least as prominent as any other.
+              style={{ fontFamily: "-apple-system, BlinkMacSystemFont, system-ui, sans-serif" }}
+              className="tap-active mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-white bg-white px-4 py-3 text-[15px] font-semibold text-black transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <AppleMark />
+              Continue with Apple
+            </button>
+          ) : null}
 
           {showGoogle ? (
             <button
               type="button"
               onClick={() => void onGoogleSignIn()}
               disabled={pending}
-              className="tap-active mt-6 flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              className={`tap-active ${showApple ? "mt-3" : "mt-6"} flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60`}
             >
               <GoogleMark />
               Continue with Google
             </button>
           ) : null}
 
-          {showGoogle ? (
+          {showSocial ? (
             <div className="my-5 flex items-center gap-3">
               <span className="h-px flex-1 bg-border" />
               <span className="type-data-label">Or</span>
@@ -321,7 +404,7 @@ function LoginForm() {
             </div>
           ) : null}
 
-          <form onSubmit={onSubmit} className={showGoogle ? "space-y-4" : "mt-6 space-y-4"}>
+          <form onSubmit={onSubmit} className={showSocial ? "space-y-4" : "mt-6 space-y-4"}>
             <label className="block">
               <span className="type-data-label mb-2 block">Email</span>
               <input
@@ -354,7 +437,7 @@ function LoginForm() {
             </button>
           </form>
 
-          {inApp ? (
+          {inApp && !connecting ? (
             <p className="mt-4 text-center text-[13px] text-muted-foreground">
               {signingUp ? "Already have an account?" : "Don’t have an account?"}{" "}
               <button
@@ -396,7 +479,7 @@ function LoginForm() {
 
         {/* The app's other way in without an account. A plain full navigation: /demo mints a
             demo session on arrival, and a prefetch must never do that. */}
-        {inApp && demoReady ? (
+        {inApp && demoReady && !connecting ? (
           <div className="rc-reveal mt-5" style={{ "--rc-delay": "270ms" } as CSSProperties}>
             <Link
               href="/demo"

@@ -71,6 +71,15 @@ const config: CapacitorConfig = {
        */
       backgroundColor: "#FFD60A",
     },
+    /**
+     * Sign in with Apple and Google through the phone's own sheets (2026-09-25, build 2). The
+     * plugin also carries Facebook and Twitter; `false` leaves their SDKs out of the app entirely
+     * (its sync hook rewrites the plugin's Package.swift during `npx cap sync`), so no Facebook
+     * code ships and the App Store privacy answers don't change.
+     */
+    SocialLogin: {
+      providers: { google: true, apple: true, facebook: false, twitter: false },
+    },
     /*
      * No `PushNotifications.presentationOptions`, on purpose. A notification that arrives while
      * the app is open is drawn by the web app instead (`CapacitorPushBridge`), which reaches the

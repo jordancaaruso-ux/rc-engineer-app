@@ -11,6 +11,7 @@ import { isMagicLinkSmtpConfigured } from "@/lib/emailAuthEnv";
 import { renderMagicLinkEmail } from "@/lib/auth/magicLinkEmail";
 import { issueSignInCode } from "@/lib/auth/signInCode";
 import { isAppReviewerEmail } from "@/lib/auth/appReviewer";
+import { setPendingLink } from "@/lib/auth/social/pendingLink";
 
 const hasSmtpConfig = isMagicLinkSmtpConfigured();
 const googleId = process.env.AUTH_GOOGLE_ID?.trim();
@@ -99,10 +100,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return token;
     },
-    async signIn({ user }) {
+    async signIn({ user, account, profile }) {
       const email = user.email?.trim().toLowerCase();
       if (!email) return false;
-      return isEmailAuthAllowed(email);
+      if (await isEmailAuthAllowed(email)) return true;
+      // A verified Google address with no account behind it: ask "new, or already have an
+      // account?" instead of a dead end, so a driver who signed up under another address can link
+      // this Google to it (`lib/auth/social/socialSignInLogic.ts`). Still no account is made here.
+      if (account?.provider === "google" && account.providerAccountId && profile?.email_verified === true) {
+        await setPendingLink({
+          provider: "google",
+          sub: account.providerAccountId,
+          email,
+          emailVerified: true,
+          isPrivateEmail: false,
+          name: user.name ?? null,
+          image: user.image ?? null,
+          appleRefreshToken: null,
+          appleClientId: null,
+        });
+        return "/login/connect";
+      }
+      return false;
     },
   },
 });

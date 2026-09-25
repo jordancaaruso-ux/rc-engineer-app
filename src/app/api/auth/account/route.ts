@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { collectUserBlobUrls, deleteBlobUrls } from "@/lib/account/deleteAccountBlobs";
 import { DEMO_READ_ONLY_MESSAGE, isDemoIdentity } from "@/lib/demo/demoAccess";
 import { getStripe, stripeConfigured } from "@/lib/stripe";
+import { revokeAppleToken } from "@/lib/auth/social/appleTokens";
+import { appleAppClientId } from "@/lib/auth/social/socialConfig";
 
 /** Stripe statuses with nothing left to cancel. */
 const ENDED_STATUSES = new Set(["canceled", "incomplete_expired"]);
@@ -52,6 +54,22 @@ export async function DELETE() {
 
   // Read the file refs first — the cascade below destroys the rows that point at them.
   const blobUrls = await collectUserBlobUrls(id);
+
+  // Apple requires an app that offers Sign in with Apple to disconnect it when the account goes,
+  // so the driver's Apple ID stops listing Trackside. Best effort: Apple being down must not keep
+  // someone's account alive. The token and its Apple client are kept by `resolveSocialSignIn`.
+  const appleLinks = await prisma.account.findMany({
+    where: { userId: id, provider: "apple", refresh_token: { not: null } },
+    select: { refresh_token: true, session_state: true },
+  });
+  await Promise.all(
+    appleLinks.map((link) =>
+      revokeAppleToken({
+        refreshToken: link.refresh_token as string,
+        clientId: link.session_state || appleAppClientId(),
+      }),
+    ),
+  );
 
   await prisma.user.delete({ where: { id } });
 
