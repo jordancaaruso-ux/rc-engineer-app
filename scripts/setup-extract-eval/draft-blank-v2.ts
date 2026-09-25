@@ -65,11 +65,14 @@ function padded(r: ImageRegion, padX: number, padY: number): ImageRegion {
 
 /** Crop `window` out of the page and draw the field's widgets (outlined + numbered) on it. */
 async function cropWithMarks(page: Buffer, W: number, H: number, window: ImageRegion, f: BlankFieldGeometry, outWidth: number, stroke: number): Promise<Buffer> {
-  const left = Math.round(window.xPct * W), top = Math.round(window.yPct * H);
-  const width = Math.max(1, Math.round(window.wPct * W)), height = Math.max(1, Math.round(window.hPct * H));
+  const left = Math.min(W - 1, Math.round(window.xPct * W)), top = Math.min(H - 1, Math.round(window.yPct * H));
+  const width = Math.max(1, Math.min(W - left, Math.round(window.wPct * W))), height = Math.max(1, Math.min(H - top, Math.round(window.hPct * H)));
   const scale = outWidth / width;
   const fontPx = Math.max(11, Math.round(stroke * 5));
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(width * scale)}" height="${Math.round(height * scale)}">`;
+  // Size the marks layer from the resized crop itself: computing it separately came out a pixel taller than
+  // the crop on the Associated B84 and sharp refused the overlay.
+  const base = await sharp(page).extract({ left, top, width, height }).resize({ width: Math.round(width * scale) }).toBuffer({ resolveWithObject: true });
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${base.info.width}" height="${base.info.height}">`;
   f.widgets.forEach((w, i) => {
     const r = normRegion(w.region);
     const x = (r.xPct * W - left) * scale, y = (r.yPct * H - top) * scale;
@@ -81,9 +84,7 @@ async function cropWithMarks(page: Buffer, W: number, H: number, window: ImageRe
     }
   });
   svg += `</svg>`;
-  return sharp(page)
-    .extract({ left, top, width, height })
-    .resize({ width: Math.round(width * scale) })
+  return sharp(base.data)
     .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
     .jpeg({ quality: 88 })
     .toBuffer();
