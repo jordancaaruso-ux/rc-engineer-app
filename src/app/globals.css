@@ -1304,15 +1304,33 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
  */
 :root {
   /*
-   * Moved up by exactly one tab height (founder, 2026-08-19): the top of the tab
-   * now sits where its bottom used to. Written as the subtraction rather than as
-   * a new percentage so the 42% reasoning above stays readable and the offset is
-   * visibly tied to `height: 56px` below — change one and you must change both.
+   * Moved up 56px (founder, 2026-08-19), which was one tab height then: the top of
+   * the tab sat where its bottom used to. Written as the subtraction rather than as
+   * a new percentage so the 42% reasoning above stays readable.
+   *
+   * The 56 is a POSITION now, not the tab's height. The tab grew to 81px on
+   * 2026-09-25 and its centre stayed exactly here, because where it sits was the one
+   * thing the founder locked for that change. Resize the tab without touching this.
    */
   --ideas-tab-y: calc(42svh - 56px);
 }
 
 .ideas-edge-tab {
+  /*
+   * The shape as picked (founder, 2026-09-25): "Curved in", off a bench of four
+   * shapes (the old tab / curved in / notebook tab / wave), at his own slider
+   * settings. How far it sticks out, the curve where it meets the screen edge, and
+   * the round of its two outer corners.
+   *
+   * The curve and corner are what he SAW, not what his sliders read (7 and 14).
+   * The two share the 16px the tab sticks out, and 7 + 14 is more than 16, so the
+   * bench scaled both by 16/21. Build what was seen.
+   */
+  --ideas-tab-out: 16px;
+  --ideas-tab-flare: 5.33px;
+  --ideas-tab-corner: 10.67px;
+  --ideas-tab-w: calc(8px + env(safe-area-inset-left, 0px) + var(--ideas-tab-out));
+
   position: fixed;
   /*
    * Left edge, the CENTRE of the tab at 42% of the screen height (founder,
@@ -1328,9 +1346,9 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
    *
    * The 2026-08-12 objection to a mid-height tab was that it floated over the reading
    * column — but that was the RIGHT edge, and before the gutter rule below existed.
-   * This one is exactly one page-gutter wide and welded to the left edge, so it is
-   * BESIDE the text at every height rather than on top of it, and height stopped
-   * being what decides that.
+   * This one lives in the page gutter against the left edge (16px of the gutter's 20
+   * since 2026-09-25), so it is BESIDE the text at every height rather than on top of
+   * it, and height stopped being what decides that.
    *
    * The CENTRE is what is placed at 42%, which is what the half-height subtraction
    * is for. Anchoring the top edge instead drifts it 28px low, and on a short phone
@@ -1343,69 +1361,98 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
    * tab occasionally doing nothing, not a wrong navigation.
    */
   /*
-   * SEATED BELOW THE PAGE (founder pick 2026-09-14, off a four-way bench: as-was /
-   * curved into the edge / seated / both). The tab used to sit ON the page — an
-   * outward drop shadow and a lit rim, which is a raised button's profile — and it
-   * read as a sticker stuck to the edge. Now the page is the upper surface and the
-   * tab is set into a slot cut out of it: the page's edge casts a soft shadow INTO
-   * the yellow (the inset shadows below), a hairline marks the cut, and there is no
-   * outward shadow and no lit rim, because a thing sitting in a slot has neither.
+   * CURVED INTO THE EDGE (founder pick 2026-09-25). The flat block read as glued
+   * on, and his words for why were "perpendicular meeting edge of screen": its top
+   * and bottom met the screen edge at a right angle. Now they curve into it (the
+   * flares below), the way a browser tab flows into its bar, so the tab reads as
+   * grown out of the edge rather than stuck on it.
    *
-   * The 8px overhang past the screen edge is what makes the inset shadow honest.
-   * An inset shadow paints on every inner edge including the left one, and the left
-   * edge of this tab IS the screen edge — nothing is above it there to cast
-   * anything. Pushing that edge 8px off-screen puts its shadow off-screen with it.
-   * The padding puts the icon back in the centre of the VISIBLE part, and every
-   * other number here (the 42% height, the gutter width, the nudge, the ride-out
-   * under the panel) is unchanged by it: the visible tab starts at x=0 as before.
+   * It lies ON the page, lifted by a soft shadow, and nothing is drawn on it. The
+   * seated look it replaces (2026-09-14) carried a 1px ring, and a uniform dark line
+   * round a saturated fill reads as a sticker: the fault that took the rim off every
+   * yellow button on 2026-08-25.
+   *
+   * The 8px overhang past the screen edge stays for the ride-out. With the panel
+   * open, the hidden 8px sits under the panel's edge, so no seam can show between
+   * the two. The flares stand on the real screen edge, 8px in.
    */
   left: -8px;
-  top: calc(var(--ideas-tab-y) - 28px);
+  top: calc(var(--ideas-tab-y) - 40.5px);
   z-index: 45;
   align-items: center;
   justify-content: center;
-  padding: 0 0 0 8px;
+  /* The arrow centres in the visible 16px: past the overhang and any safe-area inset. */
+  padding: 0 0 0 calc(8px + env(safe-area-inset-left, 0px));
   /*
-   * Exactly the page gutter (plus the off-screen overhang), so the tab's inner edge
-   * lands on the line the cards start from instead of reaching past it into the
-   * reading column. It reads the shared `--page-gutter-left` rather than the 20px
-   * that usually resolves to — on a notched phone in landscape the gutter grows
-   * with the safe-area inset and this has to grow with it.
+   * 16px out, measured from the safe area (founder pick 2026-09-25). It was exactly
+   * the page gutter until then; at 16 it stops 4px short of the line the cards start
+   * from, still beside the text rather than over it. From the safe area so that a
+   * notched phone turned sideways still shows the tab 16px past the notch.
    */
-  width: calc(var(--page-gutter-left) + 8px);
-  height: 56px;
-  /* Rounded on the inward side only — it is anchored to the left edge now. */
-  border-radius: 0 12px 12px 0;
+  width: var(--ideas-tab-w);
+  height: 81px;
+  border-radius: 0 var(--ideas-tab-corner) var(--ideas-tab-corner) 0;
   background-color: rgb(var(--color-primary));
-  /* On yellow, always the dark ink — in both themes. */
+  /* On yellow, always the dark ink. */
   color: rgb(var(--color-primary-foreground));
   /*
-   * Three layers, top to bottom: the hairline lip of the slot on the page side of
-   * the cut; the page's shadow falling into the tab, from above and slightly from
-   * the left, the way the Start-run bar's own lip is lit from above; and a faint
-   * all-round ambient so the far corners still read as under an overhang. The
-   * shadow colour is a dark yellow-brown, not black — black over this yellow goes
-   * green.
+   * Lifted: the bench's two shadows, a tight one and a soft one, in warm ink.
+   * `drop-shadow` rather than `box-shadow` because only a filter follows the flares.
+   * Its blur length is the Gaussian's standard deviation (measured the same in
+   * Chromium and WebKit, 2026-09-25), where box-shadow's is double that. So these are
+   * the bench's numbers exactly; don't halve them to "match" a box-shadow.
    *
-   * NO SHEEN (founder call 2026-08-18). It used to carry a vertical version of the
-   * Log-run band, turned 90° to cross the 56px axis, looping every 2.6s forever.
-   * Two things were wrong with that. The tab is welded to the edge of the screen
-   * and therefore ALWAYS in shot, so a permanent loop put a light flickering in the
-   * driver's peripheral vision for the whole session — the worst case of the
-   * everything-shines problem, not a mild one. And shine says "press me" whether or
-   * not there is any reason to; the tab now moves only when there is (`.is-nudging`
-   * below), so the motion carries information instead of spending attention.
-   *
-   * The outward yellow glow it used to carry is gone for the older, related reason:
-   * that spill is how the dock circle says "this is the one action", and this tab
-   * is a utility.
+   * NO SHEEN (founder call 2026-08-18). It used to carry a looping band, and a tab
+   * on the edge of the screen is ALWAYS in shot, so a permanent loop put a light
+   * flickering in the driver's peripheral vision for the whole session. The tab moves
+   * only when there is a reason to (`.is-nudging` below). No outward yellow glow
+   * either: that spill is how the dock circle says "this is the one action", and
+   * this tab is a utility.
    */
-  box-shadow:
-    0 0 0 1px rgb(var(--color-foreground) / 0.14),
-    inset 0.6px 2.2px 4.4px rgba(90, 66, 0, 0.42),
-    inset 0 0 1.8px rgba(90, 66, 0, 0.22);
+  filter: drop-shadow(0 0.8px 0.6px rgb(var(--color-foreground) / 0.136))
+    drop-shadow(0 2.6px 2.6px rgb(var(--color-foreground) / 0.187));
   transition: transform 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
   -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * The flares: where the tab's top and bottom curve into the screen edge. Each is a
+ * square the size of the curve, standing on the screen edge just above (::before)
+ * or below (::after) the tab, painted yellow everywhere outside a circle centred on
+ * its far corner. What is left is a quarter-round that leaves the screen edge along
+ * it and meets the tab's own edge the same way, so there is no corner anywhere.
+ *
+ * Each square overlaps the tab by 1px so no hairline can open between them (the
+ * tab's top is set in svh, so it lands on fractional pixels). The colour stop is
+ * softened by a third of a pixel each way, which anti-aliases the curve without
+ * blurring it.
+ */
+.ideas-edge-tab::before,
+.ideas-edge-tab::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  width: var(--ideas-tab-flare);
+  height: calc(var(--ideas-tab-flare) + 1px);
+  pointer-events: none;
+}
+
+.ideas-edge-tab::before {
+  bottom: calc(100% - 1px);
+  background: radial-gradient(
+    circle at 100% 0,
+    transparent calc(var(--ideas-tab-flare) - 0.35px),
+    rgb(var(--color-primary)) calc(var(--ideas-tab-flare) + 0.35px)
+  );
+}
+
+.ideas-edge-tab::after {
+  top: calc(100% - 1px);
+  background: radial-gradient(
+    circle at 100% 100%,
+    transparent calc(var(--ideas-tab-flare) - 0.35px),
+    rgb(var(--color-primary)) calc(var(--ideas-tab-flare) + 0.35px)
+  );
 }
 
 /*
@@ -1413,22 +1460,26 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
  * 2026-08-18, chosen off a live bench against knock / peek / lean / hop / shake).
  *
  * WHY IT MOVES RIGHT. 7px along +X is the direction the tab actually travels when
- * you tap it (`.is-out` above, which slides it the panel's full width). So the
+ * you tap it (`.is-out` below, which slides it the panel's full width). So the
  * nudge is a preview of the gesture, not decoration — it teaches what the control
  * does at the same time as catching the eye, which is exactly what the sheen it
  * replaced could not do.
  *
- * WHY NOTHING SYMMETRICAL. The tab is pinned at `left: 0`, so it has nowhere to go
- * the other way: the leftward half of a shake or a wobble is simply clipped by the
- * viewport. This control can only move one direction, and a one-way move is the
+ * WHY NOTHING SYMMETRICAL. The tab is anchored to the screen edge, so it has nowhere
+ * to go the other way: the leftward half of a shake or a wobble is simply clipped by
+ * the viewport. This control can only move one direction, and a one-way move is the
  * only honest one.
  *
+ * IT STRETCHES, IT DOES NOT SLIDE (2026-09-25). The tab curves into the screen edge
+ * now, and sliding it 7px would pull those curves off the edge and open a gap under
+ * them. Growing the width instead moves the face 7px and the centred arrow half
+ * that, and leaves the curves where they are. It also keeps the nudge off
+ * `transform`, so it can never fight `.is-out` for it.
+ *
  * The 1px overshoot on the way back is what makes it read as a physical object
- * settling rather than a value being set. Fill mode is deliberately left at the
- * default `none`: with `both`, the final `translateX(0)` keeps overriding the
- * transform after the animation ends and `.is-out` can no longer slide the tab
- * open. Re-firing is done by removing the class, forcing a reflow and re-adding it
- * (see `IdeasEdgeTab`), so nothing here needs a fill to persist.
+ * settling rather than a value being set. Fill mode stays the default `none`, so
+ * the width hands straight back to the rule above when it ends. Re-firing is done
+ * by removing the class, forcing a reflow and re-adding it (see `IdeasEdgeTab`).
  *
  * WHEN it runs lives in `IdeasEdgeTab`, and matters more than the shape: dashboard
  * only, every 5s until the driver has opened the panel once — ever — and then never
@@ -1436,16 +1487,16 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
  */
 @keyframes rc-ideas-tab-nudge {
   0% {
-    transform: translateX(0);
+    width: var(--ideas-tab-w);
   }
   38% {
-    transform: translateX(7px);
+    width: calc(var(--ideas-tab-w) + 7px);
   }
   64% {
-    transform: translateX(-1px);
+    width: calc(var(--ideas-tab-w) - 1px);
   }
   100% {
-    transform: translateX(0);
+    width: var(--ideas-tab-w);
   }
 }
 
@@ -1540,13 +1591,6 @@ body[data-logrun-wizard-chrome] .ideas-edge-tab {
   .ideas-panel,
   .ideas-scrim {
     transition: none;
-  }
-
-  /* A band parked mid-face reads as a smear on the paint, so the lit rim carries
-     the surface alone — the same call `.logrun-fx` and `.primary-face` make. */
-  .ideas-edge-tab {
-    background-image: none;
-    animation: none;
   }
 }
 

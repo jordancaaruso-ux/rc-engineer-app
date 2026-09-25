@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { LightbulbFilament, ListChecks, Notepad } from "@phosphor-icons/react";
+import { CaretRight, LightbulbFilament, ListChecks } from "@phosphor-icons/react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DashboardActionItemRow } from "@/lib/dashboardServer";
@@ -67,12 +67,16 @@ const NUDGE_EVERY_MS = 5000;
  * open the same panel, which docks to the edge its trigger lives on: left on the
  * phone, right on desktop (nav restructure 2026-08-12).
  *
- * Both triggers are a NOTEPAD, and the two lists inside are a filament bulb (try)
- * and a tick list (do) — founder, 2026-08-16. It was a filled lightbulb, which at
- * 16px on the yellow chip lost every line inside the glass and left a dome over two
- * tapering bars: a hot air balloon. The notepad is deliberately a level up from its
- * own contents, so neither list icon is a shrunken copy of the control you pressed.
- * Anything that goes here has to read at 16px inside a 20px-wide sliver, so prefer
+ * The desktop button is a NOTEPAD, and the two lists inside are a filament bulb
+ * (try) and a tick list (do) — founder, 2026-08-16. It was a filled lightbulb, which
+ * at 16px on the yellow chip lost every line inside the glass and left a dome over
+ * two tapering bars: a hot air balloon. The notepad is deliberately a level up from
+ * its own contents, so neither list icon is a shrunken copy of the control you pressed.
+ *
+ * The phone tab carried the same notepad until 2026-09-25, when it took its curved
+ * shape and an ARROW (founder pick, off a bench of shapes, colours and icons): on a
+ * tab that slides out when pressed, the direction it moves is the clearest label.
+ * Anything that goes on it has to read at 16px inside a 16px-wide tab, so prefer
  * marks whose OUTLINE carries the meaning over ones that hide it in interior detail.
  *
  * Same three rules it has always had (founder lock 2026-07-14): a utility and
@@ -86,9 +90,9 @@ const NUDGE_EVERY_MS = 5000;
  * The LEFT edge rather than the right (founder, 2026-08-12), and 42% down rather
  * than in the bottom corner (founder, 2026-08-18). The right-edge version floated in
  * the middle of the reading column, over whatever you were looking at — and the fix
- * for that turned out to be the WIDTH, not the height. It is exactly one page-gutter
- * wide, so its inner edge lands on the line the cards start from and it sits beside
- * the text rather than over it, which is true at every height. That freed height to
+ * for that turned out to be the WIDTH, not the height. It stays inside the page
+ * gutter (16px of its 20 since 2026-09-25), so it sits beside the text rather than
+ * over it, which is true at every height. That freed height to
  * answer a different question, and 42% is the answer: away from the two yellow
  * objects that book-end the dashboard, and high enough to be found on a page you
  * read downwards. Reasoning in full on `.ideas-edge-tab` in globals.css, where the
@@ -197,9 +201,8 @@ export function IdeasEdgeTab() {
     markIdeasPanelOpened();
     setEverOpened(true);
     /*
-     * A nudge caught mid-flight would hold its own transform for up to 640ms and
-     * override `.is-out`, pinning the tab at the edge while the panel slides away
-     * from it.
+     * Stop a nudge caught mid-flight, so the tab isn't still stretching and settling
+     * while it rides out with the panel.
      */
     tabRef.current?.classList.remove("is-nudging");
     if (!loading) void loadLists();
@@ -297,7 +300,7 @@ export function IdeasEdgeTab() {
            `.ideas-edge-tab` in globals.css for why the utility loses. */
         className={cn("ideas-edge-tab", open && "is-out")}
       >
-        <Notepad size={16} weight="regular" aria-hidden />
+        <CaretRight size={16} weight="regular" aria-hidden />
       </button>
 
       {panel.mounted ? (
