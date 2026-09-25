@@ -3147,9 +3147,33 @@ html[data-nav-pending] .page {
 }
 
 /*
- * The primary face — what a yellow button is made of. Two soft warm shadows under it,
- * and nothing drawn on it. The button IS the yellow; the shadow is the only thing saying
- * it sits above the paper.
+ * The yellow's light, kept beside the one class that uses it. Move these with
+ * `--color-primary` if the brand yellow ever moves.
+ */
+:root {
+  --color-primary-lit: 255 222 36; /* #FFDE24 — where the light lands, on top */
+  --color-primary-deep: 252 203 0; /* #FCCB00 — the underside */
+  --color-primary-glow: 214 160 0; /* #D6A000 — the gold its shadow is cast in */
+}
+
+/*
+ * The primary face — what a yellow button is made of: light falling on it from above, and a
+ * shadow cast in its own gold. Nothing is drawn ON it.
+ *
+ * LIGHT, NOT A LINE (founder pick 2026-09-25, "D · Apple style" off a twelve-way bench of the
+ * real Paddock, Analysis and Tools pages). With the rim gone (below), the flat face read "flat,
+ * like a sticker": a slab of highlighter yellow with nothing saying it was an object. So the
+ * depth is light now — lemon where it lands on top, the brand yellow through the middle, a
+ * warmer yellow underneath, and a golden shadow where there was a grey one. No stop is white
+ * and the whole spread is a few percent of green: a white wash can only add blue, the channel
+ * that stops this colour being yellow (see `.logrun-fx`). The gradient sits in
+ * `background-image` over the call site's `bg-primary`, so a hover that only changes
+ * `background-color` no longer shows; `brightness` and the shadow below still do.
+ *
+ * The same pick turned every "View all" / "Open …" door grey (`BandFoot`, `ButtonLink`'s
+ * `door` variant) — yellow is for doing something, grey for going somewhere — which took
+ * Paddock from six yellow buttons to one. That was the other half of the complaint: "too
+ * many at once".
  *
  * NO RIM (founder call 2026-08-25, hours after the rebuild below, off a five-way A/B on
  * the real page). The rebuild had replaced the old two-line bevel with a single 1px inset
@@ -3163,10 +3187,10 @@ html[data-nav-pending] .page {
  * they survive every size) and lost harder: a highlight band along the top of a small chip
  * is the gel-button look. An amber ring instead of ink lost too — warmer, still a stroke.
  *
- * So the depth is not drawn at all now. #FFD60A against ash paper or a cream card is a
- * 3:1-plus jump on its own; it has never needed a line around it to be found. Ink and never
- * black in the shadows: every other shadow on paper is warm, and a neutral one reads as a
- * hole punched in the page.
+ * So the depth is never drawn as a line. #FFD60A against paper is a 3:1-plus jump on its
+ * own; it has never needed a line around it to be found. Warm and never neutral in the
+ * shadows: every other shadow on paper is warm, and a neutral one reads as a hole punched in
+ * the page — the reason this one went all the way to gold.
  *
  * DO NOT re-add a rim of any kind here. It has now been drawn three ways — 1.5px cream/bronze
  * bevel, 1px ink ring, em-scaled directional — and removed each time, always for the same
@@ -3188,9 +3212,15 @@ html[data-nav-pending] .page {
  * is the one action" — repeat it on every yellow button and it says nothing.
  */
 .primary-face {
+  background-image: linear-gradient(
+    180deg,
+    rgb(var(--color-primary-lit)) 0%,
+    rgb(var(--color-primary)) 55%,
+    rgb(var(--color-primary-deep)) 100%
+  );
   box-shadow:
-    0 1px 1px rgba(25, 24, 21, 0.09),
-    0 3px 6px -3px rgba(25, 24, 21, 0.16);
+    0 1px 2px rgba(122, 90, 0, 0.2),
+    0 5px 12px -5px rgb(var(--color-primary-glow) / 0.6);
 }
 
 /*
@@ -3206,14 +3236,14 @@ html[data-nav-pending] .page {
   a.primary-face:hover,
   label.primary-face:hover {
     box-shadow:
-      0 1px 1px rgba(25, 24, 21, 0.1),
-      0 5px 10px -4px rgba(25, 24, 21, 0.2);
+      0 1px 2px rgba(122, 90, 0, 0.22),
+      0 8px 16px -6px rgb(var(--color-primary-glow) / 0.65);
   }
 }
 
 button.primary-face:not(:disabled):active,
 a.primary-face:active {
-  box-shadow: 0 1px 1px rgba(25, 24, 21, 0.08);
+  box-shadow: 0 1px 1px rgba(122, 90, 0, 0.18);
 }
 
 /*
@@ -3227,8 +3257,8 @@ a.primary-face:active {
  * band flush with a card (the Sessions door, the Paddock band feet), where an outer shadow
  * would draw a dark line across the middle of the panel. Deleted 2026-08-25 with the rim:
  * once the ring came off `.primary-face`, face-minus-shadow was face-minus-everything, and
- * an empty class is worse than none. Those surfaces now wear plain `bg-primary` and are
- * correct — a yellow band flush on a pale card is already its own edge.
+ * an empty class is worse than none. Both of those surfaces are grey doors since 2026-09-25
+ * (`BandFoot`), so nothing needs a face without its shadow any more.
  */
 
 /* Instant tap feedback on mobile nav, hub rows, and buttons */
@@ -3323,7 +3353,7 @@ html.video-overlay-fullscreen-active body {
   overflow: hidden;
 }
 
-/* Primary actions — solid yellow fill, subtle top highlight, Sora. */
+/* Primary actions: Sora. The yellow and its light are `.primary-face`. */
 .primary-action-chip {
   position: relative;
   isolation: isolate;
@@ -3358,20 +3388,9 @@ html.video-overlay-fullscreen-active body {
   @apply gap-1.5;
 }
 
-.primary-action-chip::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  top: 0;
-  height: 1px;
-  pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.4),
-    transparent
-  );
-}
+/* `.primary-action-chip::after` drew a 1px white line along the chip's top edge. It came off
+   2026-09-25 with the light on `.primary-face`: a lit top edge on a small chip is the gel look
+   that note warns about, and it was the last rim left on a yellow button. */
 
 /* ---------------------------------------------------------------------------
    The demo door (`/demo`, DemoEntryScreen) — 2026-08-08

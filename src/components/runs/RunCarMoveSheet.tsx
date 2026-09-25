@@ -103,7 +103,7 @@ export function RunCarMoveSheet({
             type="button"
             className={cn(
               PILL_BASE,
-              "bg-primary text-primary-foreground hover:brightness-105",
+              "primary-face bg-primary text-primary-foreground hover:brightness-105",
               busy && "pointer-events-none opacity-60"
             )}
             onClick={onConfirm}

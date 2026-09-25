@@ -3,29 +3,33 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * One box for both variants. Measured 2026-08-18: primary came out **24px** tall
+ * One box for every variant. Measured 2026-08-18: primary came out **24px** tall
  * and outline **30px**, so a yellow button standing next to outline ones in a
  * toolbar sat visibly short. Two separate causes, both fixed here:
  *
- * 1. `.primary-action-chip` sets `line-height: 1` (12px at `text-xs`) where
- *    outline inherited 16px. `min-h-[30px]` + `items-center` settles it whichever
- *    line-height wins, rather than fighting the cascade over a utility.
+ * 1. `.primary-action-chip` sets `line-height: 1` where outline inherited 16px.
+ *    A `min-h-*` + `items-center` settles it whichever line-height wins, rather
+ *    than fighting the cascade over a utility.
  * 2. Only outline carried a border, making it 2px larger on both axes. Primary
- *    now carries a transparent one so the border-boxes match.
+ *    and door carry a transparent one so the border-boxes match.
  *
- * Call sites can still override — `cn` is tailwind-merge, so a later `min-h-9`
- * (to match an input beside it) wins cleanly.
+ * 36px, 13.5px type and 10px corners since 2026-09-25 (founder pick "D · Apple
+ * style", benched on the real pages): at 30px with 12px type the chips read as
+ * tags rather than buttons. 36px is also an input's height, so a button beside a
+ * field matches it without a call-site `min-h-9`.
+ *
+ * Call sites can still override — `cn` is tailwind-merge, so a later `min-h-*`,
+ * `px-*` or `text-*` wins cleanly.
  */
 const buttonBase =
-  "tap-active inline-flex min-h-[30px] items-center justify-center rounded-lg border px-2.5 py-1.5 text-xs transition";
+  "tap-active inline-flex min-h-9 items-center justify-center rounded-[10px] border px-3.5 py-1.5 text-[13.5px] tracking-[-0.005em] transition";
 
 /**
- * `.primary-face` carries the whole yellow material (globals.css): a 1px ink
- * hairline plus a paper-weight lift, with the hover and press shadows living on
- * the class rather than here. The 1.5px cream/bronze bevel it used to draw stayed
- * behind on the Log-run circle and the dashboard bar, which is the point — that
- * face marks the single #1 action, and it stops meaning anything if 87 buttons
- * wear it (see the note over `.primary-face`, rebuilt 2026-08-25).
+ * `.primary-face` carries the whole yellow material (globals.css): light from above
+ * and a shadow in the yellow's own gold, with the hover and press shadows living on
+ * the class rather than here. The 1.5px cream/bronze bevel and the crossing sheen
+ * stay on the Log-run circle and the dashboard bar, which is the point — that face
+ * marks the single #1 action, and it stops meaning anything if 87 buttons wear it.
  *
  * Weight is `font-semibold`, not `font-bold`, from the same change. Bold + 12px +
  * yellow at once is three kinds of emphasis stacked on a word like "Edit"; 600 is
@@ -40,6 +44,26 @@ const outlineClass = cn(
   buttonBase,
   "border-border bg-card font-medium text-foreground hover:border-primary-ink/40 hover:bg-muted/60"
 );
+
+/**
+ * The door: a button that goes somewhere rather than doing something — "Open the lab",
+ * "View all 8 cars". Apple's grey button: ink at 5.5% over the card, ink words, no shadow
+ * (founder pick 2026-09-25, "D · Apple style"). Yellow stays for doing things, so a hub page
+ * keeps one or two yellows instead of one per card. `BandFoot` draws the same grey at band
+ * width.
+ */
+const doorClass = cn(
+  buttonBase,
+  "border-transparent bg-foreground/[0.055] font-semibold text-foreground hover:bg-foreground/[0.08] active:bg-foreground/[0.1]"
+);
+
+export type ButtonVariant = "primary" | "outline" | "door";
+
+const VARIANT_CLASS: Record<ButtonVariant, string> = {
+  primary: primaryClass,
+  outline: outlineClass,
+  door: doorClass,
+};
 
 /** Same visual as `ButtonLink` primary — use on native `<button>`. */
 export function primaryButtonClassName(className?: string) {
@@ -69,8 +93,8 @@ export function outlineButtonClassName(className?: string) {
   return cn(outlineClass, className);
 }
 
-export function buttonLinkClassName(variant: "primary" | "outline" = "primary", className?: string) {
-  return cn(variant === "primary" ? primaryClass : outlineClass, className);
+export function buttonLinkClassName(variant: ButtonVariant = "primary", className?: string) {
+  return cn(VARIANT_CLASS[variant], className);
 }
 
 export function ButtonLink({
@@ -79,7 +103,7 @@ export function ButtonLink({
   className,
   children,
   ...props
-}: ComponentProps<typeof Link> & { variant?: "primary" | "outline" }) {
+}: ComponentProps<typeof Link> & { variant?: ButtonVariant }) {
   return (
     <Link href={href} className={buttonLinkClassName(variant, className)} {...props}>
       {children}

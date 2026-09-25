@@ -91,11 +91,15 @@ export function LapImportBench({
         </div>
       )}
 
-      {/* The door is a yellow button in the foot, the Geometry Lab's pattern beside it (founder
-          call, 2026-09-24): a "+" in the header and a grey "upload one" line were too quiet to find. */}
+      {/* The door is a button in the foot, the Geometry Lab's pattern beside it (founder call,
+          2026-09-24): a "+" in the header and a grey "upload one" line were too quiet to find.
+          Yellow for a day, then the grey door like every "Open …" (founder pick 2026-09-25, off
+          a bench of this page) — a grey BUTTON, which is not the grey line that went unfound. */}
       <div className="mt-auto flex items-center justify-end gap-2 border-t border-border bg-muted/40 px-4 py-2.5">
         {remaining > 0 ? <span className="type-timestamp mr-auto">{remaining} more</span> : null}
-        <ButtonLink href="/laps/analysis">Open lap time analysis</ButtonLink>
+        <ButtonLink href="/laps/analysis" variant="door">
+          Open lap time analysis
+        </ButtonLink>
       </div>
 
       {/* The Undo for a session just deleted on its own page, which sent the driver back here. */}

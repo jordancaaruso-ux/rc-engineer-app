@@ -116,11 +116,11 @@ function formatFileSize(bytes: number): string {
 }
 
 /**
- * Flush yellow across the card, like the add-car upload — not the 30px toolbar chip. The
- * outline twin sits beside it at the same height so the pair reads as one decision.
+ * Yellow across the card, like the add-car upload — not the toolbar chip. The outline twin
+ * sits beside it at the same height so the pair reads as one decision.
  */
 const WIDE_PRIMARY =
-  "tap-active flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2.5 text-[13px] font-semibold tracking-tight text-primary-foreground transition hover:brightness-105 active:brightness-95 disabled:opacity-60";
+  "tap-active flex w-full items-center justify-center gap-1.5 rounded-lg primary-face bg-primary px-3 py-2.5 text-[13px] font-semibold tracking-tight text-primary-foreground transition hover:brightness-105 active:brightness-95 disabled:opacity-60";
 const WIDE_OUTLINE =
   "tap-active flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-runna px-3 py-2.5 text-[13px] font-semibold tracking-tight text-foreground transition hover:bg-surface-runna-inset disabled:opacity-60";
 const TEXT_LINK =

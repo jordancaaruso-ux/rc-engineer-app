@@ -426,7 +426,7 @@ function EditRow({
           type="button"
           onClick={onCommit}
           disabled={busy}
-          className="tap-active rounded-md bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground disabled:opacity-60"
+          className="tap-active rounded-md primary-face bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground disabled:opacity-60"
         >
           {busy ? "Saving…" : "Save"}
         </button>

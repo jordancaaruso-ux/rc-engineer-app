@@ -107,7 +107,7 @@ export type WizardSheetRow = {
  *  the pre-run-complete save button — so they read as one control (top-light
  *  gradient, dark label/icon, soft yellow cast shadow). */
 /**
- * The shared yellow face — solid fill and a lit rim (`.primary-face`). No sheen:
+ * The shared yellow face (`.primary-face`): light from above and a golden shadow. No sheen:
  * that band belongs to the dashboard's Start-a-new-run bar and the dock's Log-run
  * circle, and nothing else (founder call 2026-08-18).
  *
@@ -116,10 +116,9 @@ export type WizardSheetRow = {
  * solid fill plus a rim. This pill was the last thing still wearing the old look,
  * and the odd one out on the button drivers press most.
  *
- * `bg-primary` is a background COLOUR rather than a gradient on purpose. That is
- * now belt-and-braces rather than load-bearing — it mattered while `.primary-face`
- * still painted a band into `background-image`, which a gradient fill here would
- * have overwritten — but keeping the fill in one property leaves the option open.
+ * `bg-primary` is a background COLOUR rather than a gradient on purpose, and it is
+ * load-bearing again: since 2026-09-25 `.primary-face` paints its light into
+ * `background-image`, which a gradient fill here would overwrite.
  */
 const YELLOW_FILL =
   "primary-face bg-primary text-primary-foreground hover:brightness-[0.96]";

@@ -7,23 +7,22 @@ import { ChevronRight, type LucideIcon } from "lucide-react";
  * Lifted wholesale from the Recent-runs card on `/analysis` (`RecentRunsCard`), which is what
  * the founder pointed at: "a thing at the bottom 'view all cars' like in analysis on the session
  * card". Two parts, and the split is the point — the paper row EXPLAINS what is through the door,
- * the yellow button ACTS and carries the count. Putting the count on the button leaves the sub-line
- * free to say what the room contains instead of repeating the number.
+ * the button ACTS and carries the count. Putting the count on the button leaves the sub-line free
+ * to say what the room contains instead of repeating the number.
  *
- * All three bands get the button (founder call 2026-08-19). `BandHeader` (now `components/ui/`)
- * carries the opposite warning from the `+` pass — "three bands plus the log-run circle put five
- * yellow objects on one 390px screen, which turns the accent into wallpaper" — and it was put to
- * him with both drawn. He wants the buttons. If it reads loud in the hand the retreat is to drop
- * Tracks and Events to the row alone, which is deleting the `<span>` below, not a redesign.
+ * Every band gets the button (founder call 2026-08-19), and since 2026-09-25 it is GREY — the
+ * Apple grey of `ButtonLink`'s `door` variant, drawn at band width. The warning `BandHeader`
+ * (now `components/ui/`) carried from the `+` pass came true: yellow feet on every band plus the
+ * log-run circle turned the accent into wallpaper, and the founder picked grey doors off a bench
+ * of the real Paddock ("much more premium"). Yellow is for doing something; this goes somewhere.
  *
  * A `<span>`, never a nested `<button>` or `<a>`: the whole foot is already the link, and the tap
  * target has to be the whole foot — the button alone is ~40px, which is under the minimum on its
  * own. The three bands share this ONE component rather than each growing a copy, because three
  * feet that must look identical are exactly the thing that stops looking identical.
  *
- * Plain `bg-primary` with no face class: `.primary-face`'s lift is drawn for a button raised off
- * the page, and under something this wide the same shadow reads as a rule ruled across the card
- * rather than as depth. A yellow band on a pale card is already its own edge.
+ * No shadow and no face class: a door sits in the card, not on it. 46px with 15px type are the
+ * bench's numbers — the old 40px bar with 13px type read as a banner rather than a button.
  */
 export function BandFoot({
   href,
@@ -45,7 +44,7 @@ export function BandFoot({
     <Link
       href={href}
       prefetch
-      className="tap-active group block border-t border-border px-4 pb-3.5 pt-3 transition-colors hover:bg-primary/[0.05]"
+      className="tap-active group block border-t border-border px-4 pb-3.5 pt-3 transition-colors hover:bg-muted/40"
     >
       <span className="flex items-center gap-3">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-primary-ink/35 bg-primary/[0.09] text-primary-ink">
@@ -61,7 +60,7 @@ export function BandFoot({
         </span>
       </span>
 
-      <span className="mt-2.5 flex items-center justify-center gap-1.5 rounded-[10px] bg-primary px-3 py-2.5 text-[13px] font-semibold tracking-tight text-primary-foreground transition group-hover:brightness-105 group-active:brightness-95">
+      <span className="mt-2.5 flex min-h-[46px] items-center justify-center gap-1.5 rounded-xl bg-foreground/[0.055] px-3 text-[15px] font-semibold tracking-[-0.01em] text-foreground transition group-hover:bg-foreground/[0.08] group-active:bg-foreground/[0.1]">
         {action}
         <ChevronRight
           className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5"

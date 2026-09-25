@@ -1037,7 +1037,7 @@ export function RunDetailPanel({
               type="button"
               onClick={() => (unconfirmed ? void confirmRun(true) : setEditing(false))}
               disabled={confirming}
-              className="tap-active shrink-0 rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground disabled:opacity-60"
+              className="tap-active shrink-0 rounded-md primary-face bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground disabled:opacity-60"
             >
               {unconfirmed ? "Confirm" : "Done"}
             </button>

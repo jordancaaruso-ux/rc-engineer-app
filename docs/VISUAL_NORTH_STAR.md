@@ -100,6 +100,7 @@ Use **Tailwind semantic tokens** (`bg-background`, `text-foreground`, `border-bo
 ### Color semantics
 
 - **Yellow = action, plus one measured axis** (CTAs, focus rings, active nav — including the page-title timing-line segment, which is nav-position information, not decoration). Never use yellow to mean “fast lap” or “good data.”
+- **Doors are grey, not yellow** (founder pick 2026-09-25, "D · Apple style" off a bench of the real pages). A button that goes somewhere — "View all 8 cars", "Open the lab" — is Apple grey (`variant="door"`, `BandFoot`); yellow stays for doing something. The yellow that is left wears light from above and a golden shadow (`.primary-face`), never a line.
   - **The one exception (founder 2026-08-03): corner balance.** The balance instrument in `HandlingAssessmentFields.tsx` fills its severity tiles in accent. Balance is captured on *every* run, so most answers describe what the car did rather than report a fault, and the previous destructive-coral treatment read as “something is wrong” on ordinary data. The exception is narrow and stays narrow: it is a **magnitude on a measured axis**, not a verdict, and read-back drops to a monochrome ink ramp so a stored record is never mistaken for a live control. Anything else wanting yellow for data still needs a founder call.
 - **Green / red = pace/quality deltas only** (`gain` / `loss` — faster/slower, cleaner/messier). **Volume deltas are neutral:** fewer runs, laps, or wheel time is *less*, not a failure, so those changes render in muted ink with a plain ↑/↓, never green/red (2026-07-10; `DashboardSummaryCard` `DeltaChip`).
 - **Dark text on yellow** — always `primary-foreground` (`#121110`), never white on yellow.
@@ -257,7 +258,8 @@ every drifted row listed at the top of this file drifted because nothing failed 
 |---------|--------|----------|
 | Hero panel | 16px | `rounded-2xl` (`SurfaceCard` variant `hero`) |
 | Card / panel | 12px | `rounded-xl` |
-| Button / input | 8px | `rounded-lg` |
+| Button | 10px, 36px tall | `Button` / `ButtonLink` (2026-09-25) |
+| Input | 8px | `rounded-lg` |
 | Badge / chip | 6px | `rounded-md` |
 
 - **Borders:** 1px hairline `border-border` (`#282726`).
@@ -289,7 +291,7 @@ Use these shared primitives so every screen reads as one system. **Do not invent
 | `PanelTitle`, `PanelSubtitle`, `HubRowTitle` | `src/components/ui/panel.tsx` | Card headlines + supporting line; hub row labels |
 | `Eyebrow` | `src/components/ui/panel.tsx` | Sora 11px semibold uppercase muted section label. First child of a `SurfaceCard` → that card's band (tint + one full-bleed hairline); anywhere else, the words alone. `.eyebrow-band` puts the same band on a header row by hand (the `dot` prop is a retained no-op) |
 | `StatStrip`, `StatTile` | `src/components/ui/panel.tsx` | Hairline-separated metric strip (instrument panel) |
-| `Button` / `ButtonLink` | `src/components/ui/Button.tsx`, `ButtonLink.tsx` | Primary (yellow) and outline actions |
+| `Button` / `ButtonLink` | `src/components/ui/Button.tsx`, `ButtonLink.tsx` | Primary (yellow: doing something), door (grey: going somewhere) and outline |
 | `SectionTitle` | `src/components/ui/SectionTitle.tsx` | Section headers in lists (audit when touching) |
 
 ### Page chrome
@@ -373,7 +375,7 @@ Before opening a PR or marking a screen “done”:
 - [ ] Uses semantic Tailwind tokens — no new raw `#c92a2a`, `#2563eb`, or cool greys.
 - [ ] Every number carries `tabular-nums` — **always**, whichever face it is in. Sora's digits are proportional without it (rule 7).
 - [ ] Micro-labels are Sora 12px 600 sentence case, muted grey — **not** mono, and not uppercase-tracked.
-- [ ] Primary actions use `Button` / `ButtonLink` primary (yellow + dark text).
+- [ ] Primary actions use `Button` / `ButtonLink` primary (yellow + dark text); a button that goes somewhere ("View all …", "Open …") uses `variant="door"`.
 - [ ] Cards use `CardPanel` or `SurfaceCard`, not one-off `bg-card` wrappers with different radii.
 - [ ] Section labels use `<Eyebrow>` where the dashboard does.
 - [ ] Page title uses `.page-title` (**Space Grotesk 700, sentence case, `-0.01em`**).

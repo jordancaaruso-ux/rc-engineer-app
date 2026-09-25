@@ -117,7 +117,7 @@ export default async function ToolsPage(): Promise<ReactNode> {
       </div>
       <div className="flex flex-wrap gap-2">
         <ButtonLink href="/runs/new">Log a run</ButtonLink>
-        <ButtonLink href="/analysis/roll-center" variant="outline">
+        <ButtonLink href="/analysis/roll-center" variant="door">
           Open the lab
         </ButtonLink>
       </div>

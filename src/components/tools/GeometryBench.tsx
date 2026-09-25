@@ -138,11 +138,13 @@ export function GeometryBench({ geometry }: { geometry: ToolsGeometry }) {
               the one person who couldn't reach it. "Blank car" is the Lab's own name for the
               slot you land in, not a description of it.
             */}
-            <ButtonLink href="/analysis/roll-center" variant="outline">
+            <ButtonLink href="/analysis/roll-center" variant="door">
               Blank car
             </ButtonLink>
-            {/* Says what the yellow door does: it carries THIS car's setup into the Lab with you. */}
-            <ButtonLink href={rc.labHref}>Open this setup</ButtonLink>
+            {/* Says what the door does: it carries THIS car's setup into the Lab with you. */}
+            <ButtonLink href={rc.labHref} variant="door">
+              Open this setup
+            </ButtonLink>
           </div>
         </>
       ) : (
@@ -164,11 +166,14 @@ export function GeometryBench({ geometry }: { geometry: ToolsGeometry }) {
           {/*
             One door here, not two. It goes to the same blank calculator the "Blank car" chip
             does above — but there is no second, setup-carrying door to tell it apart from, so it
-            keeps the lab's own name and takes the yellow: the only action on a band is never a
-            quiet one.
+            keeps the lab's own name. It took the yellow until 2026-09-25, on "the only action on a
+            band is never a quiet one"; it is the grey door now like every "Open …", a call the
+            founder made looking at this exact band on the bench.
           */}
           <div className="mt-auto flex items-center justify-end border-t border-border bg-muted/40 px-4 py-2.5">
-            <ButtonLink href="/analysis/roll-center">Open the lab</ButtonLink>
+            <ButtonLink href="/analysis/roll-center" variant="door">
+              Open the lab
+            </ButtonLink>
           </div>
         </>
       )}

@@ -24,7 +24,7 @@ export function CompareBench({ compare }: { compare: ToolsCompare | null }) {
         <p className="text-[13px] leading-relaxed text-muted-foreground">
           Log two runs on the same car and they land here, ready to put side by side.
         </p>
-        <ButtonLink href="/setup/comparison" variant="outline">
+        <ButtonLink href="/setup/comparison" variant="door">
           Open the bench
         </ButtonLink>
       </CardPanel>

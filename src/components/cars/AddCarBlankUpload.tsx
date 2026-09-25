@@ -25,9 +25,9 @@ import {
  * and the requirement drowned in it. The field label below no longer repeats it either.
  *
  * The card has exactly one yellow thing at a time, and it is always the next move: "Choose file"
- * full-width until a file exists, then "Create chassis" in its place. Neither wears
- * `.primary-face`: that class's lift is drawn for a button raised off the page, and across the
- * full width of a card the same shadow reads as a rule under the control rather than depth.
+ * full-width until a file exists, then "Create chassis" in its place. Both wear `.primary-face`
+ * since 2026-09-25: its shadow is gold now, and under a full-width control that reads as the
+ * button's own light, where the grey shadow before it read as a rule under the control.
  *
  * NO NAME GATE (2026-08-18). The picker used to stay disabled until the chassis had a name, which
  * left the card opening on a greyed-out control with nothing to press — and a yellow button you
@@ -52,13 +52,12 @@ import {
  */
 
 /**
- * The card's single yellow action, whichever one it currently is. Deliberately NOT
- * `primaryButtonClassName()`: that is the toolbar chip — 30px tall, `text-xs`, and lifted off
- * the page by `.primary-face`. This one is flush across the card, so it takes the fill and no
- * shadow at all; the yellow is its own edge on paper.
+ * The card's single yellow action, whichever one it currently is. Not
+ * `primaryButtonClassName()`: that is the 36px toolbar chip. This one spans the card, in the
+ * chip's face.
  */
 const wideYellowClassName =
-  "tap-active flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2.5 text-[13px] font-semibold tracking-tight text-primary-foreground transition hover:brightness-105 active:brightness-95 disabled:opacity-60";
+  "tap-active flex w-full items-center justify-center gap-1.5 rounded-lg primary-face bg-primary px-3 py-2.5 text-[13px] font-semibold tracking-tight text-primary-foreground transition hover:brightness-105 active:brightness-95 disabled:opacity-60";
 
 function formatFileSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
