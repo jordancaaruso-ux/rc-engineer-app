@@ -13,7 +13,6 @@ import {
 import {
   activeTireCountChip,
   expandedTireCountChips,
-  tireAgeReadoutLine,
   tireRunNumber,
   TIRE_COUNT_CHIPS,
   type TireCountChip,
@@ -38,34 +37,30 @@ import type { TireEnd } from "@/lib/tires/tireCatalogFilter";
  * trade. What replaces the question:
  *
  * - The count row is always on screen, so the guess is visible, not buried.
- * - On one end of a front/rear car, the answer line under it opens "Carried on ·"
- *   when the number came from the last run, so a carried count is never mistaken
- *   for one the driver entered. A one-tire car no longer says so (see the end).
  * - Fixing it is one tap on the row that is already showing it. `4+` grows the
  *   row in place rather than handing off to a stepper.
  *
- * A front/rear end shows no numeral for the state. "run 1" reads as an index, so a
- * fresh set says **New tires**; a carried set says how many runs are *on* them and
- * promises the run number. (A one-tire car shows "Run 1" beside the compound since
- * 2026-09-26 — the founder picked it off a bench that showed exactly that, with the
- * lit "New" chip right under it.) Anything meaning different rubber clears the
- * stint id, and the server mints a fresh one on save.
+ * Nothing says a count was carried from the last run. Until 2026-09-26 a line did —
+ * a grey hint on one-tire cars, "Carried on ·" in a front/rear end's answer — and
+ * the founder picked the run box below over both, told the marker went with them.
+ * Anything meaning different rubber clears the stint id, and the server mints a
+ * fresh one on save.
+ *
+ * THE RUN BESIDE THE TIRE (founder picks 2026-09-26, off three benches of the real Tires step).
+ * Every tire has a small "Run 4" box beside its compound, at the picker's height — "on the left
+ * have the selector, then a small box on the right indicating which run this is", then "build it
+ * so every discipline is uniform" — dashed and dimmed like the chips until there is an answer.
+ * It replaced a big "On the car now" box on one-tire cars (dashed edge, yellow stripe, spaced
+ * capitals: the only box of its kind in the app) and the one-line answer on front/rear ends. The
+ * earlier rule was no numeral — "run 1" reads as an index, so a fresh set said **New tires** —
+ * but this number is the run itself, the lit "New" chip sits right under it, and he picked it
+ * off a bench showing exactly that. A one-tire car also lost its "Runs on these tires" heading
+ * and its "Pick a compound" prompt, so both kinds of car read the same.
  *
  * ONE END OF A FRONT/REAR CAR (2026-09-19). An off-road car logs its front and rear tires apart,
  * each with its own count, and `RunSplitTireSelectionPanel` mounts this panel twice with
  * `variant="compact"`. Every rule above is the same — that is why it is this panel and not a
- * copy — but the presentation is cut down so both ends fit one phone screen: the end's name for
- * a heading, the insert/wheel row in `children`, the chips, and the answer on one line.
- *
- * THE RUN BESIDE THE TIRE (founder picks 2026-09-26, off two benches of the real Tires step). A
- * one-tire car used to answer in a big "On the car now" box — dashed edge, yellow stripe, spaced
- * capitals — the only box of its kind in the app, under a grey line saying where the count came
- * from ("No previous run on this car, so assumed a fresh set"; his words: remove it). Both are
- * gone. The compound has a small "Run 4" box beside it at its own height ("H": "on the left have
- * the selector, then a small box on the right indicating which run this is"), dashed and dimmed
- * like the chips until there is an answer. The lit chip below already says how many runs are on
- * the set, so that is the whole answer. Nothing on a one-tire car says a count was carried any
- * more; he was told before he picked it. A front/rear end keeps its line.
+ * copy. The end's name is the heading, and its insert/wheel/diameter row comes in `children`.
  */
 
 export type { TireStintValue };
@@ -277,142 +272,92 @@ export function RunTireSelectionPanel({
     [commit, last, source, value]
   );
 
-  if (variant === "compact") {
-    const endName = end === "front" ? "Front" : "Rear";
-    const line = tireAgeReadoutLine(source, value);
-    return (
-      <div className="space-y-2">
-        <Eyebrow>{endName}</Eyebrow>
-        <TireTypeCombobox
-          value={tireTypeId}
-          carId={carId}
-          bucket={bucket}
-          end={end}
-          onChange={(id) => handleCompoundChange(id, null)}
-          onSelectedTypeChange={(opt) => {
-            if (opt) handleCompoundChange(opt.id, opt.displayName);
-          }}
-          className={prefillFieldClass}
-          placeholder={`${endName} tire…`}
-          aria-label={`${endName} tire compound`}
-        />
-        {children}
-        <div
-          className={cn(
-            "flex gap-1.5",
-            expanded ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap"
-          )}
-          role="group"
-          aria-label={`Runs on the ${endName.toLowerCase()} tires`}
-        >
-          {chips.map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              aria-pressed={activeChip === chip.key}
-              disabled={!tireTypeId}
-              onClick={() => chooseCount(chip)}
-              className={cn(
-                chipToggleClass(activeChip === chip.key),
-                "shrink-0 px-3 py-2 text-xs",
-                !tireTypeId && "border-dashed opacity-50"
-              )}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-        {line ? <div className="text-[12px] font-medium text-foreground">{line}</div> : null}
-      </div>
-    );
-  }
+  // A front/rear end is named for its end; a one-tire car's only tire is "the compound".
+  const endName = variant === "compact" ? (end === "front" ? "Front" : "Rear") : null;
 
+  // One layout for every car (see the header): heading, the tire with its run box, the end's own
+  // boxes, the count row.
   return (
-    <div className="space-y-3">
-      <div className="space-y-1.5">
-        <Eyebrow>Compound</Eyebrow>
-        {/* The compound, and beside it which run this will be on the set (see the header). The
-            box stretches to the picker's height, or to the controlled tire's when an event locks
-            it. */}
-        <div className="flex items-stretch gap-2">
-          {locked ? (
-            <div className="min-w-0 flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2">
-              <div className="text-sm text-foreground">{specTireType!.displayName}</div>
-              <div className="text-[11px] text-muted-foreground">
-                Controlled tire for this event — set at the event, not here.
-              </div>
+    <div className="space-y-2">
+      <Eyebrow>{endName ?? "Compound"}</Eyebrow>
+      {/* The box stretches to the picker's height, or to the controlled tire's when an event
+          locks it. */}
+      <div className="flex items-stretch gap-2">
+        {locked ? (
+          <div className="min-w-0 flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2">
+            <div className="text-sm text-foreground">{specTireType!.displayName}</div>
+            <div className="text-[11px] text-muted-foreground">
+              Controlled tire for this event — set at the event, not here.
             </div>
-          ) : (
-            <TireTypeCombobox
-              value={tireTypeId}
-              carId={carId}
-              bucket={bucket}
-              onChange={(id) => handleCompoundChange(id, null)}
-              onSelectedTypeChange={(opt) => {
-                if (opt) handleCompoundChange(opt.id, opt.displayName);
-              }}
-              className={cn("min-w-0 flex-1", prefillFieldClass)}
-              aria-label="Tire compound"
-            />
-          )}
-          <div
+          </div>
+        ) : (
+          <TireTypeCombobox
+            value={tireTypeId}
+            carId={carId}
+            bucket={bucket}
+            end={end}
+            onChange={(id) => handleCompoundChange(id, null)}
+            onSelectedTypeChange={(opt) => {
+              if (opt) handleCompoundChange(opt.id, opt.displayName);
+            }}
+            className={cn("min-w-0 flex-1", prefillFieldClass)}
+            placeholder={endName ? `${endName} tire…` : undefined}
+            aria-label={endName ? `${endName} tire compound` : "Tire compound"}
+          />
+        )}
+        <RunNumberBox run={runNumber} />
+      </div>
+      {children}
+      <div
+        className={cn(
+          "flex gap-1.5",
+          expanded ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap"
+        )}
+        role="group"
+        aria-label={endName ? `Runs on the ${endName.toLowerCase()} tires` : "Runs on these tires"}
+      >
+        {chips.map((chip) => (
+          <button
+            key={chip.key}
+            type="button"
+            aria-pressed={activeChip === chip.key}
+            disabled={!tireTypeId}
+            onClick={() => chooseCount(chip)}
             className={cn(
-              "flex shrink-0 items-center gap-[5px] rounded-lg border bg-background/45 px-[11px]",
-              runNumber ? "border-border" : "border-dashed border-border opacity-[0.55]"
+              chipToggleClass(activeChip === chip.key),
+              "shrink-0 px-3 py-2 text-xs",
+              !tireTypeId && "border-dashed opacity-50"
             )}
           >
-            <span className="type-data-label">Run</span>
-            <span aria-hidden className="text-[15.5px] font-semibold tabular-nums text-foreground">
-              {runNumber ?? "–"}
-            </span>
-            <span className="sr-only">
-              {runNumber === null ? "not set yet" : runNumber === "?" ? "unknown" : runNumber}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Eyebrow>Runs on these tires</Eyebrow>
-
-        <div
-          className={cn(
-            "flex gap-1.5",
-            expanded ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap"
-          )}
-          role="group"
-          aria-label="Runs on these tires"
-        >
-          {chips.map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              aria-pressed={activeChip === chip.key}
-              disabled={!tireTypeId}
-              onClick={() => chooseCount(chip)}
-              className={cn(
-                chipToggleClass(activeChip === chip.key),
-                "shrink-0 px-3 py-2 text-xs",
-                !tireTypeId && "border-dashed opacity-50"
-              )}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-
-        {/* The run box above answers once a compound is picked; until then the dimmed chips
-            need one prompt. */}
-        {!tireTypeId ? (
-          <div className="text-[11px] leading-snug text-muted-foreground">
-            Pick a compound and this fills itself in.
-          </div>
-        ) : null}
+            {chip.label}
+          </button>
+        ))}
       </div>
 
       {copyTireWarning ? (
         <div className="text-[11px] text-muted-foreground">{copyTireWarning}</div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Which run this will be on the set, beside every compound (see the header): "Run 4", "Run ?"
+ * after Not sure, and dashed and dimmed like the chips until there is an answer.
+ */
+function RunNumberBox({ run }: { run: string | null }) {
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 items-center gap-[5px] rounded-lg border bg-background/45 px-[11px]",
+        run ? "border-border" : "border-dashed border-border opacity-[0.55]"
+      )}
+    >
+      <span className="type-data-label">Run</span>
+      <span aria-hidden className="text-[15.5px] font-semibold tabular-nums text-foreground">
+        {run ?? "–"}
+      </span>
+      <span className="sr-only">{run === null ? "not set yet" : run === "?" ? "unknown" : run}</span>
     </div>
   );
 }

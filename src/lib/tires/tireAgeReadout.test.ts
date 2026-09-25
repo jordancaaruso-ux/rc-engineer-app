@@ -105,7 +105,7 @@ test("the lit chip follows the value, and nothing is lit before a compound", () 
   assert.equal(activeTireCountChip("manual", v(0, false)), "unsure", "unknown age beats the count");
 });
 
-test("one end of a front/rear car reads on one line, and a carried count says so itself", () => {
+test("the answer on one line says a carried count itself", () => {
   const v = (runsCompleted: number, ageKnown = true) => ({ runsCompleted, ageKnown, stintId: null });
   // Nothing picked: the dimmed chips already say that.
   assert.equal(tireAgeReadoutLine(null, v(0)), null);
@@ -126,7 +126,7 @@ test("one end of a front/rear car reads on one line, and a carried count says so
   );
 });
 
-test("a one-tire car's run box names the run this will be, and never guesses one", () => {
+test("the run box beside every tire names the run this will be, and never guesses one", () => {
   assert.equal(tireRunNumber(null, v(0)), null, "no answer yet: no number");
   assert.equal(tireRunNumber("assumedFresh", v(0)), "1", "new tires: this is run 1");
   assert.equal(tireRunNumber("carried", v(2, true, "stint-1")), "3");

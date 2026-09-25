@@ -7,12 +7,14 @@
  * half-answered: a compound is either picked, or nothing is.
  *
  * That makes the carry-over silent, which is the one thing the previous design
- * refused to do. On one end of a front/rear car the mitigation is the answer line
- * (`tireAgeReadoutLine`), which opens "Carried on ·" when the number came from the
- * last run. A one-tire car shows only the run number now (`tireRunNumber`, founder
- * pick 2026-09-26), so nothing there says a count was carried; its grey hint line
- * (`tireAgeHint`) went the same day. A wrong guess is still one tap to fix, which
- * is cheaper than the question it replaced.
+ * refused to do. The mitigation was a line naming where the count came from — a
+ * grey hint on one-tire cars (`tireAgeHint`), "Carried on ·" in a front/rear end's
+ * answer (`tireAgeReadoutLine`). Since 2026-09-26 every car shows only the run
+ * number (`tireRunNumber`; founder picks off three benches, told the marker goes),
+ * so nothing says a count was carried. A wrong guess is still one tap to fix, which
+ * is cheaper than the question it replaced. `tireAgeReadout`, `tireAgeReadoutLine`
+ * and `tireAgeHint` are off the log-run form; they stay as the tested wording for
+ * the answer in words.
  *
  * The count row is always on screen for the same reason: it is both the display
  * of the guess and the correction for it.
@@ -64,11 +66,10 @@ export function tireAgeReadout(source: TireAgeSource, value: TireStintValue): Ti
 }
 
 /**
- * The same answer as `tireAgeReadout`, on one line — for one end of a front/rear car, where two of
- * the big "On the car now" boxes stacked on a phone would push the rear tire off the screen
- * (founder call 2026-09-19). A carried count says so in the line itself, because the separate hint
- * line is gone too. Null while no tire is picked: the dimmed chips already say that. A one-tire
- * car answers with `tireRunNumber` instead.
+ * The same answer as `tireAgeReadout`, on one line. It was each front/rear end's answer from
+ * 2026-09-19 (two big "On the car now" boxes stacked on a phone pushed the rear tire off the
+ * screen) until 2026-09-26, when every car took the run box (`tireRunNumber`). A carried count
+ * says so in the line itself. Null while no tire is picked.
  */
 export function tireAgeReadoutLine(source: TireAgeSource, value: TireStintValue): string | null {
   if (source === null) return null;
@@ -85,11 +86,12 @@ export function tireAgeReadoutLine(source: TireAgeSource, value: TireStintValue)
 }
 
 /**
- * Which run this will be on the set, for the small "Run 4" box beside a one-tire car's compound
- * (founder pick "H", 2026-09-26: "on the left have the selector, then a small box on the right
- * indicating which run this is"). It replaced the big "On the car now" box: the lit chip already
- * says how many runs are on the set. Null until there is an answer; "?" after Not sure, because a
- * set of unknown age has no run number either.
+ * Which run this will be on the set, for the small "Run 4" box beside every compound on the
+ * log-run Tires step (founder picks 2026-09-26: "on the left have the selector, then a small box on
+ * the right indicating which run this is", then "every discipline uniform"). It replaced the big
+ * "On the car now" box on one-tire cars and the one-line answer on front/rear ends: the lit chip
+ * already says how many runs are on the set. Null until there is an answer; "?" after Not sure,
+ * because a set of unknown age has no run number either.
  */
 export function tireRunNumber(source: TireAgeSource, value: TireStintValue): string | null {
   if (source === null) return null;
@@ -101,7 +103,7 @@ export function tireRunNumber(source: TireAgeSource, value: TireStintValue): str
  * The line that sat under the chips on a one-tire car until 2026-09-26 (founder: remove it). Says
  * where the count came from so a carried number is never mistaken for one the driver entered —
  * and says nothing once they have corrected it, because then they already know. Nothing on the
- * log-run form shows it now; a front/rear end's `tireAgeReadoutLine` carries the "Carried on" part.
+ * log-run form shows it now.
  */
 export function tireAgeHint(source: TireAgeSource, last: LastRunTires | null): string | null {
   if (source === "carried") {
