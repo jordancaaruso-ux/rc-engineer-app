@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { RACE_CLASSES } from "./carClasses";
+import { POWER_TYPES, RACE_CLASSES } from "./carClasses";
 import {
   NO_TIRE_PROFILE,
   TIRE_BUCKETS,
   hasTireProfileEntry,
   tireProfileForDiscipline,
 } from "./tireProfile";
+
+/** Every class the picker offers, in both powers — what a car can actually store. */
+const EVERY_DISCIPLINE = RACE_CLASSES.flatMap((cls) =>
+  POWER_TYPES.map((power) => ({ cls, discipline: `${cls.id}~${power.id}` }))
+);
 
 test("every class the picker offers has decided what its tires look like", () => {
   // A class added to RACE_CLASSES without a row here would fall through to "whole list" and
@@ -16,7 +21,7 @@ test("every class the picker offers has decided what its tires look like", () =>
   }
 });
 
-test("touring shops the touring list and keeps the single-tire form", () => {
+test("electric touring shops the touring list and keeps the single-tire form", () => {
   assert.deepEqual(tireProfileForDiscipline("touring~electric"), {
     bucket: "touring",
     split: false,
@@ -24,12 +29,22 @@ test("touring shops the touring list and keeps the single-tire form", () => {
     frontRearSwitch: true,
     foldPrep: false,
   });
-  // Nitro touring and FWD run the same one-tire step.
-  assert.deepEqual(tireProfileForDiscipline("touring~nitro"), tireProfileForDiscipline("touring~electric"));
   assert.equal(tireProfileForDiscipline("fwd~electric").bucket, "touring");
   assert.equal(tireProfileForDiscipline("fwd~electric").split, false);
   // A legacy bare id, written before power was asked for, still places the car.
-  assert.equal(tireProfileForDiscipline("touring").bucket, "touring");
+  assert.deepEqual(tireProfileForDiscipline("touring"), tireProfileForDiscipline("touring~electric"));
+});
+
+test("nitro touring runs foam: front and rear, each with its diameter, over the whole list", () => {
+  // Founder call 2026-09-25 on the Infinity IF15II: "one-tenth nitro uses foam tires".
+  assert.deepEqual(tireProfileForDiscipline("touring~nitro"), {
+    bucket: null,
+    split: true,
+    boxes: ["diameter", "mods"],
+    frontRearSwitch: false,
+    foldPrep: false,
+  });
+  assert.deepEqual(tireProfileForDiscipline("touring~nitro"), tireProfileForDiscipline("pan-12th~electric"));
 });
 
 test("1/10 off-road shops the off-road list and logs front and rear with insert and wheel", () => {
@@ -48,15 +63,13 @@ test("1/10 off-road shops the off-road list and logs front and rear with insert 
   }
 });
 
-test("power never changes the tires", () => {
-  assert.deepEqual(
-    tireProfileForDiscipline("buggy-4wd~nitro"),
-    tireProfileForDiscipline("buggy-4wd~electric")
-  );
-  assert.deepEqual(
-    tireProfileForDiscipline("gt-8th~nitro"),
-    tireProfileForDiscipline("gt-8th~electric")
-  );
+test("power changes the tires on a touring car only", () => {
+  for (const cls of RACE_CLASSES) {
+    const electric = tireProfileForDiscipline(`${cls.id}~electric`);
+    const nitro = tireProfileForDiscipline(`${cls.id}~nitro`);
+    if (cls.id === "touring") assert.notDeepEqual(nitro, electric);
+    else assert.deepEqual(nitro, electric, cls.id);
+  }
 });
 
 test("1/8 off-road gets the off-road step but no filter — nothing is imported for it yet", () => {
@@ -105,34 +118,33 @@ test("a car nothing can place keeps today's form and sees everything", () => {
 });
 
 test("every front/rear class names at least one box, and a one-tire class names none", () => {
-  for (const cls of RACE_CLASSES) {
-    const p = tireProfileForDiscipline(cls.id);
-    if (p.split) assert.ok(p.boxes.length > 0, cls.id);
-    else assert.equal(p.boxes.length, 0, cls.id);
+  for (const { discipline } of EVERY_DISCIPLINE) {
+    const p = tireProfileForDiscipline(discipline);
+    if (p.split) assert.ok(p.boxes.length > 0, discipline);
+    else assert.equal(p.boxes.length, 0, discipline);
   }
 });
 
-test("touring and FWD offer the front/rear switch; a class that always splits never does", () => {
-  // Founder "Yes", 2026-09-25: foam touring runs different ends.
+test("electric touring and FWD offer the front/rear switch; a class that always splits never does", () => {
+  // Founder "Yes", 2026-09-25.
   assert.equal(tireProfileForDiscipline("touring~electric").frontRearSwitch, true);
   assert.equal(tireProfileForDiscipline("fwd~electric").frontRearSwitch, true);
-  for (const cls of RACE_CLASSES) {
-    const p = tireProfileForDiscipline(cls.id);
-    assert.ok(!(p.split && p.frontRearSwitch), cls.id);
+  for (const { discipline } of EVERY_DISCIPLINE) {
+    const p = tireProfileForDiscipline(discipline);
+    assert.ok(!(p.split && p.frontRearSwitch), discipline);
   }
 });
 
 test("tire prep starts folded on off-road only", () => {
   // Founder "Yes", 2026-09-25: off-road sheets almost never ask for additive; on-road nearly all do.
-  for (const cls of RACE_CLASSES) {
-    const p = tireProfileForDiscipline(cls.id);
-    assert.equal(p.foldPrep, cls.surface === "offroad", cls.id);
+  for (const { cls, discipline } of EVERY_DISCIPLINE) {
+    assert.equal(tireProfileForDiscipline(discipline).foldPrep, cls.surface === "offroad", discipline);
   }
 });
 
 test("every bucket a profile can name is one the catalog holds", () => {
-  for (const cls of RACE_CLASSES) {
-    const { bucket } = tireProfileForDiscipline(cls.id);
+  for (const { discipline } of EVERY_DISCIPLINE) {
+    const { bucket } = tireProfileForDiscipline(discipline);
     if (bucket != null) assert.ok((TIRE_BUCKETS as readonly string[]).includes(bucket));
   }
 });

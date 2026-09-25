@@ -23,11 +23,17 @@ import type { TireEndBox } from "@/lib/tires/tireFitment";
  *
  * Founder "Yes", 2026-09-25, to two follow-ups:
  *
- * - Touring and FWD keep one tire but offer a "Different front and rear" switch — foam touring
- *   runs different ends, and a few sheets (Infinity IF14, RC Maker SP1F) print both.
+ * - Touring and FWD keep one tire but offer a "Different front and rear" switch — a few sheets
+ *   (Infinity IF14, RC Maker SP1F) print both ends.
  * - Tire prep (additive) starts FOLDED on off-road, one tap to open. Nearly every on-road sheet
  *   asks for additive (1/12 15 of 15, touring 22 of 24); off-road sheets almost never do (1/10
  *   6 of 55, 1/8 0 of 27). Folded, not removed: the few who sauce on carpet still can.
+ *
+ * Founder call, 2026-09-25, on the Infinity IF15II: "one-tenth nitro uses foam tires … it should
+ * have front tires different to rear tires." So 1/10 NITRO touring is the one class where power
+ * changes the tires: foam, front and rear, each with its diameter, like the pan cars (both IF15II
+ * sheets print a front, a rear and a diameter). It shops the whole list, because the touring list
+ * is all rubber.
  *
  * The `bucket` is the COARSE catalog slice (`TireType.discipline`), not the race class — founder
  * call 2026-09-18: "1/10 offroad is fine for now, they can search for stuff". A class whose tires
@@ -88,7 +94,10 @@ const OFFROAD_10TH: TireProfile = {
 };
 /** Off-road, but no tires imported for the scale yet — front/rear form over the whole list. */
 const OFFROAD_UNCATALOGUED: TireProfile = { ...OFFROAD_10TH, bucket: null };
-/** 1/12, 1/10 and 1/8 pan, formula, 1/8 on-road: front and rear, each trued to a diameter. */
+/**
+ * 1/12, 1/10 and 1/8 pan, formula, 1/8 on-road and 1/10 nitro touring: front and rear, each
+ * trued to a diameter.
+ */
 const ONROAD_FRONT_REAR: TireProfile = {
   bucket: null,
   split: true,
@@ -137,14 +146,27 @@ const PROFILE_BY_CLASS: Readonly<Record<string, TireProfile>> = {
 };
 
 /**
+ * The few classes where power changes the tires, keyed `class~power`. Checked before
+ * `PROFILE_BY_CLASS`; a legacy bare id (no power) falls through to the class row.
+ */
+const PROFILE_BY_CLASS_AND_POWER: Readonly<Record<string, TireProfile>> = {
+  // 1/10 nitro touring runs foam, front and rear (founder call 2026-09-25, header above).
+  "touring~nitro": ONROAD_FRONT_REAR,
+};
+
+/**
  * The tire profile for a stored discipline (an encoded `carClasses.ts` value — resolve the car
- * with `disciplineForCar` first). Power never matters here: nitro and electric buggies bolt on
- * the same tires.
+ * with `disciplineForCar` first). Power only matters where `PROFILE_BY_CLASS_AND_POWER` says so:
+ * nitro and electric buggies bolt on the same tires, nitro and electric touring cars don't.
  */
 export function tireProfileForDiscipline(discipline: string | null | undefined): TireProfile {
-  const classId = parseDiscipline(discipline)?.classId;
-  if (!classId) return NO_TIRE_PROFILE;
-  return PROFILE_BY_CLASS[classId] ?? NO_TIRE_PROFILE;
+  const parsed = parseDiscipline(discipline);
+  if (!parsed) return NO_TIRE_PROFILE;
+  if (parsed.power) {
+    const byPower = PROFILE_BY_CLASS_AND_POWER[`${parsed.classId}~${parsed.power}`];
+    if (byPower) return byPower;
+  }
+  return PROFILE_BY_CLASS[parsed.classId] ?? NO_TIRE_PROFILE;
 }
 
 /** True when the class id has an explicit row above — the test's hook, not for app code. */
