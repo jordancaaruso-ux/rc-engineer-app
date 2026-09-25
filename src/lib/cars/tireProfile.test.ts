@@ -21,6 +21,8 @@ test("touring shops the touring list and keeps the single-tire form", () => {
     bucket: "touring",
     split: false,
     boxes: [],
+    frontRearSwitch: true,
+    foldPrep: false,
   });
   // Nitro touring and FWD run the same one-tire step.
   assert.deepEqual(tireProfileForDiscipline("touring~nitro"), tireProfileForDiscipline("touring~electric"));
@@ -40,7 +42,7 @@ test("1/10 off-road shops the off-road list and logs front and rear with insert 
   ]) {
     assert.deepEqual(
       tireProfileForDiscipline(d),
-      { bucket: "offroad-10th", split: true, boxes: ["insert", "wheel", "mods"] },
+      { bucket: "offroad-10th", split: true, boxes: ["insert", "wheel", "mods"], frontRearSwitch: false, foldPrep: true },
       d
     );
   }
@@ -61,7 +63,7 @@ test("1/8 off-road gets the off-road step but no filter — nothing is imported 
   for (const d of ["buggy-8th-4wd~nitro", "buggy-8th-2wd~electric", "truggy-8th~nitro", "other-offroad~electric~Monster"]) {
     assert.deepEqual(
       tireProfileForDiscipline(d),
-      { bucket: null, split: true, boxes: ["insert", "wheel", "mods"] },
+      { bucket: null, split: true, boxes: ["insert", "wheel", "mods"], frontRearSwitch: false, foldPrep: true },
       d
     );
   }
@@ -75,14 +77,20 @@ test("pan cars, formula and 1/8 on-road log front and rear, each with its diamet
   for (const d of ["pan-12th~electric", "pan-10th~electric", "pan-8th~nitro", "formula~electric", "gt-8th~nitro"]) {
     assert.deepEqual(
       tireProfileForDiscipline(d),
-      { bucket: null, split: true, boxes: ["diameter", "mods"] },
+      { bucket: null, split: true, boxes: ["diameter", "mods"], frontRearSwitch: false, foldPrep: false },
       d
     );
   }
 });
 
 test("1/5 GT logs front and rear with Modifications — no sheet to read yet", () => {
-  assert.deepEqual(tireProfileForDiscipline("gt-5th~nitro"), { bucket: null, split: true, boxes: ["mods"] });
+  assert.deepEqual(tireProfileForDiscipline("gt-5th~nitro"), {
+    bucket: null,
+    split: true,
+    boxes: ["mods"],
+    frontRearSwitch: false,
+    foldPrep: false,
+  });
 });
 
 test("a named other on-road class keeps today's one-tire form", () => {
@@ -101,6 +109,24 @@ test("every front/rear class names at least one box, and a one-tire class names 
     const p = tireProfileForDiscipline(cls.id);
     if (p.split) assert.ok(p.boxes.length > 0, cls.id);
     else assert.equal(p.boxes.length, 0, cls.id);
+  }
+});
+
+test("touring and FWD offer the front/rear switch; a class that always splits never does", () => {
+  // Founder "Yes", 2026-09-25: foam touring runs different ends.
+  assert.equal(tireProfileForDiscipline("touring~electric").frontRearSwitch, true);
+  assert.equal(tireProfileForDiscipline("fwd~electric").frontRearSwitch, true);
+  for (const cls of RACE_CLASSES) {
+    const p = tireProfileForDiscipline(cls.id);
+    assert.ok(!(p.split && p.frontRearSwitch), cls.id);
+  }
+});
+
+test("tire prep starts folded on off-road only", () => {
+  // Founder "Yes", 2026-09-25: off-road sheets almost never ask for additive; on-road nearly all do.
+  for (const cls of RACE_CLASSES) {
+    const p = tireProfileForDiscipline(cls.id);
+    assert.equal(p.foldPrep, cls.surface === "offroad", cls.id);
   }
 });
 

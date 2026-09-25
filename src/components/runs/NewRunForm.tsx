@@ -43,6 +43,7 @@ import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobo
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { RunTireSelectionPanel, type TireStintValue } from "@/components/runs/RunTireSelectionPanel";
 import { tireProfileForDiscipline } from "@/lib/cars/tireProfile";
+import { isSamePlatform } from "@/lib/cars/carClasses";
 import { RunSplitTireSelectionPanel } from "@/components/runs/RunSplitTireSelectionPanel";
 import {
   normalizeTireFitment,
@@ -728,6 +729,13 @@ export function NewRunForm(props: {
   const [frontTire, setFrontTire] = useState<TireEndState>(EMPTY_TIRE_END);
   /** Front/rear cars: what each end is glued to. Kept as typed; normalised on save. */
   const [tireFitment, setTireFitment] = useState<TireFitment>({});
+  /**
+   * A one-tire car (touring, FWD) whose driver flipped "Different front and rear" on. Only the
+   * switch's own state: once a front tire is picked, the front itself keeps the ends apart.
+   */
+  const [frontRearChosen, setFrontRearChosen] = useState(false);
+  /** Tire prep opened from its folded row (off-road, `TireProfile.foldPrep`). */
+  const [prepUnfolded, setPrepUnfolded] = useState(false);
   const [additiveTypeId, setAdditiveTypeId] = useState<string>("");
   /** Ordered tire-prep applications toward the run (see src/lib/runs/tirePrep.ts).
    *  Starts empty — the driver adds applications on demand, and an added row is
@@ -1793,7 +1801,10 @@ export function NewRunForm(props: {
    * reopen as front/rear even if its car has since been re-classed, or is one nothing can place.
    */
   const splitTiresActive =
-    tireProfile.split || Boolean(frontTire.typeId) || tireFitmentHasContent(tireFitment);
+    tireProfile.split ||
+    (tireProfile.frontRearSwitch && frontRearChosen) ||
+    Boolean(frontTire.typeId) ||
+    tireFitmentHasContent(tireFitment);
   /** Each end's boxes beside its tire: the class's own, plus any the form already holds a value in. */
   const tireBoxes = useMemo(
     () => tireEndBoxesToShow(tireProfile.boxes, tireFitment),
@@ -1805,18 +1816,28 @@ export function NewRunForm(props: {
    * tires from the new car's last run; this covers the doors that change the car without that
    * plan (the classic form's car picker). Only on a change, never on first paint, so a hydrate
    * that sets the car and its front together is left alone.
+   *
+   * One exception since touring can log its ends apart (2026-09-25): a touring front carries to
+   * another touring car, exactly as its rear does — the same wheels bolt on.
    */
   const carIdForTireResetRef = useRef(carId);
+  const platformForTireResetRef = useRef<string | null>(selectedCar?.platform ?? null);
   useEffect(() => {
+    const prevPlatform = platformForTireResetRef.current;
+    platformForTireResetRef.current = selectedCar?.platform ?? null;
     if (carIdForTireResetRef.current === carId) return;
     const hadCar = Boolean(carIdForTireResetRef.current);
     carIdForTireResetRef.current = carId;
+    // The switch and the unfolded prep belong to the car they were used on.
+    setFrontRearChosen(false);
+    setPrepUnfolded(false);
     if (!hadCar || isEditing) return;
     if (selectedCar?.platform && !tireProfile.split) {
+      if (tireProfile.frontRearSwitch && isSamePlatform(prevPlatform, selectedCar.platform)) return;
       setFrontTire(EMPTY_TIRE_END);
       setTireFitment({});
     }
-  }, [carId, isEditing, selectedCar?.platform, tireProfile.split]);
+  }, [carId, isEditing, selectedCar?.platform, tireProfile.split, tireProfile.frontRearSwitch]);
   const [modelTemplate, setModelTemplate] = useState<SetupSheetTemplate | null>(null);
   /**
    * Set when this car's chassis was derived from somebody's own PDF and fills in on a picture of
@@ -5698,9 +5719,50 @@ export function NewRunForm(props: {
               prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}
             />
             )}
+            {/* Touring and FWD log one tire, unless the driver says the ends differ (foam
+                touring). Off turns the form back to one tire and drops the front. */}
+            {tireProfile.frontRearSwitch ? (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-foreground">Different front and rear</span>
+                <Switch
+                  checked={splitTiresActive}
+                  onChange={(on) => {
+                    setFrontRearChosen(on);
+                    if (!on) {
+                      setFrontTire(EMPTY_TIRE_END);
+                      setTireFitment({});
+                    }
+                  }}
+                  ariaLabel="Different front and rear tires"
+                />
+              </div>
+            ) : null}
             {/* Prep under the compound in BOTH modes since 2026-09-16 — the
-                wizard used to hold this back for a Prep step of its own. */}
-            {prepPanelJsx}
+                wizard used to hold this back for a Prep step of its own. Folded on
+                off-road until it's opened or already holds something (2026-09-25). */}
+            {!tireProfile.foldPrep ||
+            prepUnfolded ||
+            Boolean(additiveTypeId) ||
+            tirePrepHasContent(tirePrep) ||
+            completeValidation.additive ||
+            controlAdditive ? (
+              prepPanelJsx
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <Eyebrow dot="muted" className="mb-0">
+                  Tire prep
+                </Eyebrow>
+                <button
+                  type="button"
+                  onClick={() => setPrepUnfolded(true)}
+                  aria-expanded={false}
+                  aria-label="Add tire prep"
+                  className="tap-active -mr-2 rounded-md px-2 py-1.5 text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+                >
+                  + Add
+                </button>
+              </div>
+            )}
           </div>
               ),
             },

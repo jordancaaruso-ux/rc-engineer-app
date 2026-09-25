@@ -21,6 +21,14 @@ import type { TireEndBox } from "@/lib/tires/tireFitment";
  * - Every front/rear end also gets the one free-text Modifications box (side-wall glue, trued,
  *   holes — the driver's own words; 2026-09-19 ruling).
  *
+ * Founder "Yes", 2026-09-25, to two follow-ups:
+ *
+ * - Touring and FWD keep one tire but offer a "Different front and rear" switch — foam touring
+ *   runs different ends, and a few sheets (Infinity IF14, RC Maker SP1F) print both.
+ * - Tire prep (additive) starts FOLDED on off-road, one tap to open. Nearly every on-road sheet
+ *   asks for additive (1/12 15 of 15, touring 22 of 24); off-road sheets almost never do (1/10
+ *   6 of 55, 1/8 0 of 27). Folded, not removed: the few who sauce on carpet still can.
+ *
  * The `bucket` is the COARSE catalog slice (`TireType.discipline`), not the race class — founder
  * call 2026-09-18: "1/10 offroad is fine for now, they can search for stuff". A class whose tires
  * nobody has imported yet gets `bucket: null`, which means the whole list, exactly as before. An
@@ -43,25 +51,56 @@ export type TireProfile = {
    * a one-tire car logs the tire alone. Empty = the tire and its count, nothing else.
    */
   boxes: readonly TireEndBox[];
+  /**
+   * A one-tire car that may still log its ends apart: the Tires step shows a "Different front
+   * and rear" switch. Never set with `split` — that car always logs both ends.
+   */
+  frontRearSwitch: boolean;
+  /** Tire prep (additive + applications) starts folded behind one tap. */
+  foldPrep: boolean;
 };
 
 /** A car nothing can place, or a class with nothing tire-specific yet: today's form, whole list. */
-export const NO_TIRE_PROFILE: TireProfile = { bucket: null, split: false, boxes: [] };
+export const NO_TIRE_PROFILE: TireProfile = {
+  bucket: null,
+  split: false,
+  boxes: [],
+  frontRearSwitch: false,
+  foldPrep: false,
+};
 
 const OFFROAD_BOXES: readonly TireEndBox[] = ["insert", "wheel", "mods"];
 const FOAM_BOXES: readonly TireEndBox[] = ["diameter", "mods"];
 
-const TOURING: TireProfile = { bucket: "touring", split: false, boxes: [] };
-const OFFROAD_10TH: TireProfile = { bucket: "offroad-10th", split: true, boxes: OFFROAD_BOXES };
+const TOURING: TireProfile = {
+  bucket: "touring",
+  split: false,
+  boxes: [],
+  frontRearSwitch: true,
+  foldPrep: false,
+};
+const OFFROAD_10TH: TireProfile = {
+  bucket: "offroad-10th",
+  split: true,
+  boxes: OFFROAD_BOXES,
+  frontRearSwitch: false,
+  foldPrep: true,
+};
 /** Off-road, but no tires imported for the scale yet — front/rear form over the whole list. */
-const OFFROAD_UNCATALOGUED: TireProfile = { bucket: null, split: true, boxes: OFFROAD_BOXES };
+const OFFROAD_UNCATALOGUED: TireProfile = { ...OFFROAD_10TH, bucket: null };
 /** 1/12, 1/10 and 1/8 pan, formula, 1/8 on-road: front and rear, each trued to a diameter. */
-const ONROAD_FRONT_REAR: TireProfile = { bucket: null, split: true, boxes: FOAM_BOXES };
+const ONROAD_FRONT_REAR: TireProfile = {
+  bucket: null,
+  split: true,
+  boxes: FOAM_BOXES,
+  frontRearSwitch: false,
+  foldPrep: false,
+};
 /**
  * 1/5 GT: no chassis in the app to read a sheet from. Front and rear (the widths differ), and
  * Modifications only — a guess to confirm with Jordan, not a sheet's answer.
  */
-const GT_5TH: TireProfile = { bucket: null, split: true, boxes: ["mods"] };
+const GT_5TH: TireProfile = { ...ONROAD_FRONT_REAR, boxes: ["mods"] };
 
 /**
  * One explicit row per class id, so adding a class to `RACE_CLASSES` without deciding its tires
