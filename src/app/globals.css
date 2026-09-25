@@ -207,7 +207,7 @@
    * Vertical anchor for the fixed mobile corner chrome (JRC pill + account
    * avatar, both 34px tall) so their centres line up with the page title.
    * Title centre = header padding-top (0.75rem below md) + half its line-box; the
-   * title is `clamp(22px,3.9vw,28px)` at line-height 1.15, so half-line = 0.575 ×
+   * title is `clamp(25px,3.9vw,28px)` at line-height 1.15, so half-line = 0.575 ×
    * that. Pill top = title-centre − 17px (half the pill), i.e. 12 − 17 = −5px.
    * Tracks the title across the whole < md range where the pills are visible.
    * Shared by MobileBrandMark + AccountMenu, and through `--top-chrome-y` by
@@ -233,7 +233,13 @@
    * hanging over the card below. Anything positioning against the VIEWPORT still
    * wants `--top-chrome-y`; only in-flow content wants the inset alone.
    */
-  --top-chrome-inset: calc(-5px + 0.575 * clamp(22px, 3.9vw, 28px));
+  --top-chrome-inset: calc(-5px + 0.575 * clamp(25px, 3.9vw, 28px));
+
+  /*
+   * The page-title face (2026-09-25): Apple's own font where the platform has it, Inter (loaded
+   * by layout.tsx, never preloaded) everywhere else. Page titles only — see `.page-title`.
+   */
+  --font-title: -apple-system, BlinkMacSystemFont, var(--font-title-inter), system-ui, sans-serif;
 
   /*
    * The page gutter — ONE source for the distance from the screen edge to the content,
@@ -1626,12 +1632,16 @@ html[data-nav-pending] .page {
  * pt-2). It is a real 26px closer to the cards than it looks, because the title also gave
  * up the 10px of padding that reserved room for its underline when that was removed.
  *
+ * 2026-09-25, with the stripe gone (Page Title Bench, founder pick "gap 12px"): the title's line
+ * box sits 12px above the first card below md — this 0.25rem plus `.page-body`'s pt-2. From md
+ * up the header keeps the 18px it had (0.5rem + the 10px the track used to reserve).
+ *
  * `--top-chrome-inset` is derived from the padding-top. Change one, change the other.
  */
 .page-header {
   @apply relative flex items-center justify-center;
   padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
   padding-left: var(--page-gutter-left);
   padding-right: var(--page-gutter-right);
 }
@@ -1648,6 +1658,7 @@ html[data-nav-pending] .page {
 @media (min-width: 768px) {
   .page-header {
     padding-top: 1.5rem;
+    padding-bottom: calc(0.5rem + 10px);
   }
 }
 
@@ -1753,35 +1764,31 @@ html[data-nav-pending] .page {
 }
 
 /*
- * Page title — Sora 700 over a nav-positional timing line.
+ * Page title — Apple's own font, centred, nothing under it (founder pick 2026-09-25 off the
+ * Page Title Bench: "Apple: SF Pro · Inter · 25px · Bold · letter spacing −1% · gap 12px · No mark").
  *
- * A hairline track spans the title's width; a −21° yellow sector (skewed to the JRC glyph's
- * cut) sits at the page's slot in the mobile dock. `--title-nav-sector` + `data-nav-sector`
- * are set by AppShell from `resolveActiveNavId`; off-dock routes (settings, add run, login)
- * show the bare track. Yellow here carries location, not decoration. Approved as artifact v4
- * "segment = nav position", 2026-07-13, replacing the drafting corner brackets before it.
+ * Page titles ONLY carry this face; every other word in the app is still Sora. `--font-title`
+ * asks for the platform font first, so iPhones and Macs draw SF Pro and download nothing; other
+ * devices get Inter (layout.tsx, never preloaded). The typography net allows it on the two title
+ * selectors and nowhere else.
  *
- * It was removed on 2026-09-05 and restored the same day — see the note under the rule,
- * which is worth reading before removing it a second time.
+ * The stripe is gone: the hairline track and the −21° yellow sector at the page's dock slot
+ * (2026-07-13 → 2026-09-25), and with it the scrolled title's compact mark. It had been removed
+ * once before, on 2026-09-05, and restored the same day, because a bare 22px Sora title floated.
+ * This time the size does that work instead: 25px, and 12px from the first card (see
+ * `.page-header`). AppShell still writes `data-nav-sector` / `--title-nav-sector`; nothing on
+ * the title reads them now.
  */
 .page-title {
-  font-family: var(--font-ui), system-ui, sans-serif;
+  font-family: var(--font-title);
   font-weight: 700;
-  /* 22 → 26 → 24 → 22px, all on 2026-09-05, each step read back on his phone. It landed
-     where it started, but not for the reason it started there: at 22px WITH the hairline
-     track and the −21° sector under it the title needed the size to out-rank a card, and
-     22px did not. With nothing beneath it, centred in its own band between the two corner
-     pills, position does that work and the size does not have to.
-
-     Measured on the pages themselves rather than argued from the ramp: the largest bold
-     heading inside a card is 17px (a session name on Analysis), and the Garage's row
-     headings are 13–14px. `PanelTitle`'s 20–22px hero variant is the only thing that comes
-     close, and it appears on other pages than these. 22px still clears all of it.
-
-     Every literal title fits on one line at 390px (286px of header between the 44px chevron
-     and the avatar) — this is the roomiest the header has been all day. */
-  font-size: clamp(22px, 3.9vw, 28px);
-  letter-spacing: -0.02em;
+  /* 25px on a phone. `--top-chrome-inset` bakes in this clamp and the 1.15 line-height, so the
+     corner pills stay level with the title: change them together. The title has 273px of room
+     at 393 (60px clear of each corner); measured in Inter on the 09-25 build, "Review setup for
+     PDF" is 246px and "Chassis workbench" 228px, so every driver-facing title stays on one line.
+     Only the admin "Calibrate image setup sheet" (323px) wraps. */
+  font-size: clamp(25px, 3.9vw, 28px);
+  letter-spacing: -0.01em;
   line-height: 1.15;
   position: relative;
   width: fit-content;
@@ -1791,69 +1798,7 @@ html[data-nav-pending] .page {
      do and the name runs under the corner chrome (founder, 2026-09-01). */
   max-width: 100%;
   margin-inline: auto;
-  /* Room for the track below. Goes with it if it is ever removed again. */
-  padding-bottom: 10px;
   @apply text-foreground;
-}
-
-/* REMOVED and RESTORED on 2026-09-05, both on founder call, in that order.
-   Keep this note: the argument for taking it off is a good one and will be made again.
-
-   It came off because the bottom dock already says where you are and the title says it in
-   words directly above, so the sector was a third statement of one fact — the same reasoning
-   that took the leading tick off `<Eyebrow>` on 2026-08-25. Seen on the phone with the title
-   bare, that reasoning lost to what the page actually looked like: with nothing under it the
-   heading floats, and the track is what seats it on the page. So it is back, unchanged.
-
-   What did NOT come back with it is the old size: the title is 22px, not the 26px it needed
-   during the bare spell to out-rank a card. The track carries that job again.
-
-   `--title-nav-sector` / `--title-nav-count` are read by the rules below and are live again;
-   AppShell writes them, along with `data-nav-sector`, from `resolveActiveNavId`. */
-
-/* The track — full title width, hairline. */
-.page-title::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: 2px;
-  background: rgb(var(--color-border));
-}
-
-/* The sector segment — one slot of the track, positioned by nav slot.
-   z-index lifts it above the track (::after paints later in pseudo order,
-   which would otherwise draw the hairline through the yellow).
-
-   Slot width comes from `--title-nav-count` (set by AppShell from MOBILE_NAV.length),
-   NOT a hardcoded 20%. It was 20% while the dock had five destinations; Teams became
-   the sixth and its tick resolved to `left: 100%`, off the end of the title. The
-   fallback keeps the rule honest if the variable is ever missing.
-
-   The brand yellow, not `primary-ink`, since 2026-09-25 — the same call as `.nav-tick`. */
-.page-title::before {
-  content: "";
-  position: absolute;
-  display: none;
-  z-index: 1;
-  bottom: -1px;
-  height: 4px;
-  width: calc(100% / var(--title-nav-count, 5));
-  left: calc(var(--title-nav-sector, 0) * (100% / var(--title-nav-count, 5)));
-  background: rgb(var(--color-primary));
-  transform: skewX(-21deg);
-  transition: left 0.34s cubic-bezier(0.3, 0.9, 0.35, 1);
-}
-
-/* Off-dock routes (settings, add run, login) show the bare track. */
-[data-nav-sector] .page-title::before {
-  display: block;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .page-title::before {
-    transition: none;
-  }
 }
 
 /*
@@ -1904,21 +1849,8 @@ html[data-nav-pending] .page {
    If the label turns out unreadable over busy content, the answer is a backing
    on the LABEL, not a full-width wash. */
 
-/* The compact echo of `.page-title`'s −21° sector, for the scrolled state. It and the title's
-   own sector were removed and restored together on 2026-09-05, and they must stay coupled:
-   keeping one without the other makes the mark appear or vanish purely on scroll position.
-   The same goes for its colour. */
-.title-condenser .title-condenser-mark {
-  flex: none;
-  width: 14px;
-  height: 5px;
-  border-radius: 1px;
-  background: rgb(var(--color-primary));
-  transform: skewX(-21deg);
-}
-
 .title-condenser .page-title-condensed {
-  font-family: var(--font-ui), system-ui, sans-serif;
+  font-family: var(--font-title);
   font-weight: 700;
   font-size: 14px;
   letter-spacing: -0.01em;
@@ -2290,9 +2222,9 @@ html[data-nav-pending] .page {
         the header mirrors it off its own next sibling rather than making all 60
         call sites remember to set it twice.
 
-   The 2px underrule goes with the centring: whitespace separates the header on
-   desktop, matching the dashboard/events handoffs. The yellow sector tick
-   (`.page-title::before`) is retained — it carries location, not decoration.
+   Whitespace separates the header on desktop, matching the dashboard/events
+   handoffs. (The title's track and yellow sector were removed everywhere on
+   2026-09-25.)
 --------------------------------------------------------------------------- */
 @media (min-width: 1280px) {
   .page-header {
@@ -2320,10 +2252,6 @@ html[data-nav-pending] .page {
 
   .page-title {
     margin-inline: 0;
-  }
-
-  .page-title::after {
-    display: none;
   }
 
   /*
@@ -3445,8 +3373,8 @@ html.video-overlay-fullscreen-active body {
 --------------------------------------------------------------------------- */
 
 /* Display voice at hero scale, left-aligned. `.page-title` can't be reused here:
-   it's `width: fit-content; margin-inline: auto` and carries the yellow nav-sector
-   track, which means location — and this screen isn't anywhere in the dock yet. */
+   it's `width: fit-content; margin-inline: auto`, and since 2026-09-25 it is set in the
+   page-title face, while this door stays Sora. */
 .demo-door-title {
   font-family: var(--font-ui), system-ui, sans-serif;
   font-weight: 700;

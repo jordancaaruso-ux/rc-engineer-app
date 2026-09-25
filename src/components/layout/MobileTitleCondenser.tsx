@@ -8,9 +8,8 @@ import { usePathname } from "next/navigation";
  * pill and the account avatar) once the large `.page-title` scrolls out of
  * view — the iOS large-title → inline-title handoff, on-brand.
  *
- * Reads the current title text + nav-sector straight from the DOM (`.page-title`
- * / `.app-shell[data-nav-sector]`), so it needs zero per-page wiring and stays a
- * behaviour-only addition.
+ * Reads the current title text straight from the DOM (`.page-title`), so it needs
+ * zero per-page wiring and stays a behaviour-only addition.
  *
  * Reveal is driven by a capture-phase scroll listener (catches whichever element
  * actually scrolls, window or a nested container) that reads the live title rect
@@ -31,7 +30,6 @@ import { usePathname } from "next/navigation";
 export function MobileTitleCondenser() {
   const pathname = usePathname();
   const [title, setTitle] = useState("");
-  const [hasSector, setHasSector] = useState(false);
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
@@ -40,7 +38,6 @@ export function MobileTitleCondenser() {
     let titleEl: HTMLElement | null = null;
     let lastEl: Element | null = null;
     let lastText = "";
-    let lastSector: boolean | null = null;
 
     // Reveal the compact title ONLY once the big title has scrolled fully above
     // the top edge of the screen (its bottom passes y=0), so the big and compact
@@ -59,12 +56,6 @@ export function MobileTitleCondenser() {
     const resolve = () => {
       const el = document.querySelector<HTMLElement>(".page-title");
       const text = el?.textContent?.trim() ?? "";
-      const sector =
-        document.querySelector(".app-shell")?.hasAttribute("data-nav-sector") ?? false;
-      if (sector !== lastSector) {
-        lastSector = sector;
-        setHasSector(sector);
-      }
       if (el !== lastEl || text !== lastText) {
         lastEl = el;
         lastText = text;
@@ -108,10 +99,6 @@ export function MobileTitleCondenser() {
 
   return (
     <div className="title-condenser" data-shown={shown} aria-hidden>
-      {/* The compact echo of `.page-title`'s −21° sector. Both were removed and then restored
-          on 2026-09-05; they move together, because keeping one without the other means the
-          mark appears or vanishes purely on scroll position. */}
-      {hasSector ? <span className="title-condenser-mark" /> : null}
       <span className="page-title-condensed">{title}</span>
     </div>
   );

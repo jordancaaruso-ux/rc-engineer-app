@@ -6,7 +6,8 @@
  * failed when it did. A rule written only in prose is a rule that decays. Four assertions:
  *
  *   1. ONE FACE      — every visible element resolves to Sora, or the platform mono stack
- *                      inside `.type-machine` / <pre> / <code>. Catches a reintroduced
+ *                      inside `.type-machine` / <pre> / <code>, or (since 2026-09-25) the
+ *                      page-title face on `.page-title` / `.page-title-condensed` only. Catches a reintroduced
  *                      webfont and a stray `font-mono`. Space Grotesk was allowed inside the
  *                      three title selectors until 2026-09-05; it is now a failure ANYWHERE,
  *                      which is what makes “one face” a rule the suite enforces rather than
@@ -152,7 +153,15 @@ test("one face, tabular figures, and a closed ramp on every page", async ({ page
             // both spellings and fail on either, wherever it appears.
             const isDisplay = /Space[\s_]?Grotesk/i.test(firstFamily);
             const isMono = /mono|consolas|menlo|courier/i.test(firstFamily);
-            if (isDisplay) {
+            // The one sanctioned second face (founder call 2026-09-25): page titles, and their
+            // scrolled compact copy, ask for the platform font first (SF Pro on Apple) with Inter
+            // behind it. Allowed on those two selectors ONLY, so a stray use still fails.
+            const isTitleFace =
+              /apple-system|BlinkMacSystemFont|Inter/i.test(firstFamily) &&
+              el.closest(".page-title, .page-title-condensed") !== null;
+            if (isTitleFace) {
+              // fine
+            } else if (isDisplay) {
               faceProblems.push({
                 detail: `Space Grotesk is deleted (2026-09-05) — found on <${el.tagName.toLowerCase()} class="${el.className}"> "${text.slice(0, 40)}"`,
               });

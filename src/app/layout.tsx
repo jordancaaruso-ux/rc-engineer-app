@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 
-import { Sora } from "next/font/google";
+import { Inter, Sora } from "next/font/google";
 
 import Script from "next/script";
 
@@ -73,10 +73,30 @@ const sora = Sora({
    wordmark looked straighter than the words underneath it. Titles are Sora now, on the ramp
    below (`.page-title` at 26–34px / 700, `-0.02em`) — the step over `PanelTitle`'s 20–22px is
    what separates a page from a card, together with the yellow nav sector line. ONE face loads.
-   Do not reintroduce a display-only page-title font; this has now been argued and settled.
+   (Superseded for page titles on 2026-09-25 — see `inter` below.)
    Two surfaces still carry Space Grotesk deliberately and are NOT part of this: the share-card
    renderer (`src/lib/share/shareFonts.ts`, satori TTFs, server-side only — no browser cost) and
    the static landing page, which is served verbatim by founder call 2026-08-06. */
+
+
+
+/* The page-title face (founder call 2026-09-25, off the Page Title Bench, "Apple" feel): page
+   titles only, everything else stays Sora. `.page-title` asks for the platform font FIRST, so
+   iPhones, iPads and Macs draw Apple's own SF Pro and never fetch this file. Inter, its near-twin,
+   is what Android and Windows get. `preload: false` is what keeps it off Apple devices: a
+   preloaded font downloads whether or not a rule ends up using it. The opsz axis gives Inter its
+   display cut at title size, which is the one SF Pro Display matches. */
+const inter = Inter({
+
+  subsets: ["latin"],
+
+  variable: "--font-title-inter",
+
+  axes: ["opsz"],
+
+  preload: false,
+
+});
 
 
 
@@ -272,7 +292,7 @@ export default async function RootLayout({
          the first byte of HTML rather than from a script, so there is no flash. */
       data-theme={APP_THEME}
 
-      className={sora.variable}
+      className={`${sora.variable} ${inter.variable}`}
 
     >
 
