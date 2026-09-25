@@ -11,7 +11,6 @@ import { test } from "node:test";
 import {
   FOUNDING_BATCHES,
   FOUNDING_CLOSES_AT,
-  FOUNDING_OPENS_AT,
   FOUNDING_SHOW_COUNT_BELOW,
   formatFoundingAmount,
   foundingClosedMessage,
@@ -21,20 +20,18 @@ import {
 
 const DURING = new Date("2026-10-15T00:00:00.000Z");
 
-test("opens at midnight 1 October and closes at the end of 31 October, Sydney time", () => {
-  // Sydney is UTC+10 on 1 October (daylight saving starts 4 October), UTC+11 by 31 October.
-  assert.equal(FOUNDING_OPENS_AT.toISOString(), "2026-09-30T14:00:00.000Z");
+test("closes at the end of 31 October, Sydney time", () => {
+  // Sydney is on daylight saving (UTC+11) by 31 October.
   assert.equal(FOUNDING_CLOSES_AT.toISOString(), "2026-10-31T13:00:00.000Z");
   const sydney = (d: Date) =>
     d.toLocaleString("en-AU", { timeZone: "Australia/Sydney", hour12: false });
-  assert.match(sydney(FOUNDING_OPENS_AT), /^01\/10\/2026, (00|24):00:00$/);
   assert.match(sydney(FOUNDING_CLOSES_AT), /^01\/11\/2026, (00|24):00:00$/);
 });
 
-test("nothing on sale before it opens, or from the moment it closes", () => {
-  const justBefore = new Date(FOUNDING_OPENS_AT.getTime() - 1);
-  assert.equal(foundingOfferState({ sold: 0, now: justBefore }).status, "not-open");
-  assert.equal(foundingOfferState({ sold: 0, now: FOUNDING_OPENS_AT }).status, "open");
+test("on sale now, before launch, and until the moment it closes (no start date)", () => {
+  // Switched on 2026-09-26, five days before the 1 October launch (founder call).
+  const beforeLaunch = new Date("2026-09-26T02:00:00.000Z");
+  assert.equal(foundingOfferState({ sold: 0, now: beforeLaunch }).status, "open");
   const lastMoment = new Date(FOUNDING_CLOSES_AT.getTime() - 1);
   assert.equal(foundingOfferState({ sold: 0, now: lastMoment }).status, "open");
   assert.equal(foundingOfferState({ sold: 0, now: FOUNDING_CLOSES_AT }).status, "closed");
@@ -116,7 +113,6 @@ test("amounts read like the price cards", () => {
 });
 
 test("a refused checkout says why", () => {
-  assert.equal(foundingClosedMessage({ status: "not-open" }), "Founding seats go on sale on 1 October.");
   assert.equal(foundingClosedMessage({ status: "sold-out" }), "Every founding seat is taken.");
   assert.equal(foundingClosedMessage({ status: "closed" }), "The founding offer has closed.");
   assert.equal(foundingClosedMessage(foundingOfferState({ sold: 0, now: DURING })), null);

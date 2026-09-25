@@ -224,7 +224,7 @@ export default async function BillingPage({
     );
   }
 
-  // Founding seats (1 to 31 October 2026) are sold here too, to anyone who pays for their own
+  // Founding seats (until 31 October 2026) are sold here too, to anyone who pays for their own
   // access; an admin's free access has nothing to replace.
   const founding = mode === "view" ? null : await getFoundingOfferView();
 

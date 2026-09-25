@@ -117,7 +117,7 @@ export default async function JoinPage({
 
   const demoReady = Boolean(process.env.DEMO_USER_ID);
 
-  // Founding seats (1 to 31 October 2026): a band under the plans while any are on sale.
+  // Founding seats (until 31 October 2026): a band under the plans while any are on sale.
   // Priced in the visitor's currency (US$ in the US, € in the euro area, A$ elsewhere).
   const [plans, founding] = await Promise.all([
     getVisitorPriceCurrency().then((currency) => getPricePlansWithAmounts(currency)),

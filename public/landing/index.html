@@ -706,7 +706,7 @@
           <a href="/join" style="margin-top:auto;padding-top:1.5rem"><span style="display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;padding:0.8rem 1.4rem;border-radius:9px;background:#FFD60A;border:1px solid #FFD60A;color:#171614;transition:transform .2s ease,box-shadow .3s ease" style-hover="transform:translateY(-1px);box-shadow:0 8px 26px rgba(255,214,10,0.2)">Get started</span></a>
         </div>
       </div>
-      <!-- Founding seats (1 to 31 October 2026). Hidden unless /api/billing/founding-status
+      <!-- Founding seats (until 31 October 2026). Hidden unless /api/billing/founding-status
            answers with an offer: this static page can't know the batch on sale or when seats run
            out. Filled by initFounding / paintFounding in the component below. -->
       <div id="jrcFounding" data-card="founding" style="display:none;margin-top:1.25rem;border-radius:16px;padding:clamp(1.25rem,2.6vw,1.9rem) clamp(1.5rem,3vw,2.25rem);flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1.25rem 2.5rem">
@@ -1013,7 +1013,7 @@ class Component extends DCLogic {
     if (d.currency) this.all("[data-plan-code]").forEach(el => { el.textContent = d.currency; });
   }
 
-  /* ── founding seats (1 to 31 October 2026) ────────── */
+  /* ── founding seats (until 31 October 2026) ─────── */
   /* The app decides what is on sale (batch, price, seats left, open or not); this page only asks,
      and stays hidden unless an offer comes back. The seats line arrives already worded, so the app's
      band and this one can never say different things. */

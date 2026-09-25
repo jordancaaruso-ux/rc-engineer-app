@@ -380,7 +380,7 @@ Grouped by what they serve:
   invites, feed, comments).
 - **Auth & billing (~12)** — `auth/[...nextauth]`, `verify-code`, `redeem-access-code`, `demo`,
   `dev-new-user`, `account`, `logout`, `config-hint`; `billing/checkout`, `portal`,
-  `public-checkout`, `founding-checkout`, `founding-status` (founding seats, October 2026),
+  `public-checkout`, `founding-checkout`, `founding-status` (founding seats, until 31 October 2026),
   `stripe/webhook`.
 - **Platform (~20)** — `push/*` (web + native), `perf/beacon`, `weather`, `me/time-zone`,
   `profile-image`, `onboarding`, `new-run/bootstrap`, `video-analysis/*`, `videos/*`,

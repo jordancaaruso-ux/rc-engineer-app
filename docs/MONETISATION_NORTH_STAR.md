@@ -25,7 +25,7 @@ sees once inside) — this doc governs how anyone *gets* an account at all.
 | **Front door** | **Small landing page** (what it is, three value points, pricing) → **Try the demo** / **Get started**. Built last — its buttons need somewhere real to go. |
 | **Existing testers** | **Comp'd via 100%-off promo codes through the same checkout** — one provisioning path for everyone, comps can later expire or convert without code changes. `allow_promotion_codes` is already on. Consequence: the existing *grandfather* branch in `entitlement.ts` should retire once codes go out (see hazard below). |
 | **Build order** | Paid door + enforcement first (all verifiable in Stripe test mode with `BILLING_ENFORCED` dark) → demo → landing page → flip. |
-| **Founding seats** (2026-09-25) | **A one-off payment for Race Engineer for the life of the app**, on sale 1 to 31 October 2026 (Sydney): 25 seats at $399, then 25 at $499, both batches announced up front. Covers whatever Race Engineer becomes, never add-ons sold separately; the 100-questions cap stays. No seat numbers for now (founder: "if someone is #1 days after release they know no one did it"). Terms say "for as long as we operate" the app, so closing it owes no refund. See [Founding seats](#founding-seats--2026-09-25). |
+| **Founding seats** (2026-09-25) | **A one-off payment for Race Engineer for the life of the app**, on sale from 26 September to the end of 31 October 2026 (Sydney; switched on five days before the 1 October launch, founder call 2026-09-26): 25 seats at $399, then 25 at $499, both batches announced up front. Covers whatever Race Engineer becomes, never add-ons sold separately; the 100-questions cap stays. No seat numbers for now (founder: "if someone is #1 days after release they know no one did it"). Terms say "for as long as we operate" the app, so closing it owes no refund. See [Founding seats](#founding-seats--2026-09-25). |
 
 ## The provisioning inversion
 
@@ -224,8 +224,10 @@ all read a founder as Race Engineer with no special case.
 
 **Env.** `STRIPE_PRICE_FOUNDING_1`, `STRIPE_PRICE_FOUNDING_2` (one-off $399/$499) and
 `STRIPE_PRICE_FOUNDING_SEAT` ($0/year). Until all three are set, the offer shows nowhere and the
-checkout refuses. `FOUNDING_OFFER_OFF=1` is the kill switch. The dates live in code, so the band
-appears at midnight 1 October and disappears at the end of 31 October by itself. A dev server (never a
+checkout refuses. `FOUNDING_OFFER_OFF=1` is the kill switch. There is no start date: the offer opens
+the moment the three settings are live (founder call 2026-09-26, "I want it to be live now"; it
+was first set to open at midnight 1 October). The closing date lives in code, so the band disappears at
+the end of 31 October by itself. A dev server (never a
 deployed build) honours `FOUNDING_OFFER_TEST_NOW` and `FOUNDING_OFFER_TEST_BATCH_SEATS` for driving it.
 
 **Seat count.** Live seats = `Subscription` rows on the seat price with status active/trialing. The

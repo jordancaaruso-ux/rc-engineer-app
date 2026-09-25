@@ -72,8 +72,8 @@ export default function TermsPage() {
 
       <Section title="Founding member seats" id="founding">
         <p>
-          From 1 to 31 October 2026 we sell a limited number of founding member seats, in batches
-          at the prices shown on our website. A seat is a single payment. It gives you {TIER_LABELS.pro},
+          Until the end of 31 October 2026, Sydney time, we sell a limited number of founding
+          member seats, in batches at the prices shown on our website. A seat is a single payment. It gives you {TIER_LABELS.pro},
           including what {TIER_LABELS.pro} gains over time, for as long as we operate {PRODUCT_NAME}.
           Nothing renews, and there is nothing more to pay for it.
         </p>

@@ -180,7 +180,7 @@ async function ensureCompCoupon(): Promise<string> {
   return created.id;
 }
 
-async function ensureWebhook(): Promise<{ url: string; secret: string | null }> {
+async function ensureWebhook({ create = true }: { create?: boolean } = {}): Promise<{ url: string; secret: string | null }> {
   const url = `${origin}/api/stripe/webhook`;
   const endpoints = await stripe.webhookEndpoints.list({ limit: 30 });
   const found = endpoints.data.find((e) => e.url === url);
@@ -199,6 +199,12 @@ async function ensureWebhook(): Promise<{ url: string; secret: string | null }> 
     // The signing secret is only revealed at creation. Keep the endpoint; tell the operator.
     return { url, secret: found.secret ?? null };
   }
+  if (!create) {
+    // `--founding-only` never mints an endpoint: a new one comes with a new signing secret the
+    // app doesn't have, and every event sent to it would fail.
+    console.warn(`No webhook endpoint at ${url}; left alone. Check the --origin.`);
+    return { url, secret: null };
+  }
   const created = await stripe.webhookEndpoints.create({
     url,
     enabled_events: WEBHOOK_EVENTS,
@@ -215,7 +221,7 @@ async function main() {
   // no plan prices, no portal, no coupons.
   const foundingLines = await ensureFoundingSeats(stripe);
   if (args.includes("--founding-only")) {
-    await ensureWebhook();
+    await ensureWebhook({ create: false });
     console.log(`\n--- Vercel env (Production) — add these three ---`);
     console.log(foundingLines.join("\n"));
     return;

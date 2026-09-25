@@ -8,7 +8,9 @@
  *   - Two batches, both announced up front: 25 seats at $399, then 25 at $499. The dearer second
  *     batch is the honest reason to buy now; a surprise second batch at the same price after
  *     "only 25" would read as fake scarcity in a scene this small.
- *   - On sale from midnight 1 October to the end of 31 October, Sydney time.
+ *   - On sale until the end of 31 October, Sydney time. There is no start date: the offer opens
+ *     the moment the live Stripe settings exist (2026-09-26, founder: "I want it to be live
+ *     now"; it was going to open at midnight 1 October, launch day).
  *   - The seats-left count shows only once fewer than ten remain in the batch: a counter stuck
  *     at "23 of 25 left" tells every visitor nobody is buying.
  *   - No seat numbers ("#7 of 50") for now: if someone is #1 days after launch they know nobody
@@ -22,12 +24,6 @@
 
 /** Stamped into `metadata.offer` on the checkout session, its payment and the seat subscription. */
 export const FOUNDING_OFFER = "founding";
-
-/**
- * Midnight at the start of 1 October 2026 in Sydney. NSW is still on AEST (UTC+10) that day;
- * daylight saving starts on Sunday 4 October.
- */
-export const FOUNDING_OPENS_AT = new Date("2026-09-30T14:00:00.000Z");
 
 /** Midnight at the end of 31 October 2026 in Sydney, on AEDT (UTC+11). */
 export const FOUNDING_CLOSES_AT = new Date("2026-10-31T13:00:00.000Z");
@@ -57,7 +53,6 @@ export const FOUNDING_SHOW_COUNT_BELOW = 10;
 export const FOUNDING_COMPARE_YEARS = 5;
 
 export type FoundingOfferState =
-  | { status: "not-open" }
   | { status: "closed" }
   | { status: "sold-out" }
   | {
@@ -84,15 +79,12 @@ export function foundingOfferState(input: {
   /** The kill switch (`FOUNDING_OFFER_OFF=1`), or Stripe not configured for the offer. */
   unavailable?: boolean;
   batches?: readonly FoundingBatch[];
-  opensAt?: Date;
   closesAt?: Date;
 }): FoundingOfferState {
   const batches = input.batches ?? FOUNDING_BATCHES;
-  const opensAt = input.opensAt ?? FOUNDING_OPENS_AT;
   const closesAt = input.closesAt ?? FOUNDING_CLOSES_AT;
   if (input.unavailable) return { status: "closed" };
   const t = input.now.getTime();
-  if (t < opensAt.getTime()) return { status: "not-open" };
   if (t >= closesAt.getTime()) return { status: "closed" };
 
   const sold = Math.max(0, Math.floor(input.sold));
@@ -120,8 +112,6 @@ export function foundingClosedMessage(state: FoundingOfferState): string | null 
   switch (state.status) {
     case "open":
       return null;
-    case "not-open":
-      return "Founding seats go on sale on 1 October.";
     case "sold-out":
       return "Every founding seat is taken.";
     case "closed":

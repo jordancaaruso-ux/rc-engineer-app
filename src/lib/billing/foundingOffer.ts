@@ -64,8 +64,8 @@ const isDevServer = () => process.env.NODE_ENV !== "production";
 
 /**
  * Test hooks, honoured by a dev server only, never by a deployed build (Vercel builds run as
- * production). `FOUNDING_OFFER_TEST_NOW` moves the clock so the offer can be driven before
- * 1 October or after it closes; `FOUNDING_OFFER_TEST_BATCH_SEATS` shrinks every batch so the
+ * production). `FOUNDING_OFFER_TEST_NOW` moves the clock so the offer can be driven after it
+ * closes; `FOUNDING_OFFER_TEST_BATCH_SEATS` shrinks every batch so the
  * switch to the second batch can be driven without selling 25 seats.
  */
 function offerNow(): Date {
@@ -129,7 +129,7 @@ export type FoundingOfferView = {
   seatsLine: string;
 };
 
-/** The band's content, or null when nothing is on sale (not yet open, sold out, closed, off). */
+/** The band's content, or null when nothing is on sale (sold out, closed, or switched off). */
 export async function getFoundingOfferView(): Promise<FoundingOfferView | null> {
   const state = await getFoundingOfferState();
   if (state.status !== "open") return null;
