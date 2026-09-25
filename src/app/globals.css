@@ -327,8 +327,8 @@
 
    The yellow does not invert. #FFD60A is 1.4:1 on this card, so it survives only
    as a FILL under dark text (12.6:1) — buttons, the log-run circle, chips — and
-   as the where-you-are marks (nav tick, title sector, Engineer ✦; founder call
-   2026-09-25, see `.nav-tick`). Every other foreground use resolves through
+   as the Engineer ✦ mark (founder call 2026-09-25; the nav tick went to ink the
+   same day, see `.nav-tick`). Every other foreground use resolves through
    `--color-primary-ink` to #8A6A00 (4.9:1).
 --------------------------------------------------------------------------- */
 :root[data-theme="light"] {
@@ -942,6 +942,9 @@ html[data-native="true"] .web-only {
 }
 
 :root[data-theme="light"] .nav-tick {
+  /* Ink, not yellow (founder, 2026-09-25): once the page title lost its yellow slash, a lone
+     yellow bar in the dock looked out of place. Covers the phone dock and the desktop tabs. */
+  background-color: rgb(var(--color-foreground));
   /* Nothing to glow against on paper — a halo round a 2px bar reads as blur. */
   box-shadow: none;
 }
@@ -1122,7 +1125,7 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
   color: rgb(var(--color-foreground));
 }
 
-/* Ink, not `primary-ink` (2026-09-25): the tick under the tab is the yellow — see `.nav-tick`. */
+/* Ink, not `primary-ink` (2026-09-25); the tick under the tab is ink too — see `.nav-tick`. */
 .top-rail-item[data-active="true"] {
   background-color: rgb(var(--color-elevate) / 0.05);
   color: rgb(var(--color-foreground));
