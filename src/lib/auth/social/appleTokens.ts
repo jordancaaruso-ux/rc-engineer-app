@@ -49,12 +49,18 @@ function clientSecret(clientId: string): string | null {
       sub: clientId,
     }),
   );
-  const signer = createSign("SHA256");
-  signer.update(`${header}.${claims}`);
-  signer.end();
-  // Apple wants the JOSE (r||s) form, not the DER encoding Node emits by default.
-  const signature = signer.sign({ key, dsaEncoding: "ieee-p1363" });
-  return `${header}.${claims}.${base64Url(signature)}`;
+  try {
+    const signer = createSign("SHA256");
+    signer.update(`${header}.${claims}`);
+    signer.end();
+    // Apple wants the JOSE (r||s) form, not the DER encoding Node emits by default.
+    const signature = signer.sign({ key, dsaEncoding: "ieee-p1363" });
+    return `${header}.${claims}.${base64Url(signature)}`;
+  } catch {
+    // A mangled key must not turn a sign-in or an account deletion into a crash.
+    console.error("[apple-signin] APPLE_SIGNIN_PRIVATE_KEY can't sign; check the .p8 contents");
+    return null;
+  }
 }
 
 async function postForm(url: string, form: Record<string, string>): Promise<Response | null> {
@@ -111,5 +117,9 @@ export async function revokeAppleToken(input: {
     console.error(`[apple-signin] revoke failed (${res?.status ?? 0}) for client ${input.clientId}`);
     return false;
   }
+  // Apple answers 200 even to a token or secret it doesn't recognise (checked 2026-09-25), so this
+  // line only proves the call was made. A wrong key shows up at sign-in instead, where the code
+  // exchange fails loudly.
+  console.info(`[apple-signin] revoked for client ${input.clientId}`);
   return true;
 }
