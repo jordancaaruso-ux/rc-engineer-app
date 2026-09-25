@@ -5719,11 +5719,14 @@ export function NewRunForm(props: {
               prefillFieldClass={prefillFieldClass(Boolean(prefillHighlights?.tires))}
             />
             )}
-            {/* Touring and FWD log one tire, unless the driver says the ends differ (foam
-                touring). Off turns the form back to one tire and drops the front. */}
+            {/* Electric touring and FWD log one tire, unless the driver says the ends differ.
+                Off turns the form back to one tire and drops the front. The switch sits right
+                after its words, which are set like the card's other labels (founder pick
+                2026-09-25): across the card from them, under "On the car now", the line read
+                like a statement about the car. */}
             {tireProfile.frontRearSwitch ? (
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-foreground">Different front and rear</span>
+              <div className="flex items-center gap-3">
+                <span className="type-data-label">Different front and rear</span>
                 <Switch
                   checked={splitTiresActive}
                   onChange={(on) => {
