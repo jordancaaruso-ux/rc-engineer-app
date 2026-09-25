@@ -13,8 +13,6 @@ import {
 import {
   activeTireCountChip,
   expandedTireCountChips,
-  tireAgeHint,
-  tireAgeReadout,
   tireAgeReadoutLine,
   TIRE_COUNT_CHIPS,
   type TireCountChip,
@@ -39,8 +37,8 @@ import type { TireEnd } from "@/lib/tires/tireCatalogFilter";
  * trade. What replaces the question:
  *
  * - The count row is always on screen, so the guess is visible, not buried.
- * - A grey hint line names where the number came from, so a carried count is
- *   never mistaken for one the driver entered.
+ * - The answer line under it opens "Carried on ·" when the number came from the
+ *   last run, so a carried count is never mistaken for one the driver entered.
  * - Fixing it is one tap on the row that is already showing it. `4+` grows the
  *   row in place rather than handing off to a stepper.
  *
@@ -53,8 +51,14 @@ import type { TireEnd } from "@/lib/tires/tireCatalogFilter";
  * each with its own count, and `RunSplitTireSelectionPanel` mounts this panel twice with
  * `variant="compact"`. Every rule above is the same — that is why it is this panel and not a
  * copy — but the presentation is cut down so both ends fit one phone screen: the end's name for
- * a heading, the insert/wheel row in `children`, the chips, and the answer on one line in place
- * of the hint and the big box. The default variant is untouched, markup included.
+ * a heading, the insert/wheel row in `children`, the chips, and the answer on one line.
+ *
+ * ONE LINE ON EVERY CAR (founder pick 2026-09-26, "C" off a bench of the real Tires step). The
+ * one-tire form used to answer in a big "On the car now" box — dashed edge, yellow stripe, spaced
+ * capitals — the only box of its kind in the app, under a grey line saying where the count came
+ * from ("No previous run on this car, so assumed a fresh set"; his words: remove it). Both are
+ * gone: the full variant answers on the same line as a front/rear end, so every car's Tires step
+ * reads alike, and the lit chip above it already says the count.
  */
 
 export type { TireStintValue };
@@ -175,8 +179,7 @@ export function RunTireSelectionPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingKey, resetSignal]);
 
-  const readout = tireAgeReadout(source, value);
-  const hint = tireAgeHint(source, last);
+  const line = tireAgeReadoutLine(source, value);
   const locked = Boolean(specTireType);
   const activeChip = activeTireCountChip(source, value, expanded);
   const chips: readonly TireCountChip[] = useMemo(
@@ -269,7 +272,6 @@ export function RunTireSelectionPanel({
 
   if (variant === "compact") {
     const endName = end === "front" ? "Front" : "Rear";
-    const line = tireAgeReadoutLine(source, value);
     return (
       <div className="space-y-2">
         <Eyebrow>{endName}</Eyebrow>
@@ -372,40 +374,14 @@ export function RunTireSelectionPanel({
           ))}
         </div>
 
-        <div className="text-[11px] leading-snug text-muted-foreground">
-          {tireTypeId ? hint : "Pick a compound and this fills itself in."}
-        </div>
-
-        {/* The answer, not another option: raised off the card, its own label, the
-            biggest type in the section, and a yellow rail — which reads as
-            emphasis rather than an action, since a rail is never pressable. */}
-        <div
-          className={cn(
-            "rounded-xl border bg-muted py-3 pr-3 pl-[0.9375rem]",
-            "shadow-[inset_3px_0_0_0_rgb(var(--color-primary))]",
-            readout.unresolved ? "border-dashed border-border" : "border-foreground/15"
-          )}
-        >
-          <div className="mb-[3px] text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            On the car now
-          </div>
-          <div
-            className={cn(
-              "text-[17px] tracking-tight",
-              readout.unresolved
-                ? "font-medium text-muted-foreground"
-                : "font-semibold text-foreground"
-            )}
-          >
-            {readout.title}
-          </div>
-          <div className="mt-0.5 text-[11.5px] text-muted-foreground">{readout.sub}</div>
-        </div>
-
-        {!value.ageKnown && source !== null ? (
+        {/* The answer on one line, exactly as a front/rear end shows it (see the header). Before a
+            compound is picked the dimmed chips need one prompt; while the car's last run is still
+            loading there is no answer yet, so nothing. */}
+        {line ? (
+          <div className="text-[12px] font-medium text-foreground">{line}</div>
+        ) : !tireTypeId ? (
           <div className="text-[11px] leading-snug text-muted-foreground">
-            I&apos;ll still track how they fade from here — I just can&apos;t tell you where in their
-            life they are.
+            Pick a compound and this fills itself in.
           </div>
         ) : null}
       </div>

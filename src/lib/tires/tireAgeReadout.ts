@@ -7,9 +7,10 @@
  * half-answered: a compound is either picked, or nothing is.
  *
  * That makes the carry-over silent, which is the one thing the previous design
- * refused to do. The mitigation is `tireAgeHint` — a grey line under the chips
- * that names where the number came from. A wrong guess is then one tap to fix,
- * which is cheaper than the question it replaced.
+ * refused to do. The mitigation is the answer line (`tireAgeReadoutLine`), which
+ * opens "Carried on ·" when the number came from the last run. A wrong guess is
+ * then one tap to fix, which is cheaper than the question it replaced. (Until
+ * 2026-09-26 a separate grey line, `tireAgeHint`, said it on one-tire cars.)
  *
  * The count row is always on screen for the same reason: it is both the display
  * of the guess and the correction for it.
@@ -61,11 +62,11 @@ export function tireAgeReadout(source: TireAgeSource, value: TireStintValue): Ti
 }
 
 /**
- * The same answer as `tireAgeReadout`, on one line — for a front/rear car, where two of the big
- * "On the car now" boxes stacked on a phone would push the rear tire off the screen (founder call
- * 2026-09-19: both ends on one screen, the readout shrinks to a line per end). A carried count
- * says so in the line itself, because the separate hint line is gone too. Null while no tire is
- * picked: the dimmed chips already say that.
+ * The same answer as `tireAgeReadout`, on one line — first for a front/rear car, where two of the
+ * big "On the car now" boxes stacked on a phone would push the rear tire off the screen (founder
+ * call 2026-09-19), and since 2026-09-26 for every car (founder pick: the big box was the only one
+ * of its kind in the app). A carried count says so in the line itself, because the separate hint
+ * line is gone too. Null while no tire is picked: the dimmed chips already say that.
  */
 export function tireAgeReadoutLine(source: TireAgeSource, value: TireStintValue): string | null {
   if (source === null) return null;
@@ -82,9 +83,10 @@ export function tireAgeReadoutLine(source: TireAgeSource, value: TireStintValue)
 }
 
 /**
- * The line under the chips. Says where the count came from so a carried number
- * is never mistaken for one the driver entered — and says nothing once they have
- * corrected it, because then they already know.
+ * The line that sat under the chips on a one-tire car until 2026-09-26 (founder: remove it). Says
+ * where the count came from so a carried number is never mistaken for one the driver entered —
+ * and says nothing once they have corrected it, because then they already know. Nothing on the
+ * log-run form shows it now; `tireAgeReadoutLine` carries the "Carried on" part.
  */
 export function tireAgeHint(source: TireAgeSource, last: LastRunTires | null): string | null {
   if (source === "carried") {
