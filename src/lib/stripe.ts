@@ -72,46 +72,53 @@ export type PricePlanWithAmount = PricePlan & {
 };
 
 /**
- * Plans enriched with live Stripe amounts. Memoized per request; prices are configuration that
- * changes at most a few times a year, so this is a cheap read on a cold page.
+ * The configured plans' Stripe prices, with every currency they carry. Memoized per request, and
+ * with no argument on purpose: a page that shows plans in US$ and a founding band in A$ reads
+ * Stripe once, not once per currency. Null for a price that couldn't be loaded.
+ */
+const loadPlanPrices = cache(async function loadPlanPrices(): Promise<(Stripe.Price | null)[]> {
+  const stripe = getStripe();
+  return Promise.all(
+    getPricePlans().map(async (plan) => {
+      try {
+        return await stripe.prices.retrieve(plan.priceId, { expand: ["currency_options"] });
+      } catch (error) {
+        // A missing/archived price must not take down /billing — the paywall sends people here.
+        console.error(`[stripe] could not load price ${plan.priceId}`, error);
+        return null;
+      }
+    }),
+  );
+});
+
+/**
+ * Plans enriched with live Stripe amounts. Prices are configuration that changes at most a few
+ * times a year, so this is a cheap read on a cold page.
  *
  * `wanted` is the visitor's currency (`priceCurrencyLogic.ts`). It is all or nothing: unless every
  * plan's price carries an amount in that currency, every plan comes back in AUD, so one page can
  * never mix "$12.99 USD" with "$9.99 AUD". Checkout reads this same answer, so the currency a page
  * shows is the one Stripe charges.
  */
-export const getPricePlansWithAmounts = cache(
-  async function getPricePlansWithAmounts(
-    wanted: PriceCurrency = DEFAULT_PRICE_CURRENCY
-  ): Promise<PricePlanWithAmount[]> {
-    const plans = getPricePlans();
-    if (!stripeConfigured() || plans.length === 0) {
-      return plans.map((p) => ({ ...p, unitAmount: null, currency: null }));
-    }
-    const stripe = getStripe();
-    const prices = await Promise.all(
-      plans.map(async (plan) => {
-        try {
-          return await stripe.prices.retrieve(plan.priceId, { expand: ["currency_options"] });
-        } catch (error) {
-          // A missing/archived price must not take down /billing — the paywall sends people here.
-          console.error(`[stripe] could not load price ${plan.priceId}`, error);
-          return null;
-        }
-      }),
-    );
-    const everyPriceHasIt = prices.every(
-      (price) => price != null && amountInCurrency(price, wanted).currency === wanted
-    );
-    const currency = everyPriceHasIt ? wanted : DEFAULT_PRICE_CURRENCY;
-    return plans.map((plan, i) => {
-      const price = prices[i];
-      if (!price) return { ...plan, unitAmount: null, currency: null };
-      const shown = amountInCurrency(price, currency);
-      return { ...plan, unitAmount: shown.unitAmount, currency: shown.currency };
-    });
-  },
-);
+export async function getPricePlansWithAmounts(
+  wanted: PriceCurrency = DEFAULT_PRICE_CURRENCY
+): Promise<PricePlanWithAmount[]> {
+  const plans = getPricePlans();
+  if (!stripeConfigured() || plans.length === 0) {
+    return plans.map((p) => ({ ...p, unitAmount: null, currency: null }));
+  }
+  const prices = await loadPlanPrices();
+  const everyPriceHasIt = prices.every(
+    (price) => price != null && amountInCurrency(price, wanted).currency === wanted
+  );
+  const currency = everyPriceHasIt ? wanted : DEFAULT_PRICE_CURRENCY;
+  return plans.map((plan, i) => {
+    const price = prices[i];
+    if (!price) return { ...plan, unitAmount: null, currency: null };
+    const shown = amountInCurrency(price, currency);
+    return { ...plan, unitAmount: shown.unitAmount, currency: shown.currency };
+  });
+}
 
 /**
  * The currency to hand Checkout for this price and visitor: the one their page showed, read from
