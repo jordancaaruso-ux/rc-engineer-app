@@ -4,6 +4,11 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { BRAND_DOMAIN, TIER_LABELS } from "@/lib/brand/brandNames";
 import { getPricePlansWithAmounts } from "@/lib/stripe";
+import {
+  DEFAULT_PRICE_CURRENCY,
+  formatPlanAmount,
+  type PriceCurrency,
+} from "@/lib/billing/priceCurrencyLogic";
 import { PRO_ENGINEER_MONTHLY_QUESTIONS } from "@/lib/aiUsage/budgets";
 import { STARTER_RUN_WINDOW, type PaidTier } from "@/lib/entitlementLogic";
 import { sendTransactionalEmail } from "@/lib/email/sendTransactionalEmail";
@@ -26,19 +31,13 @@ function appOrigin(): string {
   return raw && /^https?:\/\//.test(raw) ? raw : `https://www.${BRAND_DOMAIN}`;
 }
 
-async function welcomePlans(): Promise<AppWelcomePlan[]> {
-  const listed = await getPricePlansWithAmounts().catch(() => []);
+async function welcomePlans(currency: PriceCurrency): Promise<AppWelcomePlan[]> {
+  const listed = await getPricePlansWithAmounts(currency).catch(() => []);
   // Only tiers that are on sale — Starter appears once its price is configured, as on /join.
   const tiers = listed.length ? TIERS.filter((t) => listed.some((p) => p.tier === t)) : TIERS;
   return tiers.map((tier) => {
     const month = listed.find((p) => p.tier === tier && p.interval === "month");
-    const monthly =
-      month?.unitAmount != null && month.currency
-        ? new Intl.NumberFormat("en-AU", {
-            style: "currency",
-            currency: month.currency.toUpperCase(),
-          }).format(month.unitAmount / 100)
-        : null;
+    const monthly = month ? formatPlanAmount(month.unitAmount, month.currency) : null;
     return { label: TIER_LABELS[tier], hook: HOOKS[tier], monthly };
   });
 }
@@ -51,7 +50,11 @@ async function welcomePlans(): Promise<AppWelcomePlan[]> {
  * racing each other send once. A failed send removes the marker, so the next visit tries again
  * instead of the screen promising an email that never left.
  */
-export async function sendAppWelcomeEmailOnce(user: { id: string; email: string }): Promise<void> {
+export async function sendAppWelcomeEmailOnce(
+  user: { id: string; email: string },
+  /** Where they signed up, read by the caller while it still has the request: /join prices them in it. */
+  currency: PriceCurrency = DEFAULT_PRICE_CURRENCY
+): Promise<void> {
   // The screen refreshes itself while it waits for a plan, so the usual answer is "already sent";
   // read before claiming rather than failing an insert on every refresh.
   const marker = await prisma.appSetting.findUnique({
@@ -75,7 +78,7 @@ export async function sendAppWelcomeEmailOnce(user: { id: string; email: string 
     const plansUrl = `${appOrigin()}/join?${new URLSearchParams({ email: user.email, from: "app" })}`;
     const rendered = renderAppWelcomeEmail({
       recipientEmail: user.email,
-      plans: await welcomePlans(),
+      plans: await welcomePlans(currency),
       plansUrl,
     });
     await sendTransactionalEmail(

@@ -56,8 +56,10 @@ export default function TermsPage() {
 
       <Section title="Plans, payment and refunds">
         <p>
-          Plans are sold on our website and billed in Australian dollars through Stripe, our payment
-          provider. Monthly and yearly plans renew automatically until you cancel. You can change or
+          Plans are sold on our website and billed through Stripe, our payment provider: in US
+          dollars in the United States, in euros in the euro area, and in Australian dollars
+          everywhere else. At checkout, Stripe may convert an Australian-dollar price into your own
+          currency. Monthly and yearly plans renew automatically until you cancel. You can change or
           cancel your plan from the Subscription page, and a cancelled plan stays active until the
           end of the period you have paid for.
         </p>

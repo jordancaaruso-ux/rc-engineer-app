@@ -11,7 +11,6 @@ import type { PaidTier } from "@/lib/entitlementLogic";
 import { cn } from "@/lib/utils";
 import {
   COMPARE_ROWS,
-  INTERVAL_SUFFIX,
   PLAN_BULLETS,
   PLAN_STAT,
   PLAN_TAGLINE,
@@ -19,6 +18,7 @@ import {
   PlanHook,
   type PlanBullet,
 } from "@/components/billing/planCopy";
+import { intervalSuffix } from "@/lib/billing/priceCurrencyLogic";
 
 export type MemberPlan = {
   tier: PaidTier;
@@ -26,6 +26,8 @@ export type MemberPlan = {
   priceId: string;
   /** Formatted list price, e.g. "$9.99"; null when Stripe couldn't be read. */
   amount: string | null;
+  /** "usd", "eur" or "aud", named in the suffix ("USD / month"). */
+  currency: string | null;
 };
 
 export type CurrentPlan = {
@@ -33,6 +35,8 @@ export type CurrentPlan = {
   status: string;
   /** What THIS member pays, which can be an older price than today's list. */
   amount: string | null;
+  /** The currency their subscription is billed in. */
+  currency: string | null;
   interval: "month" | "year" | null;
   /** Renewal or end date, already formatted in the viewer's timezone on the server. */
   periodEndLabel: string | null;
@@ -73,15 +77,19 @@ type PlanAction =
   | { kind: "own" }
   | { kind: "go"; key: string; label: string; primary: boolean; run: () => void };
 
-function priceLine(amount: string | null, interval: "month" | "year" | null): string | null {
+function priceLine(
+  amount: string | null,
+  interval: "month" | "year" | null,
+  currency: string | null
+): string | null {
   if (!amount) return null;
-  return interval ? `${amount} ${INTERVAL_SUFFIX[interval]}` : amount;
+  return interval ? `${amount} ${intervalSuffix(currency, interval)}` : amount;
 }
 
 function statusLine(mode: BillingMode, current: CurrentPlan | null): string | null {
   if (mode === "view") return "No payment needed";
   if (!current) return null;
-  const price = priceLine(current.amount, current.interval);
+  const price = priceLine(current.amount, current.interval, current.currency);
   const date = current.periodEndLabel;
   if (mode === "switch") {
     const when = date ? `${current.cancelAtPeriodEnd ? "Ends" : "Renews"} ${date}` : null;
@@ -267,11 +275,14 @@ export function BillingClient({
     if (tier === ownTier && current?.amount) {
       return {
         amount: current.amount,
-        suffix: current.interval ? INTERVAL_SUFFIX[current.interval] : null,
+        suffix: current.interval ? intervalSuffix(current.currency, current.interval) : null,
       };
     }
     const plan = planFor(tier);
-    return { amount: plan?.amount ?? null, suffix: plan ? INTERVAL_SUFFIX[plan.interval] : null };
+    return {
+      amount: plan?.amount ?? null,
+      suffix: plan ? intervalSuffix(plan.currency, plan.interval) : null,
+    };
   }
 
   const line = statusLine(mode, current);

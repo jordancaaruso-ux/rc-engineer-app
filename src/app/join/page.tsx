@@ -15,6 +15,8 @@ import { ShellPlanNotice } from "@/components/billing/ShellPlanNotice";
 import { isNativeShellRequest } from "@/lib/nativeShellServer";
 import { normalizeSignupEmail } from "@/lib/billing/paidSignupLogic";
 import { getFoundingOfferView } from "@/lib/billing/foundingOffer";
+import { formatPlanAmount } from "@/lib/billing/priceCurrencyLogic";
+import { getVisitorPriceCurrency } from "@/lib/billing/visitorCurrency";
 
 export const metadata = { title: `Join ${PRODUCT_NAME}` };
 
@@ -116,20 +118,19 @@ export default async function JoinPage({
   const demoReady = Boolean(process.env.DEMO_USER_ID);
 
   // Founding seats (1 to 31 October 2026): a band under the plans while any are on sale.
-  const [plans, founding] = await Promise.all([getPricePlansWithAmounts(), getFoundingOfferView()]);
+  // Priced in the visitor's currency (US$ in the US, € in the euro area, A$ elsewhere).
+  const [plans, founding] = await Promise.all([
+    getVisitorPriceCurrency().then((currency) => getPricePlansWithAmounts(currency)),
+    getFoundingOfferView(),
+  ]);
   const joinPlans: JoinPlan[] = plans
     .filter((p): p is typeof p & { tier: PaidTier } => p.tier !== "none")
     .map((p) => ({
       tier: p.tier,
       interval: p.interval,
       priceId: p.priceId,
-      amount:
-        p.unitAmount != null && p.currency
-          ? new Intl.NumberFormat("en-AU", {
-              style: "currency",
-              currency: p.currency.toUpperCase(),
-            }).format(p.unitAmount / 100)
-          : null,
+      amount: formatPlanAmount(p.unitAmount, p.currency),
+      currency: p.currency,
     }));
 
   return (

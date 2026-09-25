@@ -8,6 +8,7 @@ import {
 } from "@/lib/aiUsage/budgets";
 import { STARTER_RUN_WINDOW } from "@/lib/entitlementLogic";
 import { FOUNDING_OFFER, formatFoundingAmount } from "@/lib/billing/foundingOfferLogic";
+import { asPriceCurrency, formatPlanAmount } from "@/lib/billing/priceCurrencyLogic";
 import { EnterSignInCode } from "@/app/login/verify-request/EnterSignInCode";
 
 export const metadata = { title: "Check your email" };
@@ -75,15 +76,11 @@ export default async function JoinSuccessPage({
             detail: { label: "Engineer questions", value: `${PRO_ENGINEER_MONTHLY_QUESTIONS} a month` },
           };
         } else if (priceId) {
-          const plan = (await getPricePlansWithAmounts()).find((p) => p.priceId === priceId);
+          // In the currency they were charged (US$ and € sessions carry their own).
+          const charged = asPriceCurrency(session.currency) ?? undefined;
+          const plan = (await getPricePlansWithAmounts(charged)).find((p) => p.priceId === priceId);
           if (plan && plan.tier !== "none") {
-            const amount =
-              plan.unitAmount != null && plan.currency
-                ? new Intl.NumberFormat("en-AU", {
-                    style: "currency",
-                    currency: plan.currency.toUpperCase(),
-                  }).format(plan.unitAmount / 100)
-                : null;
+            const amount = formatPlanAmount(plan.unitAmount, plan.currency);
             paidPlan = {
               label: TIER_LABELS[plan.tier],
               billedLabel: "Billed",

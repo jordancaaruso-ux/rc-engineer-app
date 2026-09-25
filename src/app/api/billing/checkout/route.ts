@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
-import { getPricePlans, getStripe, stripeConfigured } from "@/lib/stripe";
+import { checkoutCurrencyFor, getPricePlans, getStripe, stripeConfigured } from "@/lib/stripe";
+import { getVisitorPriceCurrency } from "@/lib/billing/visitorCurrency";
 
 /**
  * Create a Stripe Checkout Session for a subscription. Auth required; the price must be one we
@@ -37,8 +38,12 @@ export async function POST(request: Request): Promise<Response> {
   const origin =
     request.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
 
+  // The currency the plan cards showed this visitor (US$ in the US, € in the euro area).
+  const currency = await checkoutCurrencyFor(priceId, await getVisitorPriceCurrency());
+
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
+    ...(currency ? { currency } : {}),
     customer: customerId,
     client_reference_id: user.id,
     line_items: [{ price: priceId, quantity: 1 }],

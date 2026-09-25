@@ -81,6 +81,10 @@ export default auth((req) => {
   if (pathname === "/api/billing/founding-checkout" || pathname === "/api/billing/founding-status") {
     return NextResponse.next();
   }
+  // The landing page's plan cards read the visitor's prices (US$, €, A$) from here. Read-only.
+  if (pathname === "/api/billing/plan-prices") {
+    return NextResponse.next();
+  }
   // The landing page's static assets. NOT optional: the matcher at the bottom of this file only
   // exempts image extensions, so `support.js` and the walkthrough `.mp4` would be redirected to
   // /login for exactly the signed-out visitors the page exists for — it would boot to a blank

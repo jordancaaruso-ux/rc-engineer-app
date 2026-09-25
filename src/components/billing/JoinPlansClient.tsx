@@ -7,13 +7,13 @@ import type { PaidTier } from "@/lib/entitlementLogic";
 import { cn } from "@/lib/utils";
 import {
   COMPARE_ROWS,
-  INTERVAL_SUFFIX,
   PLAN_BULLETS,
   PLAN_STAT,
   PLAN_TAGLINE,
   PlanHook,
   type PlanBullet,
 } from "@/components/billing/planCopy";
+import { intervalSuffix } from "@/lib/billing/priceCurrencyLogic";
 
 export type JoinPlan = {
   tier: PaidTier;
@@ -21,6 +21,8 @@ export type JoinPlan = {
   priceId: string;
   /** Formatted amount, e.g. "$9.99" — null when Stripe couldn't be read (render em dash). */
   amount: string | null;
+  /** "usd", "eur" or "aud": the visitor's currency, the same for every plan on the page. */
+  currency: string | null;
 };
 
 /**
@@ -178,7 +180,8 @@ export function JoinPlansClient({
   const standard = plan("standard");
   const pro = plan("pro");
   const selected = plan(selectedTier);
-  const suffix = INTERVAL_SUFFIX[interval];
+  const currency = plans.find((p) => p.currency)?.currency ?? null;
+  const suffix = intervalSuffix(currency, interval);
   const tierColumns: PaidTier[] = hasStarter ? ["starter", "standard", "pro"] : ["standard", "pro"];
 
   return (
@@ -246,7 +249,7 @@ export function JoinPlansClient({
             <p className="door-price">
               {starter?.amount ?? "—"}
               <span className="ml-1.5 font-sans text-[12px] font-normal tracking-normal text-faint">
-                {INTERVAL_SUFFIX.month}
+                {intervalSuffix(currency, "month")}
               </span>
             </p>
             <div className="flex items-baseline justify-between gap-3 rounded-lg border border-elevate/10 bg-elevate/[0.04] px-3 py-2">

@@ -106,8 +106,6 @@ export const COMPARE_ROWS: Array<{ label: string } & Record<PaidTier, string>> =
   { label: "Roll-centre tools", starter: "—", standard: "—", pro: "✓" },
 ];
 
-export const INTERVAL_SUFFIX = { month: "AUD / month", year: "AUD / year" } as const;
-
 const STANDARD_DAILY_WORDS =
   STANDARD_ENGINEER_DAILY_QUESTIONS === 1
     ? "once a day"

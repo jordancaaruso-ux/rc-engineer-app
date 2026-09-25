@@ -3,7 +3,8 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
 import { clientIpKey } from "@/lib/clientIp";
 import { isSharedDemoAccount } from "@/lib/demo/demoAccess";
-import { getPricePlans, getStripe, stripeConfigured } from "@/lib/stripe";
+import { checkoutCurrencyFor, getPricePlans, getStripe, stripeConfigured } from "@/lib/stripe";
+import { getVisitorPriceCurrency } from "@/lib/billing/visitorCurrency";
 import {
   APP_SIGNUP_FROM,
   PUBLIC_SIGNUP_SOURCE,
@@ -59,8 +60,12 @@ export async function POST(request: Request): Promise<Response> {
   const user =
     signedIn && !isSharedDemoAccount({ id: signedIn.id, email: signedIn.email }) ? signedIn : null;
 
+  // The currency the plan cards showed this visitor (US$ in the US, € in the euro area).
+  const currency = await checkoutCurrencyFor(priceId, await getVisitorPriceCurrency());
+
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
+    ...(currency ? { currency } : {}),
     line_items: [{ price: priceId, quantity: 1 }],
     // The template literal is Stripe's, filled at redirect time — the success page uses it to
     // look up the payer's email so the sign-in code box can be offered right there.

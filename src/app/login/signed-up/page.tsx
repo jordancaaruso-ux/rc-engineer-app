@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { isNativeShellRequest } from "@/lib/nativeShellServer";
 import { isDemoIdentity } from "@/lib/demo/demoAccess";
 import { sendAppWelcomeEmailOnce } from "@/lib/auth/sendAppWelcomeEmail";
+import { getVisitorPriceCurrency } from "@/lib/billing/visitorCurrency";
 import { RefreshWhenBack, SignedUpFooter, TryDemoButton } from "./SignedUpClient";
 
 export const metadata = { title: "You're signed up" };
@@ -39,8 +40,10 @@ export default async function SignedUpPage(): Promise<ReactNode> {
 
   const email = user.email ?? "";
   if (email) {
+    // Read now: the request's headers are gone by the time after() runs.
+    const currency = await getVisitorPriceCurrency();
     after(() =>
-      sendAppWelcomeEmailOnce({ id: user.id, email }).catch((err) =>
+      sendAppWelcomeEmailOnce({ id: user.id, email }, currency).catch((err) =>
         console.error("[app-welcome] send failed", err)
       )
     );

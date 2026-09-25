@@ -29,6 +29,13 @@ import { Eyebrow, PanelTitle } from "@/components/ui/panel";
 import { isNativeShellRequest } from "@/lib/nativeShellServer";
 import { getFoundingOfferView, isFoundingSeatPrice } from "@/lib/billing/foundingOffer";
 import { formatFoundingAmount } from "@/lib/billing/foundingOfferLogic";
+import {
+  amountInCurrency,
+  asPriceCurrency,
+  formatPlanAmount,
+  type PriceCurrency,
+} from "@/lib/billing/priceCurrencyLogic";
+import { getVisitorPriceCurrency } from "@/lib/billing/visitorCurrency";
 
 export const metadata = { title: "Subscription" };
 
@@ -41,15 +48,20 @@ function asPaidTier(tier: string): PaidTier | null {
   return PAID_TIERS.has(tier) ? (tier as PaidTier) : null;
 }
 
-function formatAmount(
-  unitAmount: number | null | undefined,
-  currency: string | null | undefined
-): string | null {
-  if (unitAmount == null || !currency) return null;
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(unitAmount / 100);
+/**
+ * The currency a live subscription is billed in (a member who joined in the US pays US$). Plan
+ * changes happen on that same subscription in Stripe's portal, so every plan they are shown is
+ * priced in it too. Null when Stripe can't answer.
+ */
+async function subscriptionCurrency(stripeSubscriptionId: string): Promise<PriceCurrency | null> {
+  if (!stripeConfigured()) return null;
+  try {
+    const subscription = await getStripe().subscriptions.retrieve(stripeSubscriptionId);
+    return asPriceCurrency(subscription.currency);
+  } catch (error) {
+    console.error(`[billing] could not read the currency of ${stripeSubscriptionId}`, error);
+    return null;
+  }
 }
 
 /**
@@ -60,21 +72,30 @@ function formatAmount(
  */
 async function memberPrice(
   priceId: string,
-  listed: PricePlanWithAmount[]
-): Promise<{ amount: string | null; interval: "month" | "year" | null }> {
+  listed: PricePlanWithAmount[],
+  currency: PriceCurrency
+): Promise<{ amount: string | null; currency: string | null; interval: "month" | "year" | null }> {
   const hit = listed.find((p) => p.priceId === priceId);
-  if (hit) return { amount: formatAmount(hit.unitAmount, hit.currency), interval: hit.interval };
-  if (!stripeConfigured()) return { amount: null, interval: null };
-  try {
-    const price = await getStripe().prices.retrieve(priceId);
-    const iv = price.recurring?.interval;
+  if (hit) {
     return {
-      amount: formatAmount(price.unit_amount, price.currency),
+      amount: formatPlanAmount(hit.unitAmount, hit.currency),
+      currency: hit.currency,
+      interval: hit.interval,
+    };
+  }
+  if (!stripeConfigured()) return { amount: null, currency: null, interval: null };
+  try {
+    const price = await getStripe().prices.retrieve(priceId, { expand: ["currency_options"] });
+    const iv = price.recurring?.interval;
+    const own = amountInCurrency(price, currency);
+    return {
+      amount: formatPlanAmount(own.unitAmount, own.currency),
+      currency: own.currency,
       interval: iv === "year" || iv === "month" ? iv : null,
     };
   } catch (error) {
     console.error(`[billing] could not load the member's own price ${priceId}`, error);
-    return { amount: null, interval: null };
+    return { amount: null, currency: null, interval: null };
   }
 }
 
@@ -104,24 +125,40 @@ export default async function BillingPage({
     return <ShellPlanNotice tierLabel={entitlement.entitled ? tierLabel(entitlement.tier) : null} />;
   }
 
-  const [sub, listed, timeZone, params] = await Promise.all([
+  const [sub, visitorCurrency, timeZone, params] = await Promise.all([
     prisma.subscription.findUnique({ where: { userId: user.id } }),
-    getPricePlansWithAmounts(),
+    getVisitorPriceCurrency(),
     getExplicitTimeZoneForRunFormatting(),
     searchParams,
   ]);
 
+  // A member whose subscription Stripe still holds sees their own currency; anyone about to buy
+  // sees the currency of where they are, the one checkout will charge.
+  const liveSub =
+    sub != null && (isActiveSubscriptionStatus(sub.status) || LIVE_UNPAID_STATUSES.has(sub.status));
+  const currency =
+    (liveSub ? await subscriptionCurrency(sub.stripeSubscriptionId) : null) ?? visitorCurrency;
+  const listed = await getPricePlansWithAmounts(currency);
+
   const plans: MemberPlan[] = listed.flatMap((p) => {
     const tier = asPaidTier(p.tier);
     return tier
-      ? [{ tier, interval: p.interval, priceId: p.priceId, amount: formatAmount(p.unitAmount, p.currency) }]
+      ? [
+          {
+            tier,
+            interval: p.interval,
+            priceId: p.priceId,
+            amount: formatPlanAmount(p.unitAmount, p.currency),
+            currency: p.currency,
+          },
+        ]
       : [];
   });
 
   const subTier = sub ? asPaidTier(sub.tier) : null;
   let current: CurrentPlan | null = null;
   if (sub && subTier) {
-    const own = sub.priceId ? await memberPrice(sub.priceId, listed) : null;
+    const own = sub.priceId ? await memberPrice(sub.priceId, listed, currency) : null;
     // No price on the row (dev fixtures, rows written before the column existed): fall back to
     // the tier's monthly list price rather than showing nothing.
     const list = plans.find((p) => p.tier === subTier && p.interval === "month") ?? null;
@@ -129,6 +166,7 @@ export default async function BillingPage({
       tier: subTier,
       status: sub.status,
       amount: own ? own.amount : (list?.amount ?? null),
+      currency: own ? own.currency : (list?.currency ?? null),
       interval: own ? own.interval : list ? "month" : null,
       periodEndLabel: sub.currentPeriodEnd
         ? formatRunDateOnly(sub.currentPeriodEnd, timeZone)
