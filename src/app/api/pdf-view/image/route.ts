@@ -69,7 +69,8 @@ export async function GET(request: Request): Promise<Response> {
 
   const page = Math.min(Math.max(Number(params.get("page") ?? "1") || 1, 1), MAX_VIEWER_PAGES);
   try {
-    const png = await renderPdfPageToPng(new Uint8Array(bytes), page, { scale: 2 });
+    // The viewer shows a sheet to read, so its values have to be drawn — see `withFormValues`.
+    const png = await renderPdfPageToPng(new Uint8Array(bytes), page, { scale: 2, withFormValues: true });
     return new Response(new Uint8Array(png), {
       headers: {
         "Content-Type": "image/png",

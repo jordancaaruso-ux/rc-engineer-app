@@ -24,6 +24,18 @@ function standardFontDataUrl(): string | undefined {
 const STANDARD_FONT_DATA_URL = standardFontDataUrl();
 
 /**
+ * pdfjs's `AnnotationMode.ENABLE`, as the number it is: importing the enum would load a second
+ * copy of pdfjs next to the one `pdf-to-img` pins.
+ *
+ * pdfjs's DEFAULT is `ENABLE_FORMS`, which leaves every form field off the canvas, because a
+ * browser viewer draws those as HTML on top. Here there is no HTML on top, so a filled setup sheet
+ * came out with its values missing: on an A800RR setup with 139 values, the shared picture showed
+ * 3 computed numbers and none of the driver's own (2026-09-25). `ENABLE` draws each field's
+ * appearance, which is what `fillPdfForm` bakes.
+ */
+const PDFJS_ANNOTATION_MODE_ENABLE = 1;
+
+/**
  * Server-side flattened-PDF rasterizer (serverless-safe).
  *
  * A setup sheet uploaded as a PDF whose page is an *image* (a flattened/scanned sheet with zero
@@ -37,7 +49,7 @@ const STANDARD_FONT_DATA_URL = standardFontDataUrl();
  */
 export async function renderPdfFirstPageToPng(
   bytes: Uint8Array,
-  opts?: { scale?: number; timeoutMs?: number }
+  opts?: RasterOptions
 ): Promise<Buffer> {
   return renderPdfPageToPng(bytes, 1, opts);
 }
@@ -65,10 +77,21 @@ export async function pdfPageCount(bytes: Uint8Array): Promise<number> {
   }
 }
 
+type RasterOptions = {
+  scale?: number;
+  timeoutMs?: number;
+  /**
+   * Draw the form fields' values. On for a FILLED sheet a driver is meant to read (the share
+   * picture, the in-app PDF viewer). Off for a blank that the app draws its own boxes over (the
+   * fill surface's page picture) and for the calibration tools, which read the paper itself.
+   */
+  withFormValues?: boolean;
+};
+
 export async function renderPdfPageToPng(
   bytes: Uint8Array,
   pageNumber: number,
-  opts?: { scale?: number; timeoutMs?: number }
+  opts?: RasterOptions
 ): Promise<Buffer> {
   const scale = opts?.scale ?? 2;
   const timeoutMs = opts?.timeoutMs ?? 30_000;
@@ -79,6 +102,7 @@ export async function renderPdfPageToPng(
     const doc = await pdf(Buffer.from(bytes), {
       scale,
       ...(STANDARD_FONT_DATA_URL ? { docInitParams: { standardFontDataUrl: STANDARD_FONT_DATA_URL } } : {}),
+      ...(opts?.withFormValues ? { renderParams: { annotationMode: PDFJS_ANNOTATION_MODE_ENABLE } } : {}),
     });
     try {
       if (doc.length < 1) throw new Error("PDF has no pages");

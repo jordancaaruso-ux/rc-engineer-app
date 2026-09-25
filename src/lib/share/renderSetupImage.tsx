@@ -56,15 +56,25 @@ export async function renderSetupSheetImage(params: {
      * Rasterized with its form layer LIVE, not flattened.
      *
      * Since 2026-08-14 the exported PDF keeps its values in real form fields so a driver can carry
-     * on filling it. The worry was that pdfjs wouldn't draw those. Checked by rendering both ways
-     * on the Xray '26 and Mugen MTC3 blanks: pdfjs draws the widgets, marks and all — and the
-     * FLATTENED copy is the worse picture, because a box the sheet sizes automatically (Xray's
-     * comments line) gets its text burnt in at the wrong size. So the live file is the better
-     * source as well as the simpler one.
+     * on filling it. pdfjs draws those widgets ONLY when asked (`withFormValues`): its default
+     * leaves form fields to a browser's HTML layer, so without it every shared sheet went out with
+     * the driver's values missing (found 2026-09-25). With it, pdfjs draws the widgets, marks and
+     * all — and the FLATTENED copy is the worse picture, because a box the sheet sizes
+     * automatically (Xray's comments line) gets its text burnt in at the wrong size. So the live
+     * file is the better source as well as the simpler one.
      */
-    const sheet = await renderPdfFirstPageToPng(pdf);
-    // One predictable width for every chassis, and a smaller file over a club's wifi.
-    return await sharp(sheet).resize({ width: CARD_WIDTH }).png().toBuffer();
+    const sheet = await renderPdfFirstPageToPng(pdf, { withFormValues: true });
+    /*
+     * One predictable width for every chassis, and a smaller file over a club's wifi.
+     *
+     * A 256-colour PNG: a sheet is black line art with values in one or two inks, which a palette
+     * holds without visible loss, and it lands at ~0.33 MB where full colour was ~0.76 MB
+     * (A800RR, 2026-09-25). It is the file the driver sends from the track.
+     */
+    return await sharp(sheet)
+      .resize({ width: CARD_WIDTH })
+      .png({ palette: true, quality: 90, effort: 4 })
+      .toBuffer();
   } catch {
     // An unreadable render is the same answer as no render: there is no sheet to send.
     return null;

@@ -57,6 +57,43 @@ function mappedFieldNames(mappings: Record<string, PdfFormFieldMappingRule>): Se
   );
 }
 
+/*
+ * A chassis's blank, already emptied, kept for the life of the server instance.
+ *
+ * Every driver on a chassis fills the same paper, and emptying it is the slowest step of building
+ * their PDF: pdf-lib opens, clears and re-saves a ~2.5 MB file, about a second on a dev machine
+ * before a single value is written, after a download of its own (A800RR, 2026-09-25). A stored
+ * file never changes under its path (a new upload gets a new path), so the result stays good for
+ * as long as the instance lives. Four entries covers a race day's chassis and caps it near 10 MB.
+ */
+const EMPTIED_BLANK_LIMIT = 4;
+const emptiedBlanks = new Map<string, Promise<Uint8Array>>();
+
+async function emptiedChassisBlank(storagePath: string): Promise<Buffer> {
+  let pending = emptiedBlanks.get(storagePath);
+  if (pending) {
+    // Re-inserted so the entry dropped at the limit is always the least recently used one.
+    emptiedBlanks.delete(storagePath);
+    emptiedBlanks.set(storagePath, pending);
+  } else {
+    const started = (async () =>
+      blankPdfFormValues(new Uint8Array(await readBytesFromStorageRef(storagePath))))();
+    pending = started;
+    emptiedBlanks.set(storagePath, started);
+    // A failed read is not remembered: the next driver tries again.
+    started.catch(() => {
+      if (emptiedBlanks.get(storagePath) === started) emptiedBlanks.delete(storagePath);
+    });
+    while (emptiedBlanks.size > EMPTIED_BLANK_LIMIT) {
+      const oldest = emptiedBlanks.keys().next().value;
+      if (oldest === undefined) break;
+      emptiedBlanks.delete(oldest);
+    }
+  }
+  // A copy for each caller: the bytes go on into pdf-lib, and no fill may see another's.
+  return Buffer.from(await pending);
+}
+
 type PdfSource = {
   /** The blank to write into. */
   bytes: Buffer;
@@ -132,8 +169,7 @@ async function resolveChassisBlankSource(
      * Nothing is lost: what that file contained was read into values at upload, so it is drawn
      * rather than printed.
      */
-    const raw = await readBytesFromStorageRef(storagePath);
-    bytes = Buffer.from(await blankPdfFormValues(new Uint8Array(raw)));
+    bytes = await emptiedChassisBlank(storagePath);
   } catch {
     return null;
   }
