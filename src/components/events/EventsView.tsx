@@ -68,7 +68,7 @@ export function EventsView({
     scope.year == null ? "All time" : `Season ${scope.year}`,
     `${strip.events.value ?? 0} ${strip.events.value === 1 ? "event" : "events"}`,
     `${strip.venues.value ?? 0} ${strip.venues.value === 1 ? "venue" : "venues"}`,
-    `${strip.daysOnTrack.value ?? 0} days on track`,
+    `${strip.daysOnTrack.value ?? 0} ${strip.daysOnTrack.value === 1 ? "day" : "days"} on track`,
   ].join(" · ");
 
   return (
