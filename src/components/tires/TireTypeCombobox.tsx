@@ -210,12 +210,31 @@ export function TireTypeCombobox({
     return known.has(selectedOption.id) ? ([] as TireTypeOption[]) : [selectedOption];
   }, [selectedOption, recentOptions, options]);
 
+  /*
+   * A tire a driver typed stays "Unreviewed" for everyone until the founder looks at it (ruling
+   * 2026-09-26), the same word and place as an unreviewed chassis on Add car. Only a stated null
+   * counts: "Recently used" rows arrive without `verifiedAt`, so theirs is read off the catalog.
+   */
+  const reviewedById = useMemo(() => {
+    const byId = new Map<string, boolean>();
+    for (const o of [...options, ...extra]) {
+      if (o.verifiedAt !== undefined) byId.set(o.id, o.verifiedAt != null);
+    }
+    return byId;
+  }, [options, extra]);
+  const isUnreviewed = useCallback(
+    (o: TireTypeOption) =>
+      (o.verifiedAt !== undefined ? o.verifiedAt != null : reviewedById.get(o.id)) === false,
+    [reviewedById]
+  );
+
   const sections = useMemo<OptionSection[]>(() => {
     // `keywords` carries the model code: never shown, always searched, so "D32"
     // finds a compound whose visible name never says D32.
     const toRow = (o: TireTypeOption) => ({
       value: o.id,
       label: o.displayName,
+      detail: isUnreviewed(o) ? "Unreviewed" : null,
       keywords: o.modelCode,
     });
     const recent = { key: "recent", label: "Recently used", options: recentOptions.map(toRow) };
@@ -234,7 +253,7 @@ export function TireTypeCombobox({
         options: all.filter((o) => !tireFitsEnd(o.position, end)).map(toRow),
       },
     ];
-  }, [recentOptions, options, extra, end]);
+  }, [recentOptions, options, extra, end, isUnreviewed]);
 
   const closeSheet = useCallback(() => {
     setOpen(false);
@@ -373,7 +392,15 @@ export function TireTypeCombobox({
         placeholder={!selectedOption}
         className="rounded-md border border-border bg-card"
       >
-        {triggerLabel}
+        {selectedOption && isUnreviewed(selectedOption) ? (
+          // The picked tire keeps the list's mark; a long name gives way, never the mark.
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="min-w-0 truncate">{triggerLabel}</span>
+            <span className="shrink-0 text-[11.5px] text-muted-foreground">Unreviewed</span>
+          </span>
+        ) : (
+          triggerLabel
+        )}
       </PickerTrigger>
 
       <PickerSheet

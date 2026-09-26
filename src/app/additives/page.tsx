@@ -4,6 +4,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { ensureSeedAdditiveTypes } from "@/lib/additives/ensureSeedAdditiveTypes";
+import { additiveIdsUsedByOthers } from "@/lib/additives/additiveUsage";
 import { AdditiveGaragePanel } from "@/components/additives/AdditiveGaragePanel";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
@@ -50,12 +51,16 @@ export default async function AdditivesPage(props: {
   }
   const additiveTypeRows = await prisma.additiveType.findMany({
     orderBy: { displayName: "asc" },
-    select: { id: true, displayName: true, modelCode: true, verifiedAt: true },
+    select: { id: true, displayName: true, modelCode: true, verifiedAt: true, createdByUserId: true },
   });
-  const additiveTypes = additiveTypeRows.map((t) => ({
+  // Who added each row stays on the server; the panel only learns which ones are this driver's,
+  // and which of those another driver already uses (so they're locked, and it says why).
+  const additiveTypes = additiveTypeRows.map(({ createdByUserId: _maker, ...t }) => ({
     ...t,
     verifiedAt: t.verifiedAt ? t.verifiedAt.toISOString() : null,
   }));
+  const ownIds = additiveTypeRows.filter((t) => t.createdByUserId === user.id).map((t) => t.id);
+  const ownInUseIds = isAdmin ? [] : [...(await additiveIdsUsedByOthers(ownIds, user.id))];
 
   return (
     <>
@@ -70,7 +75,12 @@ export default async function AdditivesPage(props: {
       </header>
       <section className="page-body">
         <div>
-          <AdditiveGaragePanel initialAdditiveTypes={additiveTypes} isAdmin={isAdmin} />
+          <AdditiveGaragePanel
+            initialAdditiveTypes={additiveTypes}
+            isAdmin={isAdmin}
+            ownIds={ownIds}
+            ownInUseIds={ownInUseIds}
+          />
         </div>
       </section>
     </>

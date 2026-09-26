@@ -3,9 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
-import { canManageCatalogRow } from "@/lib/assets/catalogAccessLogic";
 import { additiveTypeUsedByOthers } from "@/lib/assets/catalogUsage";
+import {
+  ADDITIVE_IN_USE_REASON,
+  ADDITIVE_NOT_YOURS_REASON,
+  additiveAccess,
+  canChangeAdditive,
+} from "@/lib/additives/additiveAccess";
 import { suggestModelCodeFromDisplayName } from "@/lib/tires/matchTireType";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 const ADDITIVE_TYPE_SELECT = {
   id: true,
@@ -15,27 +21,22 @@ const ADDITIVE_TYPE_SELECT = {
   createdByUserId: true,
 } as const;
 
-type ManageableAdditiveType = {
-  id: string;
-  verifiedAt: Date | null;
-  createdByUserId: string | null;
-};
-
-/** Unified catalog rule: admin always; else creator only while unverified AND unused. */
-async function canManageAdditiveType(
+/**
+ * Admin always; else the driver who added it, while no other driver uses it — verified or not,
+ * since every additive is trusted on arrival (`additiveAccess`). A refusal says why.
+ */
+async function refuseUnlessAllowed(
   user: { id: string; email: string | null },
-  row: ManageableAdditiveType
-): Promise<boolean> {
-  if (isAuthAdminEmail(user.email)) return true;
-  const verified = row.verifiedAt != null;
-  const isCreator = row.createdByUserId != null && row.createdByUserId === user.id;
-  if (verified || !isCreator) return false;
-  const usedByOthers = await additiveTypeUsedByOthers(row.id, user.id);
-  return canManageCatalogRow(user, {
-    creatorUserId: row.createdByUserId,
-    verified,
-    usedByOthers,
-  });
+  row: { id: string; createdByUserId: string | null }
+): Promise<NextResponse | null> {
+  const maker = !isAuthAdminEmail(user.email) && row.createdByUserId === user.id;
+  const usedByOthers = maker ? await additiveTypeUsedByOthers(row.id, user.id) : false;
+  const access = additiveAccess(user, row, usedByOthers);
+  if (canChangeAdditive(access)) return null;
+  return NextResponse.json(
+    { error: access === "in-use" ? ADDITIVE_IN_USE_REASON : ADDITIVE_NOT_YOURS_REASON },
+    { status: 403 }
+  );
 }
 
 export async function PATCH(
@@ -56,12 +57,8 @@ export async function PATCH(
   if (!existing) {
     return NextResponse.json({ error: "Additive type not found" }, { status: 404 });
   }
-  if (!(await canManageAdditiveType(user, existing))) {
-    return NextResponse.json(
-      { error: "Only the creator (while unverified) or an admin can edit this additive type." },
-      { status: 403 }
-    );
-  }
+  const refused = await refuseUnlessAllowed(user, existing);
+  if (refused) return refused;
 
   const body = (await request.json().catch(() => null)) as {
     displayName?: string;
@@ -88,6 +85,9 @@ export async function PATCH(
     }
     return NextResponse.json({ error: "displayName is required" }, { status: 400 });
   }
+  // A rename lands in every driver's list, same as a new name (the create route checks too).
+  const unclean = objectionableTextError(displayName);
+  if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
 
   const modelCodeRaw =
     body?.modelCode?.trim() || suggestModelCodeFromDisplayName(displayName);
@@ -99,10 +99,8 @@ export async function PATCH(
       select: { id: true },
     });
     if (conflict && conflict.id !== additiveTypeId) {
-      return NextResponse.json(
-        { error: "An additive type with this model code already exists." },
-        { status: 409 }
-      );
+      // The code is made from the name, so to the driver renaming it this is a name clash.
+      return NextResponse.json({ error: "Another additive already has this name." }, { status: 409 });
     }
   }
 
@@ -133,12 +131,8 @@ export async function DELETE(
   if (!existing) {
     return NextResponse.json({ error: "Additive type not found" }, { status: 404 });
   }
-  if (!(await canManageAdditiveType(user, existing))) {
-    return NextResponse.json(
-      { error: "Only the creator (while unverified and unused) or an admin can delete this additive type." },
-      { status: 403 }
-    );
-  }
+  const refused = await refuseUnlessAllowed(user, existing);
+  if (refused) return refused;
 
   await prisma.additiveType.delete({ where: { id: additiveTypeId } });
   return NextResponse.json({ ok: true });

@@ -55,6 +55,7 @@
     "test:weather": "npx tsx src/lib/weather/weather.test.ts",
     "test:units": "npx tsx --test src/lib/units/unitSystem.test.ts",
     "test:condition-signature": "npx tsx src/lib/trackConditionSignature.test.ts",
+    "test:shared-items": "npx tsx --test src/lib/trackMetaTags.test.ts src/lib/additives/additiveAccess.test.ts",
     "test:engineer-chat": "node --conditions=react-server --import tsx --test src/lib/engineer/minimalChat.test.ts src/lib/engineer/nextQuestions.test.ts",
     "test:kb-manifest": "npx tsx src/lib/engineer/kbCoverageManifest.test.ts",
     "nets:check": "npx tsx scripts/validate-nets.ts",

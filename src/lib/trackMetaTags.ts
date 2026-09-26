@@ -1,4 +1,11 @@
-/** Stored on `Track.gripTags` / `Track.layoutTags` (multi-select, canonical order). */
+/**
+ * Stored on `Track.gripTags` / `Track.layoutTags`, arrays in canonical order.
+ *
+ * One value each (founder call 2026-09-26): the chips read as a single scale from "Very low" to
+ * "Very high", and as a pick-several list a driver fixing a wrong tag saved two contradictory ones
+ * ("Very low · High"). Tapping a value replaces the old one (`pickOneTag`). The columns stay
+ * arrays, so a track saved with two before then keeps both until someone taps one.
+ */
 
 export const TRACK_GRIP_TAG_IDS = [
   "VERY_LOW",
@@ -49,6 +56,15 @@ export function normalizeLayoutTags(raw: unknown): TrackLayoutTagId[] {
   if (!Array.isArray(raw)) return [];
   const set = new Set(raw.filter((x): x is string => typeof x === "string" && LAYOUT_SET.has(x)));
   return TRACK_LAYOUT_TAG_IDS.filter((id) => set.has(id));
+}
+
+/**
+ * The tags after tapping `id` on a one-value scale: that value alone, or none when it was
+ * already the only one (a tap on the lit chip clears it). A track still holding two from before
+ * keeps just the tapped one.
+ */
+export function pickOneTag<T extends string>(current: readonly string[], id: T): T[] {
+  return current.length === 1 && current[0] === id ? [] : [id];
 }
 
 export function formatGripTagsForDisplay(tags: readonly string[]): string {

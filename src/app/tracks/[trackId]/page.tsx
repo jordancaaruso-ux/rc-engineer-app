@@ -18,6 +18,7 @@ import { TrackLayoutsEditor } from "@/components/tracks/TrackLayoutsEditor";
 import { TrackTimingLinks } from "@/components/tracks/TrackTimingLinks";
 import { TrackTimingLinkFinder } from "@/components/tracks/TrackTimingLinkFinder";
 import { canManageCommunityTrack } from "@/lib/tracks/trackAccess";
+import { trackUsedByOthers } from "@/lib/assets/catalogUsage";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { UnverifiedBadge } from "@/components/assets/CatalogVerifyControl";
 import { CatalogVerifyToggleButton } from "@/components/assets/CatalogVerifyToggleButton";
@@ -99,8 +100,18 @@ export default async function TrackDetailPage(props: {
     }),
   ]);
   const canManage = canManageCommunityTrack(user, track);
-  const deleteAsAdmin = canManage && track.userId !== user.id;
   const isAdmin = isAuthAdminEmail(user.email);
+  /*
+   * Delete follows the API's rule (`DELETE /api/tracks/[trackId]`), not `canManage`: the driver
+   * who added the track may delete it only while no other driver has a run or meeting here; an
+   * admin always. Offered on `canManage` alone, the maker was walked through typing DELETE and
+   * refused at the very end (launch test drive, 2026-09-26). Same check as the API's.
+   */
+  const usedByOthers = canManage && !isAdmin ? await trackUsedByOthers(track.id, user.id) : false;
+  const canDelete = canManage && !usedByOthers;
+  const deleteAsAdmin = canDelete && track.userId !== user.id;
+  // Only read when `usedByOthers`, i.e. the viewer made the track: everyone else's runs here.
+  const othersHaveRuns = totalRunCount > runCount;
   /**
    * A LiveRC catalog row is defined by its URL, so that field states itself and offers nothing.
    * And where the pin came from LiveRC's published address there is nothing to set either — the
@@ -216,7 +227,7 @@ export default async function TrackDetailPage(props: {
 
           <TrackFavouriteClient trackId={track.id} trackName={track.name} isFavourite={isFavourite} />
 
-          {canManage ? (
+          {canDelete ? (
             <TrackDeleteClient
               trackId={track.id}
               trackName={track.name}
@@ -224,6 +235,12 @@ export default async function TrackDetailPage(props: {
               eventCount={eventCount}
               asAdmin={deleteAsAdmin}
             />
+          ) : usedByOthers ? (
+            <p className="text-xs text-muted-foreground leading-snug">
+              {othersHaveRuns
+                ? "Other racers have runs here, so you can’t delete this track."
+                : "Other racers have meetings here, so you can’t delete this track."}
+            </p>
           ) : (
             <p className="text-xs text-muted-foreground leading-snug">
               Only the user who added this track or an admin can delete it. Your runs at this venue: {runCount}.
