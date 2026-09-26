@@ -16,12 +16,16 @@ import {
   leversNotOnSheet,
   notVisibleLines,
   partlyVisibleLine,
+  partsTheClassLacks,
   readSheet,
   readableSetupKey as readableKey,
   sheetMostlyUnread,
   spurOverPinion,
   tuningValues,
+  type SheetChips,
 } from "@/lib/engineer/setupDiff";
+import { buildSetupSheetTemplateFromModel } from "@/lib/setupSheetModels/buildSetupSheetTemplate";
+import { canonicalSetupSheetTemplateId } from "@/lib/setupSheetTemplateId";
 import { loadNets } from "@/lib/engineer/nets";
 import { disciplineForCar } from "@/lib/cars/chassisPlatform";
 import { disciplineLabel, parseDiscipline } from "@/lib/cars/carClasses";
@@ -177,6 +181,8 @@ async function loadRun(userId: string, runId: string | null) {
           setupSheetModel: { select: { slug: true, discipline: true, schemaJson: true } },
           // The driver's own names for boxes the app cannot read (carSheetNames.ts).
           sheetBoxNamesJson: true,
+          // Setups saved on the car: a run with none attached is told so (setupDiff `notVisibleLines`).
+          _count: { select: { snapshots: { where: { isLibrary: true } } } },
         },
       },
       track: { select: { name: true, gripTags: true, layoutTags: true } },
@@ -275,6 +281,10 @@ function buildSessionFactsBlock(
       "The setup effect priors in this request and their step sizes were written for 1/10 touring cars. Nothing in this request was written for this car's class."
     );
   }
+  // The parts the class has none of (setupDiff `partsTheClassLacks`): a 1/12 pan car was told it
+  // "can take a front sway bar", and was led with rear toe-in (test drive, 2026-09-26).
+  const lacks = partsTheClassLacks(discipline);
+  if (lacks) facts.push(lacks);
   push("class", run.raceClass);
   push("track", run.track?.name);
   push("layout", run.trackLayout?.name ?? run.trackLayoutNameSnapshot);
@@ -344,15 +354,30 @@ function filledBoxCount(data: unknown): number {
   return Object.values(normalizeSetupData(data)).filter((raw) => fmtValue(raw) != null).length;
 }
 
+/**
+ * The chips the car's chassis sheet offers (setupDiff `SheetChips`), so a stored chip token reads as
+ * the chip the driver tapped: the Mi10's front bar "1.3" is stored `f_1_3`. Null when the sheet has
+ * none or cannot be read — the values then go out as stored, as they always did.
+ */
+export function sheetChipsOf(schemaJson: unknown): SheetChips | null {
+  if (schemaJson == null) return null;
+  try {
+    return buildSetupSheetTemplateFromModel("engineer", "", schemaJson)?.fieldChipOptionsByKey ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function buildSetupSheetBlock(
   run: LoadedRun,
   levers: ReadonlyArray<{ parameter: string; label: string }>,
   /** The same car's other runs that day: a run the app filed from the timing sheet can carry an empty sheet on a day the driver filled one in. */
-  sameCarDay: ReadonlyArray<{ setupSnapshot: { data: unknown } | null }>
+  sameCarDay: ReadonlyArray<{ setupSnapshot: { data: unknown } | null }>,
+  chips: SheetChips | null
 ): string {
   const data = normalizeSetupData(run.setupSnapshot?.data);
   const car = run.car?.name ?? run.car?.chassis ?? "this car";
-  const sheet = readSheet(data, readCarSheetNames(run.car?.sheetBoxNamesJson));
+  const sheet = readSheet(data, readCarSheetNames(run.car?.sheetBoxNamesJson), chips);
   const values = sheet.read;
   // Boxes the app cannot read that the driver has named on this car show under their name.
   const named = driverNamedRows(sheet);
@@ -363,7 +388,14 @@ function buildSetupSheetBlock(
 
   if (rows.length === 0) {
     const filled = Math.max(filledBoxCount(data), ...sameCarDay.map((r) => filledBoxCount(r.setupSnapshot?.data)));
-    return [`SETUP ON THE CAR (${car}): NOT VISIBLE.`, ...notVisibleLines(filled)].join("\n");
+    // Nothing on the run: whether a setup saved on the car could be, or the car has no sheet at all.
+    const onCar = run.car
+      ? {
+          savedSetups: run.car._count.snapshots,
+          hasSheet: Boolean(run.car.setupSheetModelId) || canonicalSetupSheetTemplateId(run.car.setupSheetTemplate) != null,
+        }
+      : {};
+    return [`SETUP ON THE CAR (${car}): NOT VISIBLE.`, ...notVisibleLines(filled, onCar)].join("\n");
   }
 
   // A sheet the Engineer can read a box or two of — the gearing and the motor on an Xray X4 —
@@ -478,9 +510,21 @@ async function loadDayRuns(
   return { day, predecessorOf };
 }
 
-/** "set C run 2"; with no set known, "run 2". */
+/** 1 → "1st", 2 → "2nd", 12 → "12th", 23 → "23rd". */
+function ordinal(n: number): string {
+  const teen = n % 100 >= 11 && n % 100 <= 13;
+  const suffix = teen ? "th" : n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th";
+  return `${n}${suffix}`;
+}
+
+/**
+ * "set C, 2nd run on it"; with no set known, "2nd run on the set". Plain words since 2026-09-26: the
+ * shorthand "tyres run 1" reached a driver in quotes ("'Tyres run 1' tells me how many runs they've
+ * done, not which tyre they are").
+ */
 function tyreSet(letter: string | null, run: number | null | undefined): string {
-  return [letter ? `set ${letter}` : null, run != null ? `run ${run}` : null].filter(Boolean).join(" ") || "unknown";
+  if (run == null) return letter ? `set ${letter}` : "unknown";
+  return letter ? `set ${letter}, ${ordinal(run)} run on it` : `${ordinal(run)} run on the set`;
 }
 
 function buildDayBlock(
@@ -496,7 +540,9 @@ function buildDayBlock(
   /** Filled with a link for each change on boxes the Engineer cannot read (sheetLinks.ts); absent = no links. */
   sheetLinks?: Map<string, SheetLinkTarget>,
   /** The setup block above already said what "(named by the driver)" means — say it once. */
-  namedNoteShown = false
+  namedNoteShown = false,
+  /** The chassis sheet's chips: a day's cars are one type, so one sheet (sameTypeCarIds). */
+  chips: SheetChips | null = null
 ): string | null {
   if (day.length < 2) return null;
   const multiCar = new Set(day.map((r) => r.carId)).size > 1;
@@ -569,9 +615,9 @@ function buildDayBlock(
       // A front/rear run states both counts — the ends are separate sets. A single-tyre run's
       // cell is unchanged.
       run.frontTireTypeId != null && run.frontTireRunNumber != null
-        ? `tyres front ${tyreSet(letterOf(run.frontTireStintId), run.frontTireRunNumber)} / rear ${tyreSet(letterOf(run.tireStintId), run.tireRunNumber)}`
+        ? `tyres: front ${tyreSet(letterOf(run.frontTireStintId), run.frontTireRunNumber)} / rear ${tyreSet(letterOf(run.tireStintId), run.tireRunNumber)}`
         : run.tireRunNumber != null
-          ? `tyres ${tyreSet(letterOf(run.tireStintId), run.tireRunNumber)}`
+          ? `tyres: ${tyreSet(letterOf(run.tireStintId), run.tireRunNumber)}`
           : null,
       run.conditionsAirTempC != null ? `${run.conditionsAirTempC}°C` : null,
       run.unconfirmedAt != null ? "(unconfirmed — setup and tyres carried, not logged by the driver)" : null,
@@ -583,7 +629,7 @@ function buildDayBlock(
     // One car either side (founder call 2026-09-01), so one set of the driver's box names.
     const names = readCarSheetNames(run.car?.sheetBoxNamesJson);
     const change = prev
-      ? diffSheet(readSheet(prev.setupSnapshot?.data, names), readSheet(run.setupSnapshot?.data, names))
+      ? diffSheet(readSheet(prev.setupSnapshot?.data, names, chips), readSheet(run.setupSnapshot?.data, names, chips))
       : null;
     // Nothing filled in on one side — unknown, not unchanged: no "changed" line.
     if (prev && change != null) {
@@ -669,8 +715,8 @@ function buildDayBlock(
       : []),
     ...(anySets
       ? [
-          `"tyres set C run 2" is run 2 on set C: the same letter is the same set of rubber, a new letter another`,
-          `set — new if it reads run 1, used before today if higher.`,
+          `"tyres: set C, 2nd run on it" is the second run on set C: the same letter is the same set of rubber, a new`,
+          `letter another set — new if it first appears on its 1st run, used before today if on a later one.`,
         ]
       : []),
     ...(anyAgainst
@@ -796,7 +842,8 @@ export async function buildDriverDataBlocks(params: {
   const levers = await loadNets({ discipline: "touring" })
     .then((n) => n.entries.map((e) => ({ parameter: e.parameter, label: e.label.toLowerCase() })))
     .catch(() => [] as Array<{ parameter: string; label: string }>);
-  const setupBlock = buildSetupSheetBlock(run, levers, day.filter((r) => r.carId === run.carId));
+  const chips = sheetChipsOf(run.car?.setupSheetModel?.schemaJson);
+  const setupBlock = buildSetupSheetBlock(run, levers, day.filter((r) => r.carId === run.carId), chips);
   parts.push(setupBlock);
 
   // The day's timed sessions, every lap of every driver (lapsBlock.ts) — loaded before the day
@@ -822,7 +869,8 @@ export async function buildDriverDataBlocks(params: {
     lapsTrackMoveByRun(lapsSessions),
     cleanAverageByRun,
     sheetLinks,
-    setupBlock.includes(DRIVER_NAMED_NOTE)
+    setupBlock.includes(DRIVER_NAMED_NOTE),
+    chips
   );
   if (dayBlock) parts.push(dayBlock);
 

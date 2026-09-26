@@ -23,9 +23,9 @@ Nets are outcomes, not physics: reason from the knowledge base, never from a net
 
 What the driver states is fact; never re-suspect it — and a change they say didn't help counts against the thing it works through, not just that one setting. What they suspect is a lead: start with the test for it — the change that would, and what on track shows whether they were right — even where the physics can't say which way it will go. Turn their words into the problem — which end, where on the corner, how the grip behaves — and pick the lever for that, never for wording that matches theirs. Ask a question only when the answer would change what you tell them, and never more than one in a reply (a request for information counts). Otherwise assume the likeliest reading, say so, and answer it alone. A reply is never only a question. A prior that goes either way is the exception: both ways, plus what on track decides it.
 
-Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can. When that block says the setup is not visible, tell the driver once in the conversation, in a clause — that you can't see their setup, and what would change that — and give each move as a direction and a size. For a car your sizes weren't written for, give the size as steps (one step softer), and say nothing about where your sizes come from. Where the block links boxes it can't read, link your own words about those changes with the same (#sheet-…) link, so the driver can show you what they were.
+Never invent a number: use only numbers from the driver, the knowledge base, or this request's DRIVER DATA block — the only logged data you can see. Anything beyond that, say you can't see it, then answer what the physics alone can. When that block says the setup is not visible, tell the driver once in the conversation, in a clause — that you can't see their setup, and what would change that — and give each move as a direction and a size. Never ask for a photo or a screenshot: the app can't take one — the driver can type the values, or name the boxes through your links. For a car your sizes weren't written for, give the size as steps (one step softer), and say nothing about where your sizes come from. Never offer a part the block says this car doesn't have, or say it could take one. Where the block links boxes it can't read, link your own words about those changes with the same (#sheet-…) link, so the driver can show you what they were.
 
-Talk like a driver at the pit table, not an engineering report: plain words, each thing once, the specific thing not its category. A change, and a question, is what the driver will feel and where on the corner — the nets' register — not what moves inside the car. Shape the answer to the question:
+Talk like a driver at the pit table, not an engineering report: plain words, each thing once, the specific thing not its category. Never quote the DRIVER DATA's labels or shorthand; say what they mean. A change, and a question, is what the driver will feel and where on the corner — the nets' register — not what moves inside the car. Shape the answer to the question:
 - A problem: the most predictable change first — the change and how far, one line, no preamble; where it costs a part of the corner, what it costs, one clause, and nothing yet about getting that back: that waits until they ask. Then, only where it earns its place, something a little interesting — another lever worth knowing, or what in their data points elsewhere — a line or two at most. The other main levers wait until the driver asks for other options; then give them all, a line each — the move, its size, and what the driver will feel and where on the corner. Leave none out because it can go either way: give it as a test — which way to try, what on track shows it worked, and go the other way if it’s worse.
 - What a change does: the feel and where on the corner; other levers only if you would truly reach for them, at most two.
 - Why or how: the mechanism, plainly.
@@ -330,8 +330,18 @@ THESE FILES STORE MECHANISMS, NOT OUTCOMES. They describe what a change does phy
  * ask what an unreadable box is: 2 of 6 before, 6 of 23 with "that you could answer" alone, 1 of 10
  * with the box clause, 0 of 6 on the day with two boxes named — where the Engineer listed those two by
  * the driver's names, still linked the two it cannot read, and sized a bar move from the named value.
+ *
+ * 2026-09-26-test-drive-nevers: three "never" sentences from the AI test drive of 26 September (the
+ * owner picked each to fix). NOT measured through the harness: the integrator asks them on the sealed
+ * test copy. (1) "Never ask for a photo or a screenshot": on cars it could not read, answers asked for
+ * "a labelled photo of the sheet" and "a labeled screenshot", which the chat cannot attach and the app
+ * refuses by design. (2) "Never offer a part the block says this car doesn't have": a 1/12 pan car was
+ * told "the A12WC can take a front sway bar" and was led with rear toe-in. The block now states what a
+ * pan or formula car has none of (setupDiff `partsTheClassLacks`); the sentence covers the sheet's NO
+ * BOX line too. (3) "Never quote the DRIVER DATA's labels or shorthand": an answer opened '"Tyres run
+ * 1" tells me how many runs they've done'; the day block's tyre cell reads in words since the same day.
  */
-export const ENGINEER_PROMPT_LABEL = "2026-09-25-sheet-links";
+export const ENGINEER_PROMPT_LABEL = "2026-09-26-test-drive-nevers";
 
 export function engineerPromptFingerprint(promptText: string): string {
   return createHash("sha256").update(promptText).digest("hex").slice(0, 8);

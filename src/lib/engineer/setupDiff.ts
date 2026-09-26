@@ -1,4 +1,6 @@
 import { normalizeSetupData } from "@/lib/runSetup";
+import { parseDiscipline } from "@/lib/cars/carClasses";
+import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
 import { isTuningComparisonKey } from "@/lib/setupComparison/tuningComparisonKeys";
 
 /**
@@ -61,9 +63,82 @@ const ENGINEER_DRIVETRAIN_KEYS = new Set<string>([
   "motor_timing",
 ]);
 
-/** What the Engineer reads off a sheet: the tuning keys, the body, the gearing and the motor. */
+/**
+ * Roll bars as the Schumacher Mi10's sheet spells them. The shared tuning list knows a bar only as
+ * `arb_…` (the A800RR's spelling), so a Mi10 driver who moved his front bar 1.3 → 1.4 and back was
+ * told three times that nothing on the car had changed (test drive, 2026-09-26). Engineer-only, like
+ * the body and the gearing: the shared list also decides which boxes join the setup statistics.
+ */
+const ENGINEER_ROLL_BAR_KEYS = new Set<string>(["anti_roll_bar_front", "anti_roll_bar_rear"]);
+
+/** What the Engineer reads off a sheet: the tuning keys, the roll bars, the body, the gearing and the motor. */
 export function isEngineerSetupKey(key: string): boolean {
-  return isTuningComparisonKey(key) || ENGINEER_BODY_KEYS.has(key) || ENGINEER_DRIVETRAIN_KEYS.has(key);
+  return (
+    isTuningComparisonKey(key) ||
+    ENGINEER_ROLL_BAR_KEYS.has(key) ||
+    ENGINEER_BODY_KEYS.has(key) ||
+    ENGINEER_DRIVETRAIN_KEYS.has(key)
+  );
+}
+
+/**
+ * Boxes on a sheet that are not a setting on the car: who, when and where, and the notes (the
+ * "Other" rows of the app's own sheets, setupSheetGroups.ts, and the same boxes as other sheets name
+ * them), the conditions, and the battery. With the tyres, additive and prep the run form writes in
+ * from the Tires tab (`isRunContextSetupKey`: no "what changed" list may count them), a change in one
+ * of these is never a setup change.
+ */
+const NOT_A_SETTING = new Set<string>([
+  "battery",
+  "driver",
+  "driver_name",
+  "setup_date",
+  "date",
+  "event",
+  "race",
+  "round",
+  "heat",
+  "result",
+  "track",
+  "track_surface",
+  "track_layout",
+  "layout",
+  "surface",
+  "traction",
+  "grip",
+  "weather",
+  "temperature",
+  "air_temp",
+  "track_temp",
+  "humidity",
+  "notes",
+  "note",
+  "body_notes",
+  "comments",
+]);
+/** A box that holds the tyre itself, typed on the sheet: `tires`, `tyre_front`, `rear_tires`. */
+const TYRE_BOX = /^(front_|rear_)?(tire|tyre)s?(_front|_rear)?$/;
+
+/** A box whose change is a change to the car: every box but the tyres, the battery, the notes and the session's. */
+export function isSettingBox(key: string): boolean {
+  return !isRunContextSetupKey(key) && !NOT_A_SETTING.has(key) && !TYRE_BOX.test(key);
+}
+
+/**
+ * The chips a chassis's sheet offers per box: the labels the driver taps and the token stored for
+ * each (buildSetupSheetTemplate `fieldChipOptionsByKey`; driverData `sheetChipsOf`). The Mi10's front
+ * bar chip "1.3" is stored as `f_1_3`, and a code the driver never saw must not reach the Engineer
+ * as the value the car ran.
+ */
+export type SheetChips = Readonly<Record<string, { options: readonly string[]; optionValues?: readonly string[] }>>;
+
+/** A stored chip token as its chip reads ("f_1_3" → "1.3"); any other value, or one that differs only by case, as stored. */
+function chipLabel(value: string, chip: SheetChips[string] | undefined): string {
+  const values = chip?.optionValues;
+  if (!chip || !values || values.length !== chip.options.length) return value;
+  const token = value.trim().toLowerCase();
+  const label = chip.options[values.findIndex((v) => v.trim().toLowerCase() === token)]?.trim();
+  return label && label.toLowerCase() !== token ? label : value;
 }
 
 /**
@@ -89,12 +164,17 @@ export type SheetRead = {
   names?: Record<string, string>;
 };
 
-export function readSheet(data: unknown, names?: Readonly<Record<string, string>> | null): SheetRead {
+export function readSheet(
+  data: unknown,
+  names?: Readonly<Record<string, string>> | null,
+  /** The chassis sheet's chips, so a stored chip token reads as its chip. Absent = values as stored. */
+  chips?: SheetChips | null
+): SheetRead {
   const read: Record<string, string> = {};
   const unread: Record<string, string> = {};
   for (const [key, raw] of Object.entries(normalizeSetupData(data))) {
     const value = fmtSetupValue(raw);
-    if (value) (isEngineerSetupKey(key) ? read : unread)[key] = value;
+    if (value) (isEngineerSetupKey(key) ? read : unread)[key] = chipLabel(value, chips?.[key]);
   }
   // Only boxes this sheet leaves unread take a driver's name: one the app reads keeps the app's.
   const named = Object.entries(names ?? {}).filter(([key, name]) => name.trim() && !(key in read));
@@ -137,12 +217,26 @@ export function sheetMostlyUnread(sheet: SheetRead): boolean {
  * The part of the sheet the app cannot read — one wording for the run block and the range block.
  * Founder, 2026-09-21: "a strong distinction between when the engineer can read a car and when it
  * can't". `filled` is how many boxes the driver has filled in.
+ *
+ * With nothing filled in, `car` says why (test drive, 2026-09-26): a driver with a setup saved on
+ * the car had been told to fill in the sheet he already had, and one whose car has no sheet in the
+ * app at all ("I don't have the sheet") was told the same. Absent, the wording is as before.
  */
-export function notVisibleLines(filled: number): string[] {
+export function notVisibleLines(
+  filled: number,
+  car: { savedSetups?: number; hasSheet?: boolean } = {}
+): string[] {
+  const saved = car.savedSetups ?? 0;
+  const nothingFilled =
+    saved > 0
+      ? `No setup is attached to this run. The driver has ${saved} saved ${saved === 1 ? "setup" : "setups"} for this car and can pick one on the run: its values then appear here.`
+      : car.hasSheet === false
+        ? "This car has no setup sheet in the app, so none of its settings can be seen unless the driver says them."
+        : "The driver has not filled in a setup sheet for this car. Once they do, the values the car ran appear here.";
   return [
     filled > 0
       ? `The driver filled in ${filled} boxes on this car's setup sheet, but the app has not yet learned which box is which on this chassis's sheet, so none of them can be read. That gap is the app's, not the driver's: they have already filled the sheet in.`
-      : "The driver has not filled in a setup sheet for this car. Once they do, the values the car ran appear here.",
+      : nothingFilled,
     "No setting on this car can be seen — not a spring, an oil, a toe, a camber or a ride height.",
   ];
 }
@@ -179,8 +273,8 @@ const LEVER_KEY_ALIASES: Readonly<Record<string, readonly string[]>> = {
   spring_rear: ["rear_spring", "rear_shock_spring"],
   shock_angle_front: ["shock_position_front", "front_shock_position", "front_shock_tower", "front_arm_shock", "shock_tower"],
   shock_angle_rear: ["shock_position_rear", "rear_shock_position", "rear_shock_tower", "rear_arm_shock", "shock_tower"],
-  arb_front: ["front_anti_roll_bar", "front_arb", "front_roll_bar"],
-  arb_rear: ["rear_anti_roll_bar", "rear_arb", "rear_roll_bar"],
+  arb_front: ["front_anti_roll_bar", "front_arb", "front_roll_bar", "anti_roll_bar_front"],
+  arb_rear: ["rear_anti_roll_bar", "rear_arb", "rear_roll_bar", "anti_roll_bar_rear"],
   damper_oil_front: ["front_shock_oil", "fr_shock_oil", "front_damper_oil"],
   damper_oil_rear: ["rear_shock_oil", "re_shock_oil", "rear_damper_oil"],
 };
@@ -213,6 +307,29 @@ export function leversNotOnSheet(
   if (keys.filter(isEngineerSetupKey).length < (opts.minReadable ?? MIN_READABLE_BOXES)) return [];
   const missing = levers.filter((l) => !sheetHasLever(l.parameter, keys)).map((l) => l.label);
   return missing.length > (opts.maxMissing ?? 6) ? [] : missing;
+}
+
+/**
+ * Classes of car built around a rear pod. Owner's call on the 2026-09-26 test drive, after the
+ * Engineer told a 1/12 pan-car racer her A12WC "can take a front sway bar" and led with rear toe-in:
+ * a pan car (1/12 or 1/10) has no anti-roll bars and no rear toe or rear camber to adjust, because
+ * its rear axle is solid, in a pod, and a formula car is built the same way. Only these: a false "no
+ * such part" takes a real lever away, and the 1/8 pan car was not part of the call.
+ */
+const REAR_POD_CLASSES: Readonly<Record<string, string>> = {
+  "pan-12th": "a pan car",
+  "pan-10th": "a pan car",
+  formula: "a formula car",
+};
+
+/**
+ * The parts this car's class doesn't have, as the fact the run block states (driverData.ts), or null
+ * for every other class and for a car nothing can place. `discipline` is `disciplineForCar`'s answer.
+ */
+export function partsTheClassLacks(discipline: string | null | undefined): string | null {
+  const what = REAR_POD_CLASSES[parseDiscipline(discipline)?.classId ?? ""];
+  if (!what) return null;
+  return `THIS CAR HAS NO anti-roll bars, and no rear toe or rear camber to adjust: on ${what} the rear axle is solid, in a pod. What adjusts on it is the rear pod (side springs or links, the centre damper, droop), front toe, camber, caster and springs, ride height, the diff, and the tyres and their prep.`;
 }
 
 /** Tuning, body, gearing and motor keys only — the blob also carries tyres, battery, electronics and free text. */
@@ -261,11 +378,12 @@ function listChanges(prev: Record<string, string>, next: Record<string, string>)
  * What moved between two sheets, for a "changed" line: the boxes the Engineer reads, by name, and
  * `unread` — how many boxes it cannot read moved. Null when either sheet has nothing filled in.
  *
- * On a sheet the Engineer reads, `unread` is always 0 and the line is `diffTuning`'s: there the
- * boxes it is not shown are the tyres, the battery and the notes (27 of the 29 A800RR runs where
- * only those moved), and counting them would make the Engineer ask about every new set of tyres.
- * On a sheet it can barely read (`sheetMostlyUnread`) every box counts, so "no setup change" is
- * said only when nothing on the sheet moved.
+ * A box that is not a setting (`isSettingBox`: the tyres, the battery, the notes, who, when and
+ * where) never counts: 27 of the 29 A800RR runs where only unread boxes moved were those, and
+ * counting them would make the Engineer ask about every new set of tyres. Every other box that
+ * moved counts, on any sheet, so "no setup change" is said only when no setting on the sheet moved.
+ * Until 2026-09-26 a sheet the Engineer reads (20+ boxes) counted none at all: the Mi10 reads its
+ * springs and geometry but not its castor or shock oil, and a change there printed "no setup change".
  */
 export function diffSheet(
   prev: SheetRead,
@@ -273,16 +391,12 @@ export function diffSheet(
 ): { changes: string[]; unread: number; named?: number } | null {
   const filled = (s: SheetRead) => Object.keys(s.read).length + Object.keys(s.unread).length;
   if (filled(prev) === 0 || filled(next) === 0) return null;
-  if (!sheetMostlyUnread(prev) && !sheetMostlyUnread(next)) {
-    const changes = diffTuning(prev.read, next.read);
-    return changes == null ? null : { changes, unread: 0 };
-  }
   // A box the driver has named on this car is a change by that name; the rest are counted.
   const names = { ...(prev.names ?? {}), ...(next.names ?? {}) };
   let unread = 0;
   const named: string[] = [];
   for (const key of [...new Set([...Object.keys(prev.unread), ...Object.keys(next.unread)])].sort()) {
-    if (sameSetupValue(prev.unread[key], next.unread[key])) continue;
+    if (!isSettingBox(key) || sameSetupValue(prev.unread[key], next.unread[key])) continue;
     if (names[key]) named.push(`${driverNamedLabel(names[key])} ${prev.unread[key] ?? "—"} → ${next.unread[key] ?? "—"}`);
     else unread++;
   }

@@ -177,6 +177,28 @@ Each of these was deleted or declined for a reason. They return only through the
 
 ## Changelog
 
+- **2026-09-26 — the AI test drive's Engineer findings** (the owner picked each to fix). Label
+  `2026-09-26-test-drive-nevers`. NOT measured through the harness: the integrator asks them on the
+  sealed test copy.
+  - **"No setup change" only when no setting moved, on every sheet.** A Mi10 driver moved his front
+    roll bar 1.3 → 1.4 and back and was told three times nothing had changed. The Mi10 is a sheet the
+    Engineer reads (20-odd boxes), and on such a sheet a box it could not read was dropped from the
+    "changed" line. Now any box that is a setting counts, with its link ("only 1 box not shown here");
+    the tyres, the battery, the notes and who/when/where never do (`setupDiff.ts` `isSettingBox`, and
+    the ringed sheet follows). The Mi10's `anti_roll_bar_front`/`_rear` read as roll bars
+    (Engineer-only, like the body), and a stored chip token reads as the chip tapped (`f_1_3` → 1.3).
+  - **A pan or formula car has no roll bars and no rear toe or camber to adjust**: a fact in the run
+    block (`partsTheClassLacks`), and one prompt sentence never offers a part the block says the car
+    doesn't have. A 1/12 pan car had been told it "can take a front sway bar" and led with rear toe-in.
+  - **Never a photo or a screenshot** of the sheet: the app can't take one. Type the values, or name
+    the boxes through the links.
+  - **Never quote the driver data's labels**: "Tyres run 1" reached a driver in quotes. The day block's
+    tyre cell reads "1st run on the set".
+  - **A reply to the Engineer's own question uses no question**, once per paid question
+    (`aiUsage/budgets.ts` `isFreeEngineerReply`), judged on the saved conversation; its cost still
+    counts toward the dollar brakes, and the composer says "Your reply is free…". The owner is to
+    check the exact rule.
+
 - **2026-09-25 — setup-change links** (founder design 2026-09-24; "I think we just do the full approved
   design before the freeze"). He hit it live on his own IF15II: "Can you identify the six changes?" —
   "No… the app would need to map your IF15II setup sheet", and the Engineer's own button had offered

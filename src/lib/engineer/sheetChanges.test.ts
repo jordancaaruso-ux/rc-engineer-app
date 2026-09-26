@@ -45,6 +45,15 @@ test("it rings exactly what the Engineer's changed line counted", () => {
   assert.deepEqual(rows.map((r) => r.key), ["pinion", "text20"]);
 });
 
+test("a new battery, a note or the date is never ringed: the sheet shows what the Engineer counted", () => {
+  const before = { pinion: "38", castor_front: "4", battery: "A", notes: "x", date: "2026-09-26" };
+  const after = { pinion: "39", castor_front: "5", battery: "B", notes: "y", date: "2026-09-27" };
+  const rows = sheetChangeRows({ before, after, boxes: [] });
+  assert.deepEqual(rows.map((r) => r.key).sort(), ["castor_front", "pinion"]);
+  const change = diffSheet(readSheet(before), readSheet(after))!;
+  assert.equal(rows.filter((r) => !r.known).length, change.unread);
+});
+
 test("a box filled for the first time is a change from nothing, and a key with no box goes last, unnumbered", () => {
   const rows = sheetChangeRows({ before: { text20: "1" }, after: { text20: "1", text34: "5", legacy_key: "3" }, boxes });
   assert.deepEqual(

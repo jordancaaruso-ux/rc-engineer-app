@@ -17,9 +17,11 @@ import {
   readableSetupKey,
   sheetMostlyUnread,
   unnamedUnreadCount,
+  type SheetChips,
 } from "@/lib/engineer/setupDiff";
 import type { SheetLinkTarget } from "@/lib/engineer/sheetLinks";
 import { readCarSheetNames } from "@/lib/engineer/carSheetNames";
+import { sheetChipsOf } from "@/lib/engineer/driverData";
 import {
   getAverageTopN,
   getBestLap,
@@ -83,7 +85,8 @@ const RUN_SELECT = {
   lapSession: true,
   ...FIELD_RUN_SELECT,
   // The car's name, and the driver's own names for boxes the app cannot read (carSheetNames.ts).
-  car: { select: { name: true, chassis: true, sheetBoxNamesJson: true } },
+  // Its sheet, for the chips a stored token stands for (loadSheetChips).
+  car: { select: { name: true, chassis: true, sheetBoxNamesJson: true, setupSheetModelId: true } },
   track: { select: { name: true } },
   tireType: { select: { displayName: true, modelCode: true } },
   setupSnapshot: { select: { data: true } },
@@ -238,11 +241,24 @@ export async function countRunsInRange(userId: string, scope: EngineerRangeScope
   return rows.length + omittedOlder;
 }
 
+/** Each chassis sheet's chips in the range (driverData `sheetChipsOf`), read once per sheet. */
+async function loadSheetChips(rows: Row[]): Promise<Map<string, SheetChips | null>> {
+  const ids = [...new Set(rows.map((r) => r.car?.setupSheetModelId).filter((id): id is string => Boolean(id)))];
+  if (ids.length === 0) return new Map();
+  const models = await prisma.setupSheetModel.findMany({ where: { id: { in: ids } }, select: { id: true, schemaJson: true } });
+  return new Map(models.map((m) => [m.id, sheetChipsOf(m.schemaJson)]));
+}
+
 /** Exported for the read-only prod capture, which assembles rows by raw SQL. */
-export function toHistoryRun(r: Row, zone: string | null, field: FieldPace | null = null): HistoryRun {
+export function toHistoryRun(
+  r: Row,
+  zone: string | null,
+  field: FieldPace | null = null,
+  chips: SheetChips | null = null
+): HistoryRun {
   const laps = primaryLapRowsFromRun(r);
   const stint = getDisplayFiveMinuteStint(laps, readFiveMinStartLap(r.lapSession));
-  const sheet = readSheet(r.setupSnapshot?.data, readCarSheetNames(r.car?.sheetBoxNamesJson));
+  const sheet = readSheet(r.setupSnapshot?.data, readCarSheetNames(r.car?.sheetBoxNamesJson), chips);
   return {
     id: r.id,
     dateYmd: localYmd(r, zone),
@@ -283,8 +299,12 @@ export function toHistoryRun(r: Row, zone: string | null, field: FieldPace | nul
  * The last run's sheet as the range block states it: the rows the Engineer reads, and how many
  * filled boxes it cannot. Null when that run's sheet is empty.
  */
-export function lastSetupOf(last: Row, zone: string | null): Parameters<typeof renderHistoryBlock>[0]["lastSetup"] {
-  const sheet = readSheet(last.setupSnapshot?.data, readCarSheetNames(last.car?.sheetBoxNamesJson));
+export function lastSetupOf(
+  last: Row,
+  zone: string | null,
+  chips: SheetChips | null = null
+): Parameters<typeof renderHistoryBlock>[0]["lastSetup"] {
+  const sheet = readSheet(last.setupSnapshot?.data, readCarSheetNames(last.car?.sheetBoxNamesJson), chips);
   if (Object.keys(sheet.read).length === 0 && Object.keys(sheet.unread).length === 0) return null;
   // Boxes the driver has named on this car show under their name; only the rest are unknown.
   const named = driverNamedRows(sheet);
@@ -362,8 +382,12 @@ export async function buildDriverHistoryBlocks(params: {
   if (rows.length === 0) return [];
 
   const fieldByRun = await loadFieldPaceForRuns(params.userId, rows).catch(() => new Map<string, FieldPace>());
-  const runs = rows.map((r) => toHistoryRun(r, zone, fieldByRun.get(r.id) ?? null));
-  const lastSetup = lastSetupOf(rows[rows.length - 1], zone);
+  // A stored chip token reads as its chip ("f_1_3" → "1.3"); a failed read leaves the values as stored.
+  const chipsByModel = await loadSheetChips(rows).catch(() => new Map<string, SheetChips | null>());
+  const chipsOf = (r: Row) => chipsByModel.get(r.car?.setupSheetModelId ?? "") ?? null;
+  const runs = rows.map((r) => toHistoryRun(r, zone, fieldByRun.get(r.id) ?? null, chipsOf(r)));
+  const last = rows[rows.length - 1];
+  const lastSetup = lastSetupOf(last, zone, chipsOf(last));
 
   const questions = [params.question, ...(params.earlierQuestions ?? [])];
   const rivalName = matchDriverNameInQuestions(questions, driversOnSheets(runs).map((d) => d.name))?.name ?? null;

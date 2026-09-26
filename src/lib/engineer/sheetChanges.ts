@@ -1,14 +1,14 @@
 import { normalizeSetupData } from "@/lib/runSetup";
-import { fmtSetupValue, isEngineerSetupKey, readableSetupKey, sameSetupValue } from "@/lib/engineer/setupDiff";
+import { fmtSetupValue, isEngineerSetupKey, isSettingBox, readableSetupKey, sameSetupValue } from "@/lib/engineer/setupDiff";
 
 /**
  * What a setup-change link opens (sheetLinks.ts): every box that moved between two runs of one car,
  * in the order they sit on the sheet, numbered the way they are ringed.
  *
- * "Moved" is decided exactly as the Engineer's "changed" line decides it on a sheet it can barely
- * read (setupDiff `diffSheet`): every filled box, compared as the Engineer compares values. So when
- * the Engineer says "2 boxes not shown here", the sheet this opens rings those two boxes and the
- * readable changes on the same line, and nothing else.
+ * "Moved" is decided exactly as the Engineer's "changed" line decides it (setupDiff `diffSheet`):
+ * every filled box that is a setting, compared as the Engineer compares values. So when the Engineer
+ * says "2 boxes not shown here", the sheet this opens rings those two boxes and the readable changes
+ * on the same line, and nothing else — not a new battery or a note.
  *
  * Pure — no database — so the page's numbers can be tested on hand-built sheets.
  */
@@ -57,6 +57,7 @@ export function sheetChangeRows(params: {
 
   const rows: Array<Omit<SheetChangeRow, "number">> = [];
   for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    if (!isSettingBox(key)) continue;
     const b = fmtSetupValue(before[key]);
     const a = fmtSetupValue(after[key]);
     if (sameSetupValue(b ?? undefined, a ?? undefined)) continue;
