@@ -15,17 +15,30 @@
  *
  * Two invariants the caller must preserve, both founder decisions:
  *
- *  - **The face moves; nothing else does.** No run is selected, no setup is
- *    attached, no baseline is set and the sheet is not expanded. Carrying a setup
- *    forward stays the job of the explicit prefill / copy-last-run tap — see
- *    `LogRunWizardHost`: "prefill should always be an option — never automatic".
+ *  - **The face moves; nothing else does** — on "Previous runs" and "New". No run
+ *    is selected, no setup is attached, no baseline is set and the sheet is not
+ *    expanded. Carrying a run's setup forward stays the job of the explicit
+ *    prefill / copy-last-run tap — see `LogRunWizardHost`: "prefill should always
+ *    be an option — never automatic".
  *  - **An empty list is only evidence when the request came back.** A failed or
  *    in-flight fetch must never read as "this car has nothing", because the cost of
  *    being wrong is landing an established driver on a blank sheet.
  *
+ * One exception, the owner's call after the 2026-09-26 test drive: landing on
+ * **"Saved" also loads a saved setup** (`savedSetupToLoad`). A driver saved his
+ * setup on the car, logged four runs that each landed on "Saved" with the picker
+ * left on "Choose a saved setup…", and not one of them got his setup.
+ *
+ * Both lists count only setups with something in them (`setupHasChassisValue`): a
+ * run logged before any setup was chosen still stores the tyre the form writes by
+ * itself, and a setup can be saved empty. Neither says where the car is, so a car
+ * whose runs carry no setup lands on its saved setup rather than on those runs.
+ *
  * Kept pure and out of the component so the rule can be tested directly — the same
  * reason `carSwap.ts` and `onboarding/visibility.ts` live where they do.
  */
+
+import { setupHasChassisValue } from "@/lib/setup/runContextSetupKeys";
 
 export type SetupSource = "previous_runs" | "other" | "new";
 
@@ -86,8 +99,9 @@ export function resolveSetupSourceDefault(input: {
   /** The default already landed for this car. It lands once; a later list refresh
    *  (an upload finishing, say) must not move the face out from under the driver. */
   alreadyDefaultedForThisCar: boolean;
-  /** Something is already on the sheet — a wizard prefill, a copied run, or the
-   *  restored local draft, none of which record a source of their own. */
+  /** A value is already on the sheet — a wizard prefill, a copied run, or the
+   *  restored local draft, none of which record a source of their own. A copied
+   *  setup with nothing in it is not an answer, so it does not count. */
   sheetHasContent: boolean;
 }): SetupSource | null {
   if (input.isEditing) return null;
@@ -95,4 +109,14 @@ export function resolveSetupSourceDefault(input: {
   if (input.alreadyDefaultedForThisCar) return null;
   if (input.sheetHasContent) return null;
   return preferredSetupSource(input.previousRuns, input.savedSetups);
+}
+
+/**
+ * The saved setup to load when the Setup step lands on "Saved": the car's only saved setup, or
+ * its most recently saved one. `/api/setup/options` lists the car's named setups newest first,
+ * ahead of its uploaded sheets, so that is the first one here with a value in it. An empty saved
+ * setup is listed but never loaded, because it would attach nothing. `null` when none has a value.
+ */
+export function savedSetupToLoad<T extends { setupData: unknown }>(options: readonly T[]): T | null {
+  return options.find((o) => setupHasChassisValue(o.setupData)) ?? null;
 }

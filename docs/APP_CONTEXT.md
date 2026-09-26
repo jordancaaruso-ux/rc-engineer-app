@@ -408,7 +408,9 @@ Ids never change (they ride in payloads and jump targets) — only labels have. 
 every step**; "continue from last run" *prefills* the steps rather than skipping them.
 
 Founder rules baked in: **prefill is always an option, never automatic** (the wizard always lands
-blank and offers the last run as a card); there is no staleness cutoff — an old run is still
+blank and offers the last run as a card; the one exception is a setup saved on the car, which the
+Setup step loads when the car's runs carry no setup — owner's call, 2026-09-26, see
+`setupSourceDefault`); there is no staleness cutoff — an old run is still
 offered, honestly dated; the "Run completed?" interstitial is retired (tabs are the nav, end-of-step
 rows carry the walk-away moment); with no cars it refuses to mount and says why.
 

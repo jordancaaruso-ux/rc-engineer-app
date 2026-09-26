@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { changedSetupKeys, setupValuesFingerprint } from "./setupValuesFingerprint";
+import { setupChangesSinceLoaded } from "./setupChangesSinceLoaded";
+import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
+import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
+import {
+  mergeSheetValuesIntoSnapshot,
+  sheetValuesFromSnapshot,
+} from "@/lib/setupSheetModels/sheetValues";
+import { surfaceValuesToStoredMerge } from "@/lib/setupSheetModels/sheetSurfaceValues";
 
 const same = (a: unknown, b: unknown) =>
   setupValuesFingerprint(a) === setupValuesFingerprint(b);
@@ -76,4 +84,67 @@ test("several edits count several times", () => {
     ).length,
     2
   );
+});
+
+// --- The run form's "N changes since loaded" (`setupChangesSinceLoaded`) ------------------------
+//
+// Test drive 2026-09-26: one box changed on a Schumacher Mi10 read "2 changes since loaded", and
+// putting it back read "1". The setup was a copied manufacturer baseline, which keeps `chassis` as
+// a preset-with-other object; the sheet draws that as a `chassis_other` box and every edit hands
+// it back as a plain string the loaded setup never had.
+
+/** A setup as the run form loads it: normalised, with its derived boxes worked out. */
+const loadIntoForm = (raw: Record<string, unknown>) =>
+  applyDerivedFieldsToSnapshot(normalizeSetupData(raw));
+
+/** One report from the sheet: the whole surface handed back and merged, as the form does it. */
+const sheetReport = (form: SetupSnapshotData, surface: Record<string, string>) =>
+  applyDerivedFieldsToSnapshot(
+    mergeSheetValuesIntoSnapshot(form, surfaceValuesToStoredMerge(surface, []))
+  );
+
+const MI10_BASELINE = {
+  chassis: { selectedPreset: "", otherText: "st" },
+  anti_roll_bar_front: "f_1_3",
+  toe_front: -1,
+  camber_front: -2,
+  motor_mount_screws: ["2", "3", "4"],
+  top_deck_screws_front: ["b"],
+  hex_width_front: "kit",
+};
+
+test("one box changed on the sheet is one change, and putting it back is none", () => {
+  const loaded = loadIntoForm(MI10_BASELINE);
+  const surface = sheetValuesFromSnapshot(loaded);
+  const once = sheetReport(loaded, { ...surface, anti_roll_bar_front: "f_1_4" });
+  assert.deepEqual(
+    setupChangesSinceLoaded(once, loaded).map((r) => r.key),
+    ["anti_roll_bar_front"]
+  );
+  const back = sheetReport(once, { ...surface, anti_roll_bar_front: "f_1_3" });
+  assert.deepEqual(setupChangesSinceLoaded(back, loaded), []);
+});
+
+test("the tyre and the boxes the sheet works out are never counted", () => {
+  // Final drive follows spur and pinion: one changed spur is one change, not two.
+  const loaded = loadIntoForm({ spur: 84, pinion: 30, toe_rear: 3 });
+  const current = loadIntoForm({
+    spur: 86,
+    pinion: 30,
+    toe_rear: 3,
+    tires: { tireTypeId: "t1", displayName: "Blue", tireRunNumber: 1, tireAgeKnown: true },
+  });
+  assert.deepEqual(setupChangesSinceLoaded(current, loaded).map((r) => r.key), ["spur"]);
+});
+
+test("clearing a box that had a value is a change", () => {
+  const loaded = loadIntoForm({ toe_rear: 3, camber_front: -2 });
+  assert.deepEqual(
+    setupChangesSinceLoaded({ ...loaded, toe_rear: "" }, loaded).map((r) => r.key),
+    ["toe_rear"]
+  );
+});
+
+test("nothing loaded, nothing to count", () => {
+  assert.deepEqual(setupChangesSinceLoaded({ toe_rear: 3 }, null), []);
 });

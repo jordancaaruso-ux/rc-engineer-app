@@ -145,8 +145,10 @@ export async function GET(request: Request) {
       })
     : [];
 
+  // Every saved setup, empty ones included: the car page lists them all, and hiding one here told a
+  // driver "No saved setups for this car yet" beside a car page showing his (test drive 2026-09-26).
+  // The run form labels an empty one and never loads it by itself.
   const libraryOptions = librarySetups
-    .filter((s) => jsonObjectNonEmpty(s.data))
     .map((s) => ({
       id: s.id,
       originalFilename: s.name ?? "Untitled setup",

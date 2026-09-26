@@ -937,7 +937,9 @@ export function RunFaces({
         )
       : null;
 
-  const shareable = runIsShareable(run, Boolean(run.setupSnapshot?.id));
+  // Owner-only, as in RunDetailPanel: the picture routes only draw the viewer's own run, so on a
+  // teammate's run the button opened a broken picture (test drive 2026-09-26).
+  const shareable = allowRunMutations && runIsShareable(run, Boolean(run.setupSnapshot?.id));
   const shareLabel = [
     run.event?.name ?? null,
     formatRunSessionDisplay(run, { fallback: "Testing run" }),
