@@ -79,6 +79,12 @@ export function SpeedhiveTrackFinder({
   const searchSeq = useRef(0);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [matches, setMatches] = useState<Match[] | null>(null);
+  /**
+   * The words the shown `matches` answer, or null for the automatic look. An empty typed search
+   * says them back: with the automatic look's line it read exactly as before the tap, as if the
+   * search never ran (launch test drive, 2026-09-26).
+   */
+  const [matchesFor, setMatchesFor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -102,6 +108,7 @@ export function SpeedhiveTrackFinder({
         return;
       }
       setMatches(data.matches ?? []);
+      setMatchesFor(q);
     } catch {
       if (seq !== searchSeq.current) return;
       setError("Couldn't reach Speedhive just now.");
@@ -188,7 +195,9 @@ export function SpeedhiveTrackFinder({
           ))}
         </ul>
       ) : matches ? (
-        <p className={cn("text-muted-foreground", text)}>Nothing close on Speedhive</p>
+        <p className={cn("text-muted-foreground", text)}>
+          {matchesFor ? `Nothing on Speedhive for “${matchesFor}”` : "Nothing close on Speedhive"}
+        </p>
       ) : null}
 
       <div className="flex gap-1.5">
