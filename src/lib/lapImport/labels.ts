@@ -245,6 +245,11 @@ export function formatImportedSessionTime(
  * Pass `sessionTimeIso` from {@link resolveImportedSessionDisplayTimeIso} for imports,
  * and `opts` so LiveRC/MyRCM wall-clock times stay frozen (see
  * {@link formatImportedSessionTime}); without `opts` the time renders in the runtime zone.
+ *
+ * Speedhive's practice loop names nobody, so the import calls each stint by its start time, and a
+ * stint read "24 Sept 2026, 7:35 PM · 24 Sept 2026, 7:35 PM". A name that is the time itself is
+ * said once. Only when the two match: a stint of a longer visit is named for its own start, which
+ * is not the session's, and an import from before the month was spelled names it "24/09/2026".
  */
 export function formatDriverSessionLabel(
   driverName: string,
@@ -253,7 +258,7 @@ export function formatDriverSessionLabel(
 ): string {
   const t = driverName.trim() || "Driver";
   const when = formatImportedSessionTime(sessionTimeIso, opts);
-  return `${t} · ${when}`;
+  return t === when ? when : `${t} · ${when}`;
 }
 
 /** Optional short context (e.g. track) after the primary driver · time label. */

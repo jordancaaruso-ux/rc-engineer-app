@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  formatDriverSessionLabel,
   formatImportedSessionTime,
   importedSessionWeatherInstantIso,
   isWallClockAsUtcTimingSource,
@@ -37,6 +38,19 @@ test("import-time fallback is a true instant even on LiveRC — no freeze", () =
     displayTimeZone: "Australia/Sydney",
   });
   assert.equal(label, "20 Jul 2026, 2:36 AM");
+});
+
+test("a driver and a time read 'name · time'; a name that IS the time says it once", () => {
+  const opts = { timingSource: "liverc" as const };
+  assert.equal(formatDriverSessionLabel("Mark Mayhew", WALL_CLOCK_AS_UTC_ISO, opts), "Mark Mayhew · 19 Jul 2026, 4:36 PM");
+  // Speedhive's practice import names each stint by its start time (test drive, 2026-09-26).
+  assert.equal(formatDriverSessionLabel("19 Jul 2026, 4:36 PM", WALL_CLOCK_AS_UTC_ISO, opts), "19 Jul 2026, 4:36 PM");
+  // A later stint of the same visit keeps its own start: it is not the session's time.
+  assert.equal(
+    formatDriverSessionLabel("19 Jul 2026, 4:52 PM", WALL_CLOCK_AS_UTC_ISO, opts),
+    "19 Jul 2026, 4:52 PM · 19 Jul 2026, 4:36 PM"
+  );
+  assert.equal(formatDriverSessionLabel("  ", WALL_CLOCK_AS_UTC_ISO, opts), "Driver · 19 Jul 2026, 4:36 PM");
 });
 
 test("timing source detection", () => {

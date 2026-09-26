@@ -56,6 +56,16 @@ export function isOnlyADate(v: string): boolean {
   );
 }
 
+/**
+ * An entrant named by when they started rather than by who they are. Speedhive's practice loop
+ * names nobody, so its import calls each stint "24 Sept 2026, 7:35 PM" — and a screen that prints
+ * the name beside the time says the time twice. The clock is required, so a race sheet that prints
+ * a bare transponder number as someone's name is never taken for one.
+ */
+export function isStartTimeName(v: string): boolean {
+  return /\d:\d{2}/.test(v) && isOnlyADate(v);
+}
+
 export function importedSessionTitle(input: {
   eventDetectionSessionLabel?: string | null;
   eventRaceClass?: string | null;
@@ -113,8 +123,9 @@ export function importedSessionTitle(input: {
   const n = input.sessionNumber;
   if (typeof n === "number" && Number.isInteger(n) && n > 0) return `${kind} ${n}`;
 
+  // Not a date either: Speedhive's practice loop hands over each stint's start time as its driver.
   const driver = usable(input.driverName);
-  if (driver && (input.driverCount ?? 1) <= 1) return driver;
+  if (driver && !isOnlyADate(driver) && (input.driverCount ?? 1) <= 1) return driver;
 
   return kind;
 }

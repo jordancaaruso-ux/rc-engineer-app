@@ -39,6 +39,7 @@ import { LapTimeGraph } from "@/components/runs/LapTimeGraph";
 import { haptic } from "@/lib/haptics";
 import { formatRunDateOnly } from "@/lib/formatDate";
 import { isDateOnlyTrackTime } from "@/lib/lapImport/trackClock";
+import { isStartTimeName } from "@/lib/lapImport/sessionTitle";
 import {
   formatImportedSessionTime,
   resolveImportedSessionDisplayTimeIso,
@@ -229,6 +230,26 @@ function formatBlockWhen(block: UrlImportBlock): string {
     return formatRunDateOnly(iso, "UTC");
   }
   return formatImportedSessionTime(iso, opts);
+}
+
+/**
+ * When one entrant of an import ran. In a Speedhive visit of several stints, the stint's name is
+ * the only thing that says when THIS one ran: the session's time is the visit's first.
+ */
+function entrantWhen(block: UrlImportBlock, driver: LapUrlSessionDriver): string {
+  const name = driver.driverName.trim();
+  return block.sessionDrivers.length > 1 && isStartTimeName(name) ? name : formatBlockWhen(block);
+}
+
+/**
+ * One entrant's row in an import's driver list: "Name · when", with the time said once. A
+ * Speedhive practice stint's "name" is its start time, and the row read "24 Sept 2026, 7:35 PM ·
+ * 24 Sept 2026, 7:35 PM" (test drive, 2026-09-26).
+ */
+function driverRowLabel(block: UrlImportBlock, driver: LapUrlSessionDriver): string {
+  const name = driver.driverName.trim();
+  if (isStartTimeName(name)) return entrantWhen(block, driver);
+  return `${name || "Driver"} · ${formatBlockWhen(block)}`;
 }
 
 /**
@@ -2245,15 +2266,19 @@ export function LapTimesIngestPanel({
                 <AttachedSessionStrip
                   key={block.blockId}
                   // Name only — the time is the meta line's job, and carrying it
-                  // in both truncated each to uselessness at 390px.
+                  // in both truncated each to uselessness at 390px. A Speedhive
+                  // practice stint's "name" is its start time: it titled the strip
+                  // with the time the line beneath repeated (test drive, 2026-09-26).
                   title={
                     driver
-                      ? driver.driverName
+                      ? isStartTimeName(driver.driverName)
+                        ? "Practice"
+                        : driver.driverName
                       : block.sessionDrivers.length > 0
                         ? "Pick your name"
                         : describeBlockSource(block)
                   }
-                  when={formatBlockWhen(block)}
+                  when={driver ? entrantWhen(block, driver) : formatBlockWhen(block)}
                   lapCount={stats?.lapCount ?? 0}
                   bestLapSeconds={stats?.bestLap ?? null}
                   medianSeconds={stats?.median ?? null}
@@ -2827,7 +2852,7 @@ export function LapTimesIngestPanel({
                       const isPreview = activePreviewKey === key;
                       const isPrimaryForRun = activeImportBlock.selectedDriverIds?.[0] === d.driverId;
                       const stats = statsForDriver(activeImportBlock, d);
-                      const primaryLabel = `${d.driverName.trim() || "Driver"} · ${formatBlockWhen(activeImportBlock)}`;
+                      const primaryLabel = driverRowLabel(activeImportBlock, d);
                       return (
                         <div
                           key={d.driverId}
