@@ -363,11 +363,13 @@ type DownloadedSetupOption = {
   kind?: "library" | "document";
 };
 
-/** Option line for the saved-setups picker: named setups read as names, documents as filenames. */
+/** Option line for the saved-setups picker: named setups read as names, documents as filenames.
+ *  A setup saved with nothing in it says so, since picking it attaches nothing. */
 function setupOptionLabel(d: DownloadedSetupOption): string {
+  const name = setupHasChassisValue(d.setupData) ? d.originalFilename : `${d.originalFilename} · no values yet`;
   return d.kind === "library"
-    ? `${d.originalFilename} · saved ${formatRunCreatedAtDateTime(d.createdAt)}`
-    : `${d.originalFilename} · ${formatRunCreatedAtDateTime(d.createdAt)}`;
+    ? `${name} · saved ${formatRunCreatedAtDateTime(d.createdAt)}`
+    : `${name} · ${formatRunCreatedAtDateTime(d.createdAt)}`;
 }
 
 function copyPreviewRecordToLastRun(r: CopyPreviewRunRecord): LastRun {
