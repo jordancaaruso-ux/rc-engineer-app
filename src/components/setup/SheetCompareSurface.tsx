@@ -6,11 +6,12 @@ import { SheetFillSurface } from "@/components/setup/SheetFillSurface";
 import { SheetGeometryStrip } from "@/components/rollCenter/SheetGeometryStrip";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { storedValuesToSurface } from "@/lib/setupSheetModels/sheetSurfaceValues";
+import { heldCompareHighlightKeys } from "@/lib/setupCompare/heldCompareHighlight";
 
 /**
  * Two setups compared BY FLIPPING between them on one sheet.
  *
- * ============================== WHY NOTHING IS DRAWN ON THE PAPER ==============================
+ * ============================== WHY NOTHING IS DRAWN ON THE PAPER AT REST ==============================
  *
  * Every earlier version of setup compare marked the changed fields — a red tint whose darkness
  * scaled with community spread, a `vs 13.0` printed under each value, a severity tally. Founder
@@ -20,6 +21,15 @@ import { storedValuesToSurface } from "@/lib/setupSheetModels/sheetSurfaceValues
  * SAME page picture, so flipping from one to the other moves only the values that differ. On a
  * still page the changed boxes are the only thing that is not still, and the eye finds them
  * without being told. It is the blink comparator, and it needs no ink at all.
+ *
+ * ============================== ...AND WHY THE HOLD LIGHTS EVERY DIFFERENCE ==============================
+ *
+ * The blink loses its signal when half the page moves at once: a teammate's setup can differ in 50
+ * to 80 boxes. So while the paper is HELD, every box that differs is marked with a highlighter
+ * (founder ruling 2026-09-26, picked off a bench of real A800RR sheets over "always on" and a
+ * "Highlight changes" switch). Every difference, never a chosen few — "it's too hard to determine
+ * what's important and what's not" — and the same set the differences list names. Release, and the
+ * paper is clean again.
  *
  * That makes the view state load-bearing. Zoom, pan and page number live inside `SheetFillSurface`
  * and MUST survive the flip untouched — which is why the other setup arrives as a second value set
@@ -90,6 +100,9 @@ export function SheetCompareSurface({
   const surfaceB = useMemo(() => storedValuesToSurface(b.values), [b.values]);
 
   const shownSide = shown === "a" ? a : b;
+
+  /** The boxes a hold lights — worked out once per pair, handed to the paper only while held. */
+  const heldHighlight = useMemo(() => heldCompareHighlightKeys(a.values, b.values), [a.values, b.values]);
 
   /* ── hold to peek ────────────────────────────────────────────────────────── */
 
@@ -249,6 +262,7 @@ export function SheetCompareSurface({
           initialValues={surfaceA}
           alternateValues={surfaceB}
           showAlternate={shown === "b"}
+          highlightKeys={peeking ? heldHighlight : null}
           readOnly
         />
       </div>

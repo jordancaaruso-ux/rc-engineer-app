@@ -95,6 +95,7 @@
     "test:derived-import": "npx tsx src/lib/setupSheetModels/sheetTrust.test.ts && npx tsx src/lib/setupSheetModels/derivedSheetFingerprint.test.ts && npx tsx --conditions=react-server src/lib/setupSheetModels/readDerivedSheetValues.test.ts && npx tsx --conditions=react-server src/lib/setupSheetModels/derivedSheetDrift.test.ts",
     "test:changed-boxes": "npx tsx src/lib/setupCompare/changedBoxRegion.test.ts",
     "test:changed-order": "npx tsx --test src/lib/setupCompare/changedSincePrevious.test.ts",
+    "test:compare-highlight": "npx tsx --test src/lib/setupCompare/heldCompareHighlight.test.ts",
     "test:setup-compare-pool": "npx tsx --test src/lib/setupCompare/setupCompareEntries.test.ts",
     "test:pdf-worker-version": "npx tsx --test src/components/setup-documents/pdfWorkerVersion.test.ts",
     "test:blank-upload": "npx tsx --conditions=react-server src/lib/setupSheetModels/blankUploadDiagnosis.test.ts && npx tsx --conditions=react-server src/lib/setupSheetModels/sheetPlan.test.ts && npx tsx --conditions=react-server src/lib/setupSheetModels/sheetValues.test.ts && npx tsx --conditions=react-server src/lib/setupSheetModels/sheetSurfaceValues.test.ts && npx tsx --conditions=react-server src/lib/setupSheetModels/sheetDerivedBoxes.test.ts && npx tsx --conditions=react-server src/lib/setupSheetModels/sheetTextWrap.test.ts && npx tsx --conditions=react-server src/lib/setupSheetModels/blankReviewQueue.test.ts && npx tsx --conditions=react-server src/lib/runSetup.test.ts && npx tsx --test src/lib/setupDocuments/blobStorageRef.test.ts",

@@ -209,6 +209,17 @@ const FOCUS_TINT = "rgba(255, 214, 10, 0.42)";
 const FOCUS_HALO = "0 0 0 1px rgba(255, 214, 10, 0.95), 0 0 0 3px rgba(255, 214, 10, 0.16)";
 
 /**
+ * The highlighter a held comparison draws over every box that differs (founder ruling 2026-09-26,
+ * picked off a bench of real sheets). Multiplied onto the page, so the paper goes yellow and the
+ * ink keeps its own colour — a pen stroke, not a fill sitting on top of the value. The pads are how
+ * far the stroke reaches past the box, as a share of the page: enough to read round a 3 mm tick
+ * box, not so much that neighbouring boxes run into one bar.
+ */
+const HELD_HIGHLIGHT = "rgba(255, 214, 10, 0.78)";
+const HELD_HIGHLIGHT_PAD_X = 0.0042;
+const HELD_HIGHLIGHT_PAD_Y = 0.0024;
+
+/**
  * A viewer sizes an auto-sized value to the box; this is that, near enough to read the same.
  *
  * MEASURED, NOT CHOSEN (2026-08-14). A real filled A800RR sheet carries a baked appearance stream
@@ -405,6 +416,7 @@ export function SheetFillSurface({
   onPlanLoaded,
   rings,
   ringsMuted = false,
+  highlightKeys,
   initialPage,
 }: {
   /** Returns an image of one page; the page number is appended as `page=`. */
@@ -425,7 +437,8 @@ export function SheetFillSurface({
    * A second value set rather than a second surface, because a comparison here is answered by
    * FLIPPING: the same page picture, the same boxes, the same fonts, and only the strings inside
    * the boxes different. That is what makes the changed values the only thing on the page that
-   * moves when you flip — nothing has to be drawn on the paper to point them out.
+   * moves when you flip. Nothing is drawn on the paper to point them out at rest; while the flip is
+   * held they also light up (`highlightKeys`, founder ruling 2026-09-26).
    *
    * It cannot be done by swapping `initialValues`: that seeds state once (see below), so the sheet
    * would never re-read it. Remounting with a `key` would re-read it and reset zoom, pan and page
@@ -448,11 +461,18 @@ export function SheetFillSurface({
   /**
    * Boxes to ring and number on the paper — the changes a setup-change link opens (founder,
    * 2026-09-24: the whole sheet "with the changed boxes ringed"). A grouped row is ringed once, round
-   * all its options. Read-only sheets only; nothing else draws on the paper.
+   * all its options. Read-only sheets only.
    */
   rings?: ReadonlyArray<{ key: string; number: number }>;
   /** Draw the rings in grey rather than yellow — the Before side of a flip, so the side is plain. */
   ringsMuted?: boolean;
+  /**
+   * Boxes to mark like a highlighter pen: every difference, while a comparison is held (see
+   * `heldCompareHighlightKeys`). The holder passes it only for the length of the hold, so at rest
+   * the paper carries nothing. Every option box of a grouped row is marked, since the tick that
+   * moved can be any of them. Read-only sheets only, like the rings.
+   */
+  highlightKeys?: ReadonlySet<string> | null;
   /** The page to open on — the page the first ring is on, when that is not page 1. */
   initialPage?: number;
 }) {
@@ -1590,6 +1610,31 @@ export function SheetFillSurface({
                 </button>
               );
             })
+          : null}
+
+        {/*
+          The held comparison's highlighter, over the boxes it names. Unlike the rings below it is a
+          mark ON the paper, so it grows with the page on a pinch instead of holding its size, and it
+          multiplies rather than covers: the value underneath stays exactly as legible as it was.
+        */}
+        {fitted.width > 0 && readOnly && highlightKeys && highlightKeys.size > 0
+          ? pageBoxes.map((b, boxIndex) =>
+              highlightKeys.has(b.key) ? (
+                <div
+                  key={`highlight:${b.key}#${b.optionValue ?? boxIndex}`}
+                  aria-hidden
+                  data-sheet-highlight=""
+                  className="pointer-events-none absolute z-10 rounded-[2px] mix-blend-multiply"
+                  style={{
+                    left: (b.x - HELD_HIGHLIGHT_PAD_X) * fitted.width,
+                    top: (b.y - HELD_HIGHLIGHT_PAD_Y) * fitted.height,
+                    width: Math.max((b.width + 2 * HELD_HIGHLIGHT_PAD_X) * fitted.width, 5),
+                    height: Math.max((b.height + 2 * HELD_HIGHLIGHT_PAD_Y) * fitted.height, 5),
+                    background: HELD_HIGHLIGHT,
+                  }}
+                />
+              ) : null
+            )
           : null}
 
         {/*

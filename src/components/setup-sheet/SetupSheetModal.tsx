@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
 import { isSetupChangeNoiseKey } from "@/lib/setupCompare/setupChangeNoise";
+import { comparedSetupDifferences } from "@/lib/setupCompare/heldCompareHighlight";
 import { SetupChangedSincePreviousList } from "@/components/runs/SetupChangedSincePreviousList";
 import {
   formatRunPickerLine,
@@ -632,12 +633,13 @@ export function SetupSheetModal({
    * no-list half of the 2026-08-14 ruling: flipping the sheet SHOWS a difference, a list FINDS
    * them. It takes the place of "vs previous" while comparing — both at once made the pop-up
    * a screen taller, and the previous run is not the question any more.
+   *
+   * The same rows the sheet lights while it is held (2026-09-26), from the same function, so the
+   * list and the paper cannot disagree about what differs.
    */
   const changedVsBaseline = useMemo(() => {
     if (!baselineValue) return null;
-    return setupChangedRowsSincePrevious(runSetup, baselineValue).filter(
-      (row) => !isSetupChangeNoiseKey(row.key)
-    );
+    return comparedSetupDifferences(runSetup, baselineValue);
   }, [baselineValue, runSetup]);
 
   const template = useMemo(() => {
@@ -997,8 +999,8 @@ export function SetupSheetModal({
                     ) : null}
                     {compareActive && baselineLabel ? (
                       <p className="text-[11px] text-muted-foreground">
-                        Hold the sheet to see {baselineLabel} in the same boxes. Only the values that
-                        differ will move.
+                        Hold the sheet to see {baselineLabel} in the same boxes. Everything that
+                        differs lights up.
                       </p>
                     ) : null}
                   </div>
@@ -1015,7 +1017,8 @@ export function SetupSheetModal({
                  * Comparing used to drop to the field list, because the red highlights and the
                  * community-spread colouring lived there. Founder ruling 2026-08-14: no highlights
                  * and no spread — a comparison is answered by FLIPPING between the two setups on
-                 * one sheet, so compare stays on the paper like everything else.
+                 * one sheet, so compare stays on the paper like everything else. Since 2026-09-26
+                 * the flip also lights every difference while it is held; at rest, still no ink.
                  */
                 sheetModelId ? (
                   <SheetCompareSurface
