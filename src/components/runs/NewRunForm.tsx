@@ -2628,7 +2628,16 @@ export function NewRunForm(props: {
           const data = (await res.json().catch(() => ({}))) as {
             todayYmd?: string;
             liveRc?: { status?: TrackLiveRcStatus; meetings?: TrackListLiveRcMeeting[] };
-            linked?: Array<{ eventId: string; intoEventId: string; renamedTo?: string | null }>;
+            // `EventsAtTrackLink` once the meetings batch lands; its extra fields are optional here.
+            linked?: Array<{
+              eventId: string;
+              intoEventId: string;
+              renamedTo?: string | null;
+              name?: string | null;
+              intoName?: string | null;
+              liveRcName?: string | null;
+              merged?: boolean;
+            }>;
           };
           if (!alive) return;
           if (!res.ok) {
@@ -2652,19 +2661,20 @@ export function NewRunForm(props: {
             setEvents(list.events ?? []);
             setEventId((current) => linked.find((l) => l.eventId === current)?.intoEventId ?? current);
           }
-          // Names: ours from the list the driver saw; LiveRC's from its meeting, a rename, or the
-          // event ours was merged into.
+          // Names as the server sends them, else from what the form holds: ours from the list the
+          // driver saw; LiveRC's from the meeting ours was merged into, or LiveRC's own row.
           setMeetingLinkNotice(
             linkedMeetingNotice(
-              linked.map((l) => ({
-                fromName: before.find((e) => e.id === l.eventId)?.name ?? null,
-                intoName:
-                  data.liveRc?.meetings?.find((m) => m.eventId === l.intoEventId)?.name ??
-                  l.renamedTo ??
-                  (l.intoEventId !== l.eventId
-                    ? (list?.events?.find((e) => e.id === l.intoEventId)?.name ?? null)
-                    : null),
-              }))
+              linked.map((l) => {
+                const meetingRow = data.liveRc?.meetings?.find((m) => m.eventId === l.intoEventId)?.name;
+                const merged = l.merged ?? l.intoEventId !== l.eventId;
+                return {
+                  fromName: l.name ?? before.find((e) => e.id === l.eventId)?.name ?? null,
+                  intoName: merged
+                    ? (l.intoName ?? list?.events?.find((e) => e.id === l.intoEventId)?.name ?? meetingRow ?? null)
+                    : (l.liveRcName ?? meetingRow ?? l.renamedTo ?? null),
+                };
+              })
             )
           );
         } catch {
