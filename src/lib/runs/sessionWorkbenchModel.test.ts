@@ -145,6 +145,30 @@ test("time of day prints on the run's own clock, then the owner's, then the read
 });
 
 /**
+ * A LiveRC race whose clock couldn't be found is stored as midnight on its day (test drive
+ * 2026-09-26: "Indoor Raceway · 24 Sept, 12:00 AM"). The row says the day and nothing else, and
+ * the chart readout, which prints `timeLabel`, says no time at all.
+ */
+test("a run whose time on track is only a day prints the day, with no clock", () => {
+  const onTrack = {
+    ...run("r1", laps(6)),
+    userId: "u1",
+    localTimeZone: "Australia/Melbourne",
+    sessionCompletedAt: new Date("2026-09-23T14:00:00.000Z"), // 24 Sep, 00:00 in Melbourne
+    createdAt: new Date("2026-09-24T09:00:00.000Z"),
+  };
+  const [row] = buildGroupRunRows(group([onTrack]));
+  assert.equal(row!.timeLabel, "");
+  assert.match(row!.whenLabel, /^24 Sept?( 2026)?$/);
+  assert.equal(buildGroupTrendModel(group([onTrack]))!.runs[0]!.timeLabel, "");
+
+  const [timed] = buildGroupRunRows(
+    group([{ ...onTrack, sessionCompletedAt: new Date("2026-09-24T04:41:00.000Z") }])
+  );
+  assert.match(timed!.whenLabel, /^24 Sept?( 2026)?, 2:41 PM$/);
+});
+
+/**
  * The row's expansion prints "Setup vs Run N" from `setupDiff`, and the three
  * modes are three different things to tell a driver. The one that matters is
  * `no_setup`: a run can be completed with an empty sheet ("log it anyway"), and

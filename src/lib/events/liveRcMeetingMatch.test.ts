@@ -140,12 +140,21 @@ test("the placeholder name reads like the track and the day", () => {
 
 test("only a kept placeholder counts as default, under the track's old or new name", () => {
   const name = defaultEventName("Radio racing cars sa", "2026-09-26");
-  assert.equal(isDefaultEventName(name, ["Radio Racing Cars SA", "Radio racing cars sa"], "2026-09-26"), true);
-  assert.equal(isDefaultEventName(name, ["Radio Racing Cars SA"], "2026-09-26"), false);
-  assert.equal(isDefaultEventName("Club champs R8", ["Radio Racing Cars SA"], "2026-09-26"), false);
-  // Same words, different day: the driver renamed nothing, but it is not this event's placeholder.
-  assert.equal(
-    isDefaultEventName(defaultEventName("Radio Racing Cars SA", "2026-09-27"), ["Radio Racing Cars SA"], "2026-09-26"),
-    false,
-  );
+  assert.equal(isDefaultEventName(name, ["Radio Racing Cars SA", "Radio racing cars sa"]), true);
+  assert.equal(isDefaultEventName(name, ["Radio Racing Cars SA"]), false);
+  assert.equal(isDefaultEventName("Club champs R8", ["Radio Racing Cars SA"]), false);
+  assert.equal(isDefaultEventName("Anything", [null, undefined, " "]), false);
+});
+
+test("a placeholder filled in for another day is still one nobody chose, so LiveRC's name replaces it", () => {
+  // Test drive 2026-09-26: made before the name followed the dates, "Indoor Raceway · Sat 26 Sep"
+  // sat on a meeting held Thursday the 24th and kept that name after joining LiveRC's.
+  assert.equal(isDefaultEventName("Indoor Raceway · Sat 26 Sep", ["Indoor Raceway"]), true);
+  assert.equal(isDefaultEventName(defaultEventName("Indoor Raceway", "2026-11-01"), ["Indoor Raceway"]), true);
+  // Anything else after the track is a name somebody typed.
+  assert.equal(isDefaultEventName("Indoor Raceway · Club night", ["Indoor Raceway"]), false);
+  assert.equal(isDefaultEventName("Indoor Raceway · Sat 26 Sep round 2", ["Indoor Raceway"]), false);
+  assert.equal(isDefaultEventName("Indoor Raceway · Sat 32 Sep", ["Indoor Raceway"]), false);
+  assert.equal(isDefaultEventName("Indoor Raceway", ["Indoor Raceway"]), false);
+  assert.equal(isDefaultEventName("Other Track · Sat 26 Sep", ["Indoor Raceway"]), false);
 });

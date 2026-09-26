@@ -60,7 +60,7 @@ export default async function EventsPage({
     searchParams,
     getExplicitTimeZoneForRunFormatting(),
   ]);
-  const [events, tracks, favouriteTrackIds, model] = await Promise.all([
+  const [events, tracks, favouriteTrackIds, season] = await Promise.all([
     loadUserScopedEvents({ userId: user.id, take: 120 }),
     // Same catalog scope as /runs/new and /tracks. Scoping this to `userId` predated the
     // community catalog and meant you could log a run at a track you could not hold an
@@ -90,13 +90,17 @@ export default async function EventsPage({
       year: parseYear(params.year),
       todayYmd: todayYmdInTimeZone(timeZone),
       timeZone,
+      // Read the way the meeting's own page reads them, so its run count and this list's agree.
+      userTimeZone: user.timeZone,
     }),
   ]);
+  const { allEvents, ...model } = season;
 
   // The phone list keeps its own row shape; it only borrows the season model's per-event
-  // evidence, which is what replaced the `Planned` badge on both breakpoints.
+  // evidence, which is what replaced the `Planned` badge on both breakpoints. Every season's, not
+  // the timeline's year: the phone has no year switch, and lists meetings from all of them.
   const stats: EventListStats = {};
-  for (const row of model.events) {
+  for (const row of allEvents) {
     stats[row.id] = {
       runCount: row.runCount,
       bestLapSeconds: row.bestLapSeconds,

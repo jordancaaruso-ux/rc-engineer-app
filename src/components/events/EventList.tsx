@@ -7,6 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Eyebrow, HubRowTitle } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { ActionToast } from "@/components/ui/ActionToast";
 import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { eventDateToYmd } from "@/lib/eventDateParse";
 import { formatLap } from "@/lib/runLaps";
@@ -182,6 +183,8 @@ export function EventList({
   // on /tracks, or created from inside this form's picker, has to lead the list on the way back.
   const [favouriteIds, setFavouriteIds] = useState<string[]>(favouriteTrackIds);
   const [addOpen, setAddOpen] = useState(false);
+  /** What New event just did, said once the form has closed on it. */
+  const [addDone, setAddDone] = useState<string | null>(null);
 
   const { upcoming, past } = useMemo(() => splitEvents(events, todayYmd), [events, todayYmd]);
 
@@ -230,10 +233,12 @@ export function EventList({
           <EventAddForm
             tracks={trackOptions}
             favouriteTrackIds={favouriteIds}
-            onCreated={(event) => {
+            open={addOpen}
+            onCreated={(event, message) => {
               const created = event as EventListItem;
               setEvents((prev) => [created, ...prev.filter((e) => e.id !== created.id)]);
               setAddOpen(false);
+              setAddDone(message);
             }}
           />
         </CollapsibleAddRow>
@@ -254,6 +259,8 @@ export function EventList({
           stats={stats}
         />
       </ul>
+      {/* Portaled to the page body; it sits here only to share the list's state. */}
+      <ActionToast message={addDone} onDismiss={() => setAddDone(null)} />
     </SurfaceCard>
   );
 }

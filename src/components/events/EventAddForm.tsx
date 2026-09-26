@@ -40,13 +40,6 @@ async function fetchLiveRcOnDays(
   return Array.isArray(data.meetings) ? data.meetings : [];
 }
 
-/** Messages that report something done, drawn in the success ink. */
-const DONE_MESSAGES = new Set([
-  "Event created.",
-  "Joined LiveRC’s meeting.",
-  "You already have this meeting.",
-]);
-
 /**
  * The create-an-event form, lifted out of `EventList` unchanged so the desktop page can
  * mount the same one behind its "New event" button.
@@ -64,13 +57,24 @@ export function EventAddForm({
   tracks,
   favouriteTrackIds = [],
   suggestedStartYmd,
+  open,
   onCreated,
 }: {
   tracks: TrackOption[];
   /** Ordered by the catalog, grouped first in the picker — same list Log your run uses. */
   favouriteTrackIds?: string[];
   suggestedStartYmd?: string | null;
-  onCreated?: (event: unknown) => void;
+  /**
+   * The panel holding the form is open. The form stays mounted while it is closed, so without
+   * this a message from last time sat beside the empty form when New event opened again.
+   */
+  open?: boolean;
+  /**
+   * The meeting made, joined or found, and the words for it. The parent closes the panel on this,
+   * so the parent says them where they can be seen (test drive 2026-09-26: "You already have this
+   * meeting." was set in the form as it closed, and nobody saw it).
+   */
+  onCreated?: (event: unknown, message: string) => void;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -99,6 +103,11 @@ export function EventAddForm({
   useEffect(() => {
     if (suggestedStartYmd) setStartDate((prev) => prev || suggestedStartYmd);
   }, [suggestedStartYmd]);
+
+  // Opened again: last time's message describes nothing on screen any more.
+  useEffect(() => {
+    if (open) setMessage(null);
+  }, [open]);
 
   /** Catalog plus anything added from inside the picker, first row of a name winning. */
   const allTracks = useMemo(() => {
@@ -200,9 +209,8 @@ export function EventAddForm({
       if (!(res.ok || res.status === 409) || !data.event) {
         throw new Error(data.error ?? `Request failed (${res.status})`);
       }
-      onCreated?.(data.event);
+      onCreated?.(data.event, "Joined LiveRC’s meeting.");
       resetForm();
-      setMessage("Joined LiveRC’s meeting.");
       router.refresh();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Couldn’t join that meeting");
@@ -258,19 +266,22 @@ export function EventAddForm({
         existingEventId?: string;
         reused?: boolean;
       };
+      // 409 with an event: someone's meeting already carries that LiveRC link, and this joined it.
       if (res.status === 409 && data.event) {
-        onCreated?.(data.event);
-        setMessage(data.error ?? "Joined existing event with this LiveRC URL.");
+        onCreated?.(data.event, "Joined LiveRC’s meeting.");
+        resetForm();
         router.refresh();
         return;
       }
       if (!res.ok) {
         throw new Error(data.error ?? `Request failed (${res.status})`);
       }
-      onCreated?.((data as { event: unknown }).event);
-      resetForm();
       // The server hands back the one you already made with this name, track and days (W2-14).
-      setMessage(data.reused ? "You already have this meeting." : "Event created.");
+      onCreated?.(
+        (data as { event: unknown }).event,
+        data.reused ? "You already have this meeting." : "Event created."
+      );
+      resetForm();
       router.refresh();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to create event");
@@ -340,8 +351,11 @@ export function EventAddForm({
         <div className="inset-panel-deep space-y-2 px-3 py-2.5">
           {liveRcOffer.map((meeting) => (
             <div key={meeting.hubUrl} className="space-y-1.5">
+              {/* Untouched dates make the meeting for today, so today is the day this asked about
+                  (test drive 2026-09-26: "on these days" beside a Dates box still reading "Pick
+                  the dates"). */}
               <p className="text-sm text-foreground">
-                LiveRC already has “{meeting.name}” on these days.
+                LiveRC already has “{meeting.name}” {startDate ? "on these days" : "today"}.
               </p>
               <button
                 type="button"
@@ -434,16 +448,8 @@ export function EventAddForm({
             {adding ? "Creating…" : "Create event"}
           </button>
         )}
-        {message && (
-          <span
-            className={cn(
-              "text-xs",
-              DONE_MESSAGES.has(message) ? "text-primary-ink" : "text-muted-foreground"
-            )}
-          >
-            {message}
-          </span>
-        )}
+        {/* Only what went wrong is said here; what worked is said by the parent, as it closes. */}
+        {message && <span className="text-xs text-muted-foreground">{message}</span>}
       </div>
     </form>
   );

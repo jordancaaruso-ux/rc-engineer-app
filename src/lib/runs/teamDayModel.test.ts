@@ -192,3 +192,23 @@ test("the clock is read in the driver's zone, not the reader's", () => {
   assert.equal(point.clock, "10:40");
   assert.equal(point.dayKey, "2026-06-26");
 });
+
+test("a run whose time on track is only a day claims no clock", () => {
+  // A LiveRC race whose clock couldn't be found: stored as midnight on its day (test drive
+  // 2026-09-26). It still sits on its day, but the readout names no time.
+  const model = buildTeamDayModel(
+    [
+      run({
+        id: "r1",
+        localTimeZone: "Australia/Sydney",
+        createdAt: new Date("2026-06-26T08:00:00Z"),
+        sortAt: new Date("2026-06-26T08:00:00Z"),
+        sessionCompletedAt: new Date("2026-06-25T14:00:00Z"), // 26 Jun, 00:00 AEST
+      }),
+    ],
+    OPTS
+  );
+  const point = pointsOf(model, "u1")[0]!;
+  assert.equal(point.clock, "");
+  assert.equal(point.dayKey, "2026-06-26");
+});

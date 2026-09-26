@@ -880,7 +880,7 @@ export function TeamDayCard({
                   {hovered.driver.name} · {hovered.point.label}
                 </span>
                 <span className="min-w-0 truncate tabular-nums text-muted-foreground">
-                  {hovered.point.clock} · best{" "}
+                  {hovered.point.clock ? `${hovered.point.clock} · ` : ""}best{" "}
                   {hovered.point.best != null ? formatLap(hovered.point.best) : "—"} ·{" "}
                   {hovered.point.lapCount} laps
                 </span>

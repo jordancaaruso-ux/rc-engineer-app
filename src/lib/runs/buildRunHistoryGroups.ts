@@ -71,6 +71,9 @@ export type RunGroupZoneOptions = {
   viewerTimeZone?: string | null;
 };
 
+/** One day formatter per zone: building one costs ~40x the format, and a fold asks thousands of times. */
+const DAY_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+
 /**
  * Calendar day (YYYY-MM-DD) for grouping. With a `timeZone` the day is resolved
  * in that zone so a run near UTC midnight groups under the same local day its
@@ -78,12 +81,17 @@ export type RunGroupZoneOptions = {
  */
 function dateKey(d: Date, timeZone?: string | null): string {
   if (timeZone) {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date(d));
+    let formatter = DAY_FORMATTERS.get(timeZone);
+    if (!formatter) {
+      formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+      DAY_FORMATTERS.set(timeZone, formatter);
+    }
+    return formatter.format(new Date(d));
   }
   return new Date(d).toISOString().slice(0, 10);
 }
@@ -379,6 +387,25 @@ export function resolveSessionGroupKeys<T extends RunForHistoryGroup>(
 
   // Touching days: an eventless day at one of the meeting's tracks that sits next to a day
   // the meeting already holds joins it, and the chain walks on from there.
+  //
+  // "Next to" is asked as "is the day before or after it held", with both days worked out once
+  // per day: comparing every candidate with every held day on every step took over a second
+  // across a long history (4,000 runs, measured 2026-09-26), once the Events list read the fold.
+  const neighbourDays = new Map<string, readonly [string, string]>();
+  const neighboursOf = (day: string): readonly [string, string] => {
+    let pair = neighbourDays.get(day);
+    if (!pair) {
+      const noon = Date.parse(`${day}T12:00:00Z`);
+      pair = Number.isNaN(noon)
+        ? ["", ""]
+        : [
+            new Date(noon - 86_400_000).toISOString().slice(0, 10),
+            new Date(noon + 86_400_000).toISOString().slice(0, 10),
+          ];
+      neighbourDays.set(day, pair);
+    }
+    return pair;
+  };
   const looseDaysByTrack = new Map<string, Set<string>>();
   for (const run of runs) {
     if (run.eventId) continue;
@@ -397,13 +424,8 @@ export function resolveSessionGroupKeys<T extends RunForHistoryGroup>(
       let grew = false;
       for (const day of candidates) {
         if (scope.days.has(day)) continue;
-        let touches = false;
-        for (const held of scope.days) {
-          if (dayKeyDistance(day, held) === 1) {
-            touches = true;
-            break;
-          }
-        }
+        const [before, after] = neighboursOf(day);
+        const touches = scope.days.has(before) || scope.days.has(after);
         if (touches) {
           scope.days.add(day);
           grew = true;
@@ -431,6 +453,24 @@ export function resolveSessionGroupKeys<T extends RunForHistoryGroup>(
     if (hit) keyByRunId.set(run.id, hit.key);
   }
   return keyByRunId;
+}
+
+/**
+ * The meeting each run sits in by the fold above (picked for it, or at its track on its days), as
+ * run id → event id. A run in no meeting is left out. A meeting's page and the Events list both
+ * count a meeting's runs off this, so the two can't disagree (test drive 2026-09-26: a club day
+ * raced on "Testing" read 4 runs on its page and nothing in the list).
+ */
+export function meetingIdByRunId(
+  runs: readonly RunForHistoryGroup[],
+  zones?: RunGroupZoneOptions,
+  meetings?: readonly MeetingForGrouping[]
+): Map<string, string> {
+  const byRun = new Map<string, string>();
+  for (const [runId, key] of resolveSessionGroupKeys(runs, zones, meetings)) {
+    if (key.startsWith("event-")) byRun.set(runId, key.slice("event-".length));
+  }
+  return byRun;
 }
 
 export function buildRunHistoryGroups<T extends RunForHistoryGroup>(

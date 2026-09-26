@@ -144,6 +144,8 @@ function yearInZone(d: Date, timeZone?: string | null): number {
  * This is the one format for run times the driver reads (dashboard, history,
  * detail). It deliberately does NOT feed the Engineer's LLM context or audit
  * logs — those keep their own formatters.
+ *
+ * A time that is only a day (`isDateOnlyRunTime`) prints as the day alone: "8 Jul".
  */
 export function formatRunDateTime(
   d: string | Date,
@@ -153,6 +155,7 @@ export function formatRunDateTime(
   const dt = new Date(d);
   if (Number.isNaN(dt.getTime())) return "—";
   const tz = timeZone?.trim();
+  if (isDateOnlyRunTime(dt, tz)) return formatRunDateShort(dt, tz, now);
   const withYear = yearInZone(dt, tz) !== yearInZone(now, tz);
   const opts: Intl.DateTimeFormatOptions = {
     day: "numeric",
@@ -168,6 +171,32 @@ export function formatRunDateTime(
   return new Intl.DateTimeFormat(LOCALE, opts)
     .format(dt)
     .replace(/\b([ap])m\b/i, (_, p) => `${p.toUpperCase()}M`);
+}
+
+/**
+ * A run's time that is only a day: midnight to the millisecond on the clock it is printed on.
+ *
+ * A timing site that gave only the date (a LiveRC race whose clock couldn't be found, a MyRCM file
+ * printing a date alone: `isDateOnlyTrackTime`) is stored as that day's midnight, and so are some
+ * older rows. Nothing is timed at 00:00:00.000, so the time is unknown, not "12:00 AM" (test drive
+ * 2026-09-26: "Indoor Raceway · 24 Sept, 12:00 AM" in Sessions, on the run and in the day chart).
+ */
+export function isDateOnlyRunTime(d: string | Date, timeZone?: string | null): boolean {
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return false;
+  // Seconds and milliseconds read the same in every zone.
+  if (dt.getUTCSeconds() !== 0 || dt.getUTCMilliseconds() !== 0) return false;
+  const tz = timeZone?.trim();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hourCycle: "h23",
+    ...(tz ? { timeZone: tz } : {}),
+  }).formatToParts(dt);
+  // Some engines print midnight as "24" in a 24-hour cycle.
+  const hour = Number(parts.find((p) => p.type === "hour")?.value) % 24;
+  const minute = Number(parts.find((p) => p.type === "minute")?.value);
+  return hour === 0 && minute === 0;
 }
 
 /**
