@@ -1,0 +1,3990 @@
+[
+  {
+    "brand": "101",
+    "discipline": "touring-foam",
+    "model": "BOSS",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=index&cPath=116",
+    "product_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=product_info&cPath=33_116&products_id=55106",
+    "notes": "Maker ONE-O-ONE (ワンオーワン); pack label \"101 BOSS Racing Tyres\". 1/10 GP touring foam, pre-mounted on black wheels; widths not stated. Front only: 101-BTF-32.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "101",
+    "discipline": "touring-foam",
+    "model": "BOSS",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=index&cPath=116",
+    "product_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=product_info&cPath=33_116&products_id=39539",
+    "notes": "Maker ONE-O-ONE (ワンオーワン); pack label \"101 BOSS Racing Tyres\". 1/10 GP touring foam, pre-mounted on black wheels; widths not stated. Front: 101-BTF-35; rear: 101-BTR-35.",
+    "compound_note": "Rears: foam cut dimensions optimised to cut stress and bounce so the tyre follows the track better.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "101",
+    "discipline": "touring-foam",
+    "model": "BOSS",
+    "compound": "38 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=index&cPath=116",
+    "product_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=product_info&cPath=33_116&products_id=38287",
+    "notes": "Maker ONE-O-ONE (ワンオーワン); pack label \"101 BOSS Racing Tyres\". 1/10 GP touring foam, pre-mounted on black wheels; widths not stated. Rear only: 101-BTR-38.",
+    "compound_note": "Rears: foam cut dimensions optimised to cut stress and bounce so the tyre follows the track better.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear",
+    "discontinued": false
+  },
+  {
+    "brand": "101",
+    "discipline": "touring-foam",
+    "model": "BOSS",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=index&cPath=116",
+    "product_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=product_info&cPath=33_116&products_id=38288",
+    "notes": "Maker ONE-O-ONE (ワンオーワン); pack label \"101 BOSS Racing Tyres\". 1/10 GP touring foam, pre-mounted on black wheels; widths not stated. Rear only: 101-BTR-40.",
+    "compound_note": "Rears: foam cut dimensions optimised to cut stress and bounce so the tyre follows the track better.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear",
+    "discontinued": false
+  },
+  {
+    "brand": "101",
+    "discipline": "touring-foam",
+    "model": "BOSS",
+    "compound": "MMC (Multi-Ring Medium Combination)",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=index&cPath=116",
+    "product_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=product_info&cPath=33_116&products_id=38878",
+    "notes": "Maker ONE-O-ONE (ワンオーワン); pack label \"101 BOSS Racing Tyres\". 1/10 GP touring foam, pre-mounted on black wheels; widths not stated. Front only: 101-BTF-MMC; no shore number published.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "101",
+    "discipline": "touring-foam",
+    "model": "BOSS",
+    "compound": "MSC (Multi-Ring Soft Combination)",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=index&cPath=116",
+    "product_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=product_info&cPath=33_116&products_id=38286",
+    "notes": "Maker ONE-O-ONE (ワンオーワン); pack label \"101 BOSS Racing Tyres\". 1/10 GP touring foam, pre-mounted on black wheels; widths not stated. Front only: 101-BTF-MSC; no shore number published.",
+    "compound_note": "Multi-ring build stiffens the tyre sideways, easing high-siding on high-grip tracks without losing much steering.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "101",
+    "discipline": "touring-foam",
+    "model": "BOSS",
+    "compound": "SC (Soft Combination)",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=index&cPath=116",
+    "product_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=product_info&cPath=33_116&products_id=38285",
+    "notes": "Maker ONE-O-ONE (ワンオーワン); pack label \"101 BOSS Racing Tyres\". 1/10 GP touring foam, pre-mounted on black wheels; widths not stated. Front only: 101-BTF-SC; no shore number published.",
+    "compound_note": "Quick, reacts linearly to steering, but tends to high-side on high-grip tracks.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "101",
+    "discipline": "touring-foam",
+    "model": "BOSS",
+    "compound": "SSC (Super Soft Combination)",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=index&cPath=116",
+    "product_url": "https://store.pro-s-futaba.co.jp/index.php?main_page=product_info&cPath=33_116&products_id=40793",
+    "notes": "Maker ONE-O-ONE (ワンオーワン); pack label \"101 BOSS Racing Tyres\". 1/10 GP touring foam, pre-mounted on black wheels; widths not stated. Front only: 101-BTF-SSC; no shore number published.",
+    "compound_note": "Slightly softer foam than the SC for more front grip and quicker handling.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "AMR",
+    "discipline": "touring-foam",
+    "model": "Avantie",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://automodel.shop-pro.jp/?mode=cate&cbid=2596698&csid=4",
+    "product_url": "https://automodel.shop-pro.jp/?pid=180384437",
+    "notes": "Auto Model Racing (Japan) 1/10 GP touring foam, pre-mounted pairs on black 12-spoke wheels, 12mm hex; colour code red. Front 26mm (64mm dia): AMR-AV10-TF35; rear 30mm (66mm dia): AMR-AV10-TR35; sets AMR-AV10-T3535 (F35+R35) and AMR-AV10-T3537 (F35+R37). Sold in the US as Kyosho KYOAMR-AV10-TF35 / -TR35.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "AMR",
+    "discipline": "touring-foam",
+    "model": "Avantie",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://automodel.shop-pro.jp/?mode=cate&cbid=2596698&csid=4",
+    "product_url": "https://automodel.shop-pro.jp/?pid=180490199",
+    "notes": "Auto Model Racing (Japan) 1/10 GP touring foam, pre-mounted pairs on black 12-spoke wheels, 12mm hex; colour code yellow. Front 26mm (64mm dia): AMR-AV10-TF37; rear 30mm (66mm dia): AMR-AV10-TR37; set AMR-AV10-T3737 (F37+R37). US: Kyosho KYOAMR-AV10-TF37 / -TR37.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "AMR",
+    "discipline": "touring-foam",
+    "model": "Avantie",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://automodel.shop-pro.jp/?mode=cate&cbid=2596698&csid=4",
+    "product_url": "https://automodel.shop-pro.jp/?pid=180490307",
+    "notes": "Rear only: AMR-AV10-TR40, 30mm wide, 66mm dia, pre-mounted pair on black 12-spoke wheels, 12mm hex; colour code white. US: Kyosho KYOAMR-AV10-TR40.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear 30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "AMR",
+    "discipline": "touring-foam",
+    "model": "Avantie",
+    "compound": "C3 Combi Hard",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://automodel.shop-pro.jp/?mode=cate&cbid=2596698&csid=4",
+    "product_url": "https://automodel.shop-pro.jp/?pid=180490474",
+    "notes": "Front only: AMR-AV10-TFC3, 26mm wide, 64mm dia, pre-mounted pair on black 12-spoke wheels, 12mm hex; colour code green. No shore number published. US: Kyosho KYOAMR-AV10-TFC3.",
+    "compound_note": "Front combination C3 compound (hard).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "AMR",
+    "discipline": "touring-foam",
+    "model": "Avantie",
+    "compound": "C4 Combi Medium",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://automodel.shop-pro.jp/?mode=cate&cbid=2596698&csid=4",
+    "product_url": "https://automodel.shop-pro.jp/?pid=180490514",
+    "notes": "Front only: AMR-AV10-TFC4, 26mm wide, 64mm dia, pre-mounted pair on black 12-spoke wheels, 12mm hex; colour code blue. No shore number published. US: Kyosho KYOAMR-AV10-TFC4.",
+    "compound_note": "Front combination C4 compound (medium).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "AMR",
+    "discipline": "touring-foam",
+    "model": "Avantie",
+    "compound": "C5 Combi Soft",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://automodel.shop-pro.jp/?mode=cate&cbid=2596698&csid=4",
+    "product_url": "https://automodel.shop-pro.jp/?pid=182931700",
+    "notes": "Front only: AMR-AV10-TFC5, 26mm wide, 64mm dia, pre-mounted pair on black 12-spoke wheels, 12mm hex; colour code light blue. No shore number published. US: Kyosho KYOAMR-AV10-TFC5.",
+    "compound_note": "Front combination C5 compound (soft).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "touring-foam",
+    "model": "Nitro Touring",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.horizonhobby.com/search?q=BXRF&sz=200",
+    "product_url": "https://www.horizonhobby.com/product/bsr-racing-tires-1-10-30mm-nitro-touring-foam-tires-mounted-30-rear-black-wheels-2/BXRF3030B.html",
+    "notes": "Pre-mounted pairs on black 12-spoke wheels, 12mm hex: rear 30mm BXRF3030B. Rear only.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear 30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "touring-foam",
+    "model": "Nitro Touring",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.horizonhobby.com/search?q=BXRF&sz=200",
+    "product_url": "https://www.horizonhobby.com/product/bsr-racing-tires-1-10-26mm-nitro-touring-foam-tires-mounted-32-front-black-wheels-2/BXRF2632B.html",
+    "notes": "Pre-mounted pairs on black 12-spoke wheels, 12mm hex: front 26mm BXRF2632B; rear 30mm BXRF3032B.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "touring-foam",
+    "model": "Nitro Touring",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.horizonhobby.com/search?q=BXRF&sz=200",
+    "product_url": "https://www.horizonhobby.com/product/bsr-racing-tires-1-10-26mm-nitro-touring-foam-tires-mounted-35-front-black-wheels-2/BXRF2635B.html",
+    "notes": "Pre-mounted pairs on black 12-spoke wheels, 12mm hex: front 26mm BXRF2635B; rear 30mm BXRF3035B.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "touring-foam",
+    "model": "Nitro Touring",
+    "compound": "38 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.horizonhobby.com/search?q=BXRF&sz=200",
+    "product_url": "https://www.horizonhobby.com/product/bsr-racing-tires-1-10-26mm-nitro-touring-foam-tires-mounted-38-front-black-wheels-2/BXRF2638B.html",
+    "notes": "Pre-mounted pairs on black 12-spoke wheels, 12mm hex: front 26mm BXRF2638B; rear 30mm BXRF3038B.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "touring-foam",
+    "model": "Nitro Touring",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.horizonhobby.com/search?q=BXRF&sz=200",
+    "product_url": "https://www.horizonhobby.com/product/bsr-racing-tires-1-10-26mm-nitro-touring-foam-tires-mounted-40-front-black-wheels-2/BXRF2640B.html",
+    "notes": "Pre-mounted pairs on black 12-spoke wheels, 12mm hex: front 26mm BXRF2640B; rear 30mm BXRF3040B.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "touring-foam",
+    "model": "Nitro Touring",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/bsr-racing-nitro-touring-26mm-front-foam-tires-black-2-42-shore-bxrf2642b/p1334101?v=1416198",
+    "notes": "Pre-mounted pairs on black 12-spoke wheels, 12mm hex: front 26mm BXRF2642B; rear 30mm BXRF3042B. 42 Shore seen at AMain only.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "touring-foam",
+    "model": "Nitro Touring",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.horizonhobby.com/search?q=BXRF&sz=200",
+    "product_url": "https://www.horizonhobby.com/product/bsr-racing-tires-1-10-26mm-nitro-touring-foam-tires-mounted-45-front-black-wheels-2/BXRF2645B.html",
+    "notes": "Pre-mounted pairs on black 12-spoke wheels, 12mm hex: front 26mm BXRF2645B; rear 30mm BXRF3045B.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "touring-foam",
+    "model": "Touring",
+    "compound": "Purple",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.horizonhobby.com/search?q=BXRF&sz=200",
+    "product_url": "https://www.horizonhobby.com/product/bsr-racing-tires-1-10-28mm-touring-tires-purple-2/BXRF2806.html",
+    "notes": "Colour-coded BSR touring foam, 12mm hex: 28mm pre-mounted pair for front or rear BXRF2806. No surface stated; colour order not published on the pages read.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC 28mm",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "touring-foam",
+    "model": "Touring",
+    "compound": "XX Orange",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.horizonhobby.com/search?q=BXRF&sz=200",
+    "product_url": "https://www.horizonhobby.com/product/bsr-racing-tires-1-10-26mm-foam-touring-tires-mounted-xx-orange-black-wheels-2/BXRF2605B.html",
+    "notes": "Colour-coded BSR touring foam, 12mm hex: 26mm front pair on black wheels BXRF2605B. No surface stated; colour order not published on the pages read.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "touring-foam",
+    "model": "Touring",
+    "compound": "XX Pink",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.horizonhobby.com/search?q=BXRF&sz=200",
+    "product_url": "https://www.horizonhobby.com/product/bsr-racing-tires-1-10-28mm-touring-tires-double-xx-pink-2/BXRF2804.html",
+    "notes": "Colour-coded BSR touring foam, 12mm hex: 26mm front pair on black wheels BXRF2604B; 28mm pair for front or rear BXRF2804. No surface stated; colour order not published on the pages read.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 28mm",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "touring-foam",
+    "model": "Touring",
+    "compound": "XX Pink/Orange",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/bsr-racing-1-10-28mm-touring-tires-2-xx-pink-orange-bxrf2805/p267043",
+    "notes": "Colour-coded BSR touring foam, 12mm hex: 28mm pre-mounted pair for front or rear BXRF2805 (AMain). No surface stated; colour order not published on the pages read.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC 28mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Electric Sedan Dual",
+    "compound": "37/45 Shore",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-1-10-electric-sedan-dual-foam-front-tires-2-37-45-shore-conj1374505/p385273?v=232746",
+    "notes": "Front pair on white wheels. SKU CONJ1374505.",
+    "compound_note": "Dual-compound foam with a harder outside slice to cut traction rolling on carpet while keeping steering (brand text).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC electric front",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Electric Sedan Dual",
+    "compound": "40/45 Shore",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-1-10-electric-sedan-dual-foam-front-tires-2-40-45-shore-conj1404505/p385273?v=232747",
+    "notes": "Front pair on white wheels. SKU CONJ1404505.",
+    "compound_note": "Dual-compound foam with a harder outside slice to cut traction rolling on carpet while keeping steering (brand text).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC electric front",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Electric Sedan Dual",
+    "compound": "42/45 Shore",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-1-10-electric-sedan-dual-foam-front-tires-2-42-45-shore-conj1424505/p385273?v=232748",
+    "notes": "Front pair on white wheels. SKU CONJ1424505.",
+    "compound_note": "Dual-compound foam with a harder outside slice to cut traction rolling on carpet while keeping steering (brand text).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC electric front",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Electric Sedan Dual",
+    "compound": "Hard",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-1-10-electric-sedan-dual-foam-tires-2-carbon-black-hard-conj1c73/p385276?v=245050",
+    "notes": "Pair on carbon-black wheels, position not stated. SKU CONJ1C73. White-wheel dual fronts also come in Soft and Medium (AMain text).",
+    "compound_note": "Dual-compound foam with a harder outside slice to cut traction rolling on carpet while keeping steering (brand text).",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Electric Sedan Dual",
+    "compound": "Medium",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-1-10-electric-sedan-dual-foam-tires-2-carbon-black-medium-conj1b73/p385276?v=245049",
+    "notes": "Pair on carbon-black wheels, position not stated. SKU CONJ1B73. White-wheel dual fronts also come in Soft and Medium (AMain text).",
+    "compound_note": "Dual-compound foam with a harder outside slice to cut traction rolling on carpet while keeping steering (brand text).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Electric Sedan Dual",
+    "compound": "Soft",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-1-10-electric-sedan-dual-foam-tires-2-carbon-black-soft-conj1a73/p385276?v=245048",
+    "notes": "Pair on carbon-black wheels, position not stated. SKU CONJ1A73. White-wheel dual fronts also come in Soft and Medium (AMain text).",
+    "compound_note": "Dual-compound foam with a harder outside slice to cut traction rolling on carpet while keeping steering (brand text).",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Electric Sedan Dual",
+    "compound": "Super Hard",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-1-10-electric-sedan-dual-foam-tires-2-carbon-black-hard-conj1c73/p385276?v=245050",
+    "notes": "Named in AMain text for the carbon-black dual pack (\"Soft, Medium, Hard and Super Hard\"); no SKU seen.",
+    "compound_note": "Dual-compound foam with a harder outside slice to cut traction rolling on carpet while keeping steering (brand text).",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Electric Sedan",
+    "compound": "37 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-12mm-hex-1-10-electric-sedan-foam-tires-2-white-37-shore-conj13705/p385275?v=232743",
+    "notes": "1/10 electric sedan foam, 27mm wide, pre-mounted pair on white wheels, 12mm hex. SKU CONJ13705.",
+    "compound_note": "Contact says its electric touring sedan compounds suit carpet and asphalt equally.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric 27mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Electric Sedan",
+    "compound": "40 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-12mm-hex-1-10-electric-sedan-foam-tires-2-white-40-shore-conj14005/p385275?v=232744",
+    "notes": "1/10 electric sedan foam, 27mm wide, pre-mounted pair on white wheels, 12mm hex. SKU CONJ14005.",
+    "compound_note": "Contact says its electric touring sedan compounds suit carpet and asphalt equally.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric 27mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Electric Sedan",
+    "compound": "42 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-12mm-hex-1-10-electric-sedan-foam-tires-2-white-42-shore-conj14205/p385275?v=232745",
+    "notes": "1/10 electric sedan foam, 27mm wide, pre-mounted pair on white wheels, 12mm hex. SKU CONJ14205.",
+    "compound_note": "Contact says its electric touring sedan compounds suit carpet and asphalt equally.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric 27mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Nitro Sedan",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-26mm-1-10-nitro-sedan-foam-front-tires-2-32-shore-conj13203/p385266?v=232681",
+    "notes": "1/10 nitro sedan foam, pre-mounted pairs, 12mm hex. Front 26mm only: CONJ13203 (white wheel), CONJ13273 (carbon wheel); rears start at 35.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Nitro Sedan",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-26mm-1-10-nitro-sedan-foam-front-tires-2-35-shore-conj13503/p385266?v=232682",
+    "notes": "1/10 nitro sedan foam, pre-mounted pairs, 12mm hex. Front 26mm: CONJ13503 (white wheel), CONJ13573 (carbon wheel); rear 30mm: CONJ13504 (white), CONJ13574 (carbon).",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Nitro Sedan",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-26mm-1-10-nitro-sedan-foam-front-tires-2-37-shore-conj13703/p385266?v=232683",
+    "notes": "1/10 nitro sedan foam, pre-mounted pairs, 12mm hex. Front 26mm: CONJ13703 (white wheel), CONJ13773 (carbon wheel); rear 30mm: CONJ13704 (white), CONJ13774 (carbon). UK distributor Schumacher lists the white-rim front as J13703, \"1/10 Front L26mm 37Sh On Standard Rims Jap Compound\".",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Nitro Sedan",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-26mm-1-10-nitro-sedan-foam-front-tires-2-40-shore-conj14003/p385266?v=232684",
+    "notes": "1/10 nitro sedan foam, pre-mounted pairs, 12mm hex. Front 26mm: CONJ14003 (white wheel), CONJ14073 (carbon wheel); rear 30mm: CONJ14004 (white), CONJ14074 (carbon).",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Nitro Sedan",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-26mm-1-10-nitro-sedan-foam-front-tires-2-42-shore-conj14203/p385266?v=232685",
+    "notes": "1/10 nitro sedan foam, pre-mounted pairs, 12mm hex. Front 26mm: CONJ14203 (white wheel), CONJ14273 (carbon wheel); rear 30mm: CONJ14204 (white), CONJ14274 (carbon).",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Nitro Sedan",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-26mm-1-10-nitro-sedan-foam-front-tires-2-42-shore-conj14203/p385266?v=232685",
+    "notes": "1/10 nitro sedan foam, pre-mounted pairs, 12mm hex. No 45 Shore SKU listed; AMain text says fronts come in #32-#45 and rears in #35-#45.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "touring-foam",
+    "model": "Nitro Sedan",
+    "compound": "Damp",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/contact-26mm-1-10-nitro-sedan-foam-front-tires-2-32-shore-conj13203/p385266?v=232681",
+    "notes": "Listed in AMain text for the white-wheel front and rear packs (\"as well as Soft/Damp foam compound\"); no SKU seen.",
+    "compound_note": "Soft/Damp foam: \"ideal in damp conditions; when the track is not totally wet but will take time to get perfectly dry\".",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "touring-foam",
+    "model": "Attack",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/110-touring-foam-tires",
+    "product_url": "https://corally.com/en/product/C-14700-35/",
+    "notes": "1/10 GP (nitro) touring foam on carbon rims, pairs, made in Italy. Front 26mm: C-14700-35; rear 30mm: C-14705-35.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "touring-foam",
+    "model": "Attack",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/110-touring-foam-tires",
+    "product_url": "https://corally.com/en/product/C-14700-37/",
+    "notes": "1/10 GP (nitro) touring foam on carbon rims, pairs, made in Italy. Front 26mm: C-14700-37; rear 30mm: C-14705-37.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "touring-foam",
+    "model": "Attack",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/110-touring-foam-tires",
+    "product_url": "https://corally.com/en/product/C-14700-40/",
+    "notes": "1/10 GP (nitro) touring foam on carbon rims, pairs, made in Italy. Front 26mm: C-14700-40; rear 30mm: C-14705-40.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "touring-foam",
+    "model": "Attack",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/110-touring-foam-tires",
+    "product_url": "https://corally.com/en/product/C-14700-42/",
+    "notes": "1/10 GP (nitro) touring foam on carbon rims, pairs, made in Italy. Front 26mm: C-14700-42; rear 30mm: C-14705-42.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Gravity RC",
+    "discipline": "touring-foam",
+    "model": "G-SPEC Type F",
+    "compound": "Carpet/Asphalt",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/foam-tires-1-10-touring-car-on-road-tires-wheels-cars-trucks/c85",
+    "product_url": "https://www.amainhobbies.com/gravity-rc-gspec-type-f-carpet-asphalt-premounted-touring-car-foam-tires-4-grc136/p726990",
+    "notes": "Spec foam for club touring-car racing: 4 pre-mounted tyres on white 8-spoke wheels, white stripe on the inside edge. SKU GRC136.",
+    "compound_note": "Single spec compound, labelled for carpet and asphalt.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC set of 4",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.kyosho.com/import/grp_1-10t.html",
+    "product_url": "https://www.kyosho.com/import/grp_1-10t.html",
+    "notes": "Pre-glued 1/10 touring foam imported by Kyosho Japan: front 26mm 622221, rear 30mm 622231. Old page; no current Italian listing seen for 30 Shore.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://rcbazarshop.com/collections/gomme-in-spugna-1-10-touring-lc-racing",
+    "product_url": "https://rcbazarshop.com/products/coppia-gomme-anteriori-in-spugna-schepis-model-by-grp-1-10-26mm-32-35-37-40",
+    "notes": "Sold as \"Schepis Model by GRP\" 1/10 touring foam pairs, glued on yellow rims: front 26mm SVY14C. The Schepis range has no 32 rear. Also sold as a GRP set of 4 (\"Treno gomme GRP\"). Kyosho Japan's GRP import page also lists front 26mm 622222 and rear 30mm 622232 (old page, pre-glued).",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://rcbazarshop.com/collections/gomme-in-spugna-1-10-touring-lc-racing",
+    "product_url": "https://rcbazarshop.com/products/coppia-gomme-anteriori-in-spugna-schepis-model-by-grp-1-10-26mm-32-35-37-40",
+    "notes": "Sold as \"Schepis Model by GRP\" 1/10 touring foam pairs, glued on yellow rims: front 26mm SVY14D, rear 30mm SVY16C. Also sold as a GRP set of 4 (\"Treno gomme GRP\"). Kyosho Japan's GRP import page also lists front 26mm 622223 and rear 30mm 622233 (old page, pre-glued).",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://rcbazarshop.com/collections/gomme-in-spugna-1-10-touring-lc-racing",
+    "product_url": "https://rcbazarshop.com/products/coppia-gomme-anteriori-in-spugna-schepis-model-by-grp-1-10-26mm-32-35-37-40",
+    "notes": "Sold as \"Schepis Model by GRP\" 1/10 touring foam pairs, glued on yellow rims: front 26mm SVY14E, rear 30mm SVY16D. Also sold as a GRP set of 4 (\"Treno gomme GRP\"). Kyosho Japan's GRP import page also lists front 26mm 622224 and rear 30mm 622234 (old page, pre-glued).",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://rcbazarshop.com/collections/gomme-in-spugna-1-10-touring-lc-racing",
+    "product_url": "https://rcbazarshop.com/products/coppia-gomme-anteriori-in-spugna-schepis-model-by-grp-1-10-26mm-32-35-37-40",
+    "notes": "Sold as \"Schepis Model by GRP\" 1/10 touring foam pairs, glued on yellow rims: front 26mm SVY14F, rear 30mm SVY16E. Also sold as a GRP set of 4 (\"Treno gomme GRP\"). Kyosho Japan's GRP import page also lists front 26mm 622225 and rear 30mm 622235 (old page, pre-glued).",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://rcbazarshop.com/collections/gomme-in-spugna-1-10-touring-lc-racing",
+    "product_url": "https://rcbazarshop.com/products/coppia-gomme-posteriori-in-spugna-schepis-model-by-grp-1-10-30mm-35-37-40-42",
+    "notes": "Sold as \"Schepis Model by GRP\" 1/10 touring foam pairs, glued on yellow rims: rear 30mm SVY16F. The Schepis range has no 42 front. Also sold as a GRP set of 4 (\"Treno gomme GRP\"). Kyosho Japan's GRP import page also lists front 26mm 622226 and rear 30mm 622236 (old page, pre-glued).",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.kyosho.com/import/grp_1-10t.html",
+    "product_url": "https://www.kyosho.com/import/grp_1-10t.html",
+    "notes": "Pre-glued 1/10 touring foam imported by Kyosho Japan: front 26mm 622227, rear 30mm 622237. Old page; no current Italian listing seen for 45 Shore.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "Rain",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.emporio2000modellismo.it/index.php/prodotti-ricambi/outlet",
+    "product_url": "https://www.emporio2000modellismo.it/index.php/prodotti-ricambi/outlet/gomme-in-spugna-posteriori-da-30mm-rain-detail",
+    "notes": "GRP 1/10 foam rear pair, 30mm, wet-weather foam; seen only as an outlet (old stock) listing with no code.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear 30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.hotracetyres.eu/287-110-white-rims",
+    "product_url": "https://www.hotracetyres.eu/110-white-rims/2146-pair-of-front-tyres-110-shore-32-on-white-rims-66mm-hot-race.html",
+    "notes": "1/10 nitro on-road (touring) foam, pre-mounted pairs. front: 005-0121 (carbon rim, 66mm), 005-0021 (white rim, 66mm). Front only in the 200mm range.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm, 66mm dia",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.hotracetyres.eu/287-110-white-rims",
+    "product_url": "https://www.hotracetyres.eu/110-white-rims/2147-pair-of-front-tyres-110-shore-35-on-white-rims-66mm-hot-race.html",
+    "notes": "1/10 nitro on-road (touring) foam, pre-mounted pairs. front: 005-0131 (carbon rim, 66mm), 005-0031 (white rim, 66mm), 005-0031-6 (white rim, 62mm); rear: 005-0132 (carbon rim, 66mm), 005-0032 (white rim, 66mm).",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / rear, 66mm dia",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.hotracetyres.eu/287-110-white-rims",
+    "product_url": "https://www.hotracetyres.eu/110-white-rims/2150-pair-of-front-tyres-110-shore-37-on-white-rims-66mm-hot-race.html",
+    "notes": "1/10 nitro on-road (touring) foam, pre-mounted pairs. front: 005-0141 (carbon rim, 66mm), 005-0041 (white rim, 66mm), 005-0041-6 (white rim, 62mm), FFVRC (white rim, 62mm); rear: 005-0142 (carbon rim, 66mm), 005-0042 (white rim, 66mm), 005-0042-6 (white rim, 64mm).",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / rear, 66mm dia",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.hotracetyres.eu/287-110-white-rims",
+    "product_url": "https://www.hotracetyres.eu/110-white-rims/2154-pair-of-front-tyres-110-shore-40-on-white-rims-66mm-hot-race.html",
+    "notes": "1/10 nitro on-road (touring) foam, pre-mounted pairs. front: 005-0151 (carbon rim, 66mm), 005-0051 (white rim, 66mm); rear: 005-0152 (carbon rim, 66mm), 005-0052 (white rim, 66mm), 005-0052-6 (white rim, 64mm), FFVRC (white rim, 64mm). Michael's RC Hobbies (US) sells older code HR10FB40, \"1/10th 26mm Tires 40 Shore Front on Black Rims\".",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / rear, 66mm dia",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.hotracetyres.eu/287-110-white-rims",
+    "product_url": "https://www.hotracetyres.eu/110-white-rims/2157-pair-of-front-tyres-110-shore-42-on-white-rims-66mm-hot-race.html",
+    "notes": "1/10 nitro on-road (touring) foam, pre-mounted pairs. front: 005-0161 (carbon rim, 66mm), 005-0061 (white rim, 66mm); rear: 005-0162 (carbon rim, 66mm), 005-0062 (white rim, 66mm).",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / rear, 66mm dia",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.hotracetyres.eu/287-110-white-rims",
+    "product_url": "https://www.hotracetyres.eu/110-white-rims/2159-pair-of-front-tyres-110-shore-45-on-white-rims-66mm-hot-race.html",
+    "notes": "1/10 nitro on-road (touring) foam, pre-mounted pairs. front: 005-0171 (carbon rim, 66mm), 005-0071 (white rim, 66mm); rear: 005-0172 (carbon rim, 66mm), 005-0072 (white rim, 66mm).",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / rear, 66mm dia",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "Double C.",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.hotracetyres.eu/287-110-white-rims",
+    "product_url": "https://www.hotracetyres.eu/110-white-rims/2145-pair-of-front-tyres-110-double-c-on-white-rims-66mm-hot-race-6850713761330.html",
+    "notes": "1/10 nitro on-road (touring) foam, pre-mounted pairs. front: 005-0111 (carbon rim, 66mm), 005-0011 (white rim, 66mm). Front only. UK shop Zen Racing also lists a \"HotRace 1/10 on-road Bi_compound Medium Front\" (HR10FWBIM).",
+    "compound_note": "Front double compound, no shore given. Hot Race text on Michael's RC Hobbies calls its \"bi-blend\" fronts a mix of shores for high-traction, additive-heavy tracks.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm, 66mm dia",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "For Humid",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.hotracetyres.eu/288-110-carbon-rims",
+    "product_url": "https://www.hotracetyres.eu/110-carbon-rims/2175-pair-of-front-tyres-110-for-humid-on-carbon-rims-hot-race.html",
+    "notes": "1/10 nitro on-road (touring) foam, pre-mounted pairs. front: 005-0181 (carbon rim); rear: 005-0182 (carbon rim). Carbon rims only. Zen Racing (UK) sells HRE005-0181 as \"HotRace 1/10 DAMPS ON CARBON RIMS FRONT\".",
+    "compound_note": "Foam for humid / damp track conditions (no shore given).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "JACO",
+    "discipline": "touring-foam",
+    "model": "Nitro Shoes",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://gravesrc.com/search.php?search_query=jac3&section=product",
+    "product_url": "https://gravesrc.com/jac3135p-jaco-1/10-nitro-shoes-35-shore-re-o-deg-offset-foam-2-/",
+    "notes": "Rear 30mm JAC3135P: pre-glued on white 6-hole rims, 0 deg offset, 63mm dia, 12mm hex. Search results also show a 26mm front JAC3035P, but those shop pages blocked reading, so front is not listed.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear 30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "JACO",
+    "discipline": "touring-foam",
+    "model": "Nitro Shoes",
+    "compound": "38 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://gravesrc.com/search.php?search_query=jac3&section=product",
+    "product_url": "https://gravesrc.com/jac3138p-jaco-1/10-38-degree-gas-sedan-rear-tire-and-wheel/",
+    "notes": "Rear JAC3138P (\"38 Degree Gas Sedan Rear\"), pre-mounted on white rims. No front 38 pack found.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear 30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "JACO",
+    "discipline": "touring-foam",
+    "model": "Nitro Shoes",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://shop.stormerhobbies.com/searchresults.asp?Search=jaco+sedan&Submit=",
+    "product_url": "https://shop.stormerhobbies.com/product-p/jac3040p.htm",
+    "notes": "Front 26mm JAC3040P on Prism 1.5 rims (about 64.5mm dia, 27.2mm wide); rear 30mm JAC3140P on white 6-hole rims, 63mm dia. Stormer lists it out of stock.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "JACO",
+    "discipline": "touring-foam",
+    "model": "Nitro Shoes",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://shop.stormerhobbies.com/searchresults.asp?Search=jaco+sedan&Submit=",
+    "product_url": "https://shop.stormerhobbies.com/product-p/jac3142p.htm",
+    "notes": "Rear 30mm JAC3142P on Prism 1.5 rims. A 26mm front JAC3042P shows only on an eBay listing that blocked reading, so front is not listed.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear 30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "JACO",
+    "discipline": "touring-foam",
+    "model": "Nitro Shoes",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://shop.stormerhobbies.com/searchresults.asp?Search=jaco+sedan&Submit=",
+    "product_url": "https://shop.stormerhobbies.com/product-p/jac3045p.htm",
+    "notes": "Front 26mm JAC3045P and rear 30mm JAC3145P, both on Prism 1.5 rims. Stormer lists both out of stock.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "JACO",
+    "discipline": "touring-foam",
+    "model": "Nitro Shoes",
+    "compound": "50 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://shop.stormerhobbies.com/searchresults.asp?Search=jaco+sedan&Submit=",
+    "product_url": "https://shop.stormerhobbies.com/product-p/jac3050p.htm",
+    "notes": "Front 26mm JAC3050P on Prism 1.5 rims; no rear 50 pack found. Stormer lists it out of stock.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Kronos",
+    "discipline": "touring-foam",
+    "model": "Superturismo",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.nextmodelrc.com/fr/recherche?controller=search&s=kronos+superturismo",
+    "product_url": "https://nextmodelrc.com/fr/piste-1-10/7376-ret1035fw-kronos-superturismo-1-10-35-avant-racing-experience-ret1035fw.html",
+    "notes": "Kronos (Racing Experience) 1/10 nitro touring foam, pre-glued pairs. Front: RET1035FW (white rim); rear: RET1035R.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Kronos",
+    "discipline": "touring-foam",
+    "model": "Superturismo",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.nextmodelrc.com/fr/recherche?controller=search&s=kronos+superturismo",
+    "product_url": "https://nextmodelrc.com/en/track-1-10/7431-ret1037fw-kronos-superturismo-1-10-37-prior-racing-experience.html",
+    "notes": "Kronos (Racing Experience) 1/10 nitro touring foam, pre-glued pairs. Front: RET1037FW (white rim); rear: RET1037R, RET1037RW (white rim).",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Kronos",
+    "discipline": "touring-foam",
+    "model": "Superturismo",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.casadelmodellismo.com/gomme-spugna-1-10-on-road-automodelli-rc-c-152.html",
+    "product_url": "https://www.casadelmodellismo.com/kronos-coppia-gomme-superturismo-anteriori-26mm-40-sh-art-ret1040f-000008000002-p-10346.html",
+    "notes": "Kronos (Racing Experience) 1/10 nitro touring foam, pre-glued pairs on 12mm hex. Front 26mm: RET1040F (titanium-filled rim), RET1040FW (white rim); rear: RET1040RW (white rim).",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Kronos",
+    "discipline": "touring-foam",
+    "model": "Superturismo",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.nextmodelrc.com/fr/recherche?controller=search&s=kronos+superturismo",
+    "product_url": "https://nextmodelrc.com/fr/piste-1-10/7435-ret1042f-kronos-superturismo-1-10-42-avant-racing-experience-ret1042f.html",
+    "notes": "Kronos (Racing Experience) 1/10 nitro touring foam, pre-glued pairs. Front: RET1042F; rear: RET1042R.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "LRP",
+    "discipline": "touring-foam",
+    "model": "VTEC Foam",
+    "compound": "35 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.hobbydirekt.de/LRP/sonstiges/VTEC-Moosgummireifen-1-10-Heck-35-LRP-64135::206616.html",
+    "product_url": "https://www.hobbydirekt.de/Neuheiten/Neuheiten-2018/sonstige/VTEC-Moosgummireifen-1-10-Front-35-LRP-64035::206611.html",
+    "notes": "Pre-glued pairs for electric and nitro touring cars, 12mm hex; LRP gives no surface. Front 26mm: 64035; rear 30mm: 64135. German shops list it sold out / archived.",
+    "compound_note": "Made of highest-quality Japanese foam; pre-trued, ready to use.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "LRP",
+    "discipline": "touring-foam",
+    "model": "VTEC Foam",
+    "compound": "37 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.hobbydirekt.de/LRP/sonstiges/VTEC-Moosgummireifen-1-10-Heck-35-LRP-64135::206616.html",
+    "product_url": "https://www.hobbydirekt.de/Neuheiten/Neuheiten-2018/sonstige/VTEC-Moosgummireifen-1-10-Front-37-LRP-64037::206612.html",
+    "notes": "Pre-glued pairs for electric and nitro touring cars, 12mm hex; LRP gives no surface. Front 26mm: 64037; rear 30mm: 64137. German shops list it sold out / archived.",
+    "compound_note": "Made of highest-quality Japanese foam; pre-trued, ready to use.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "LRP",
+    "discipline": "touring-foam",
+    "model": "VTEC Foam",
+    "compound": "40 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.hobbydirekt.de/LRP/sonstiges/VTEC-Moosgummireifen-1-10-Heck-35-LRP-64135::206616.html",
+    "product_url": "https://www.haertle.de/RC+Modellbau/RC+Car+Zubehoer/Reifen+Felgen+Raeder/ausverkauft+LRP+64040+VTEC+Moosgummireifen+1+10+Front+40+RC+Car.html",
+    "notes": "Pre-glued pairs for electric and nitro touring cars, 12mm hex; LRP gives no surface. Front 26mm: 64040; rear 30mm: 64140. German shops list it sold out / archived.",
+    "compound_note": "Made of highest-quality Japanese foam; pre-trued, ready to use.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "MX10-Spec Handout",
+    "compound": "Soft (35 front / 37 rear)",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.rc-kleinkram.de/en/cat/index/sCategory/2456",
+    "product_url": "https://www.rc-kleinkram.de/en/matrix-mx10-specs-110-scale-handout-tire-foam-soft?c=2456",
+    "notes": "Race handout set \"Matrix MX10-SpecS\" for 1/10 touring (200mm nitro): front 35 Shore 26mm 62mm dia, rear 37 Shore 30mm 64mm dia.",
+    "compound_note": "Sold as the soft spec set.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC set, 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "25 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/front-air-carbon/",
+    "notes": "Pairs on Air Carbon rims, 12mm hex: front 26mm MX-10A25AC / MX-10A25ACJP; rear 30mm MX-10P25AC (JP = pre-cut 62mm front / 64mm rear).",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/front-air-carbon/",
+    "notes": "Pairs on Air Carbon rims, 12mm hex: front 26mm MX-10A30AC / MX-10A30ACJP; rear 30mm MX-10P30AC / MX-10P30ACJP (JP = pre-cut 62mm front / 64mm rear). AMain (US) lists MTX-10A30AC / MTX-10P30AC.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/front-air-carbon/",
+    "notes": "Pairs on Air Carbon rims, 12mm hex: front 26mm MX-10A32AC / MX-10A32ACJP; rear 30mm MX-10P32AC / MX-10P32ACJP (JP = pre-cut 62mm front / 64mm rear). AMain (US) lists MTX-10A32AC / MTX-10P32AC. Japan (YURUGIX, 10-spoke rims): front YTM-A1032Fa.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "32/40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/front-air-carbon/",
+    "notes": "Front pair only, 26mm Air Carbon rims: MX-10A32/40AC, MX-10A32/40ACJP (62mm).",
+    "compound_note": "Variable (two-compound) foam: softer outer edges for cornering grip, stiffer centre for straight-line speed (AMain / Matrix text).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/front-air-carbon/",
+    "notes": "Pairs on Air Carbon rims, 12mm hex: front 26mm MX-10A35AC / MX-10A35ACJP; rear 30mm MX-10P35AC / MX-10P35ACJP (JP = pre-cut 62mm front / 64mm rear). AMain (US) lists MTX-10A35AC / MTX-10P35AC. Japan (YURUGIX, 10-spoke rims): front YTM-A1035Fa, YTM-A1035FJa (JMRCA All-Japan engine-touring control tyre, 63mm); rear YTM-A1035Ra, YTM-A1035ROa (65mm).",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "35/42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/front-air-carbon/",
+    "notes": "Front pair only, 26mm Air Carbon rims: MX-10A35/42AC, MX-10A35/42ACJP (62mm).",
+    "compound_note": "Variable (two-compound) foam: softer outer edges for cornering grip, stiffer centre for straight-line speed (AMain / Matrix text).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/front-air-carbon/",
+    "notes": "Pairs on Air Carbon rims, 12mm hex: front 26mm MX-10A37AC / MX-10A37ACJP; rear 30mm MX-10P37AC / MX-10P37ACJP (JP = pre-cut 62mm front / 64mm rear). AMain (US) lists MTX-10A37AC / MTX-10P37AC. Japan (YURUGIX, 10-spoke rims): front YTM-A1037Fa; rear YTM-A1037Ra, YTM-A1037RJa (All-Japan control tyre, 65mm).",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/front-air-carbon/",
+    "notes": "Pairs on Air Carbon rims, 12mm hex: front 26mm MX-10A40AC / MX-10A40ACJP; rear 30mm MX-10P40AC / MX-10P40ACJP (JP = pre-cut 62mm front / 64mm rear). AMain (US) lists MTX-10A40AC / MTX-10P40AC. Japan (YURUGIX, 10-spoke rims): front YTM-A1040Fa; rear YTM-A1040Ra.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/front-air-carbon/",
+    "notes": "Pairs on Air Carbon rims, 12mm hex: front 26mm MX-10A42AC / MX-10A42ACJP; rear 30mm MX-10P42AC / MX-10P42ACJP (JP = pre-cut 62mm front / 64mm rear). AMain (US) lists MTX-10P42AC. Japan (YURUGIX, 10-spoke rims): rear YTM-A1042Ra.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/front-air-carbon/",
+    "notes": "Pairs on Air Carbon rims, 12mm hex: front 26mm MX-10A45AC / MX-10A45ACJP; rear 30mm MX-10P45AC / MX-10P45ACJP (JP = pre-cut 62mm front / 64mm rear). AMain (US) lists MTX-10A45AC / MTX-10P45AC. Planet Racing (Italy) also sells a rear 45 on Kyosho rims.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "50 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/front-air-carbon/",
+    "notes": "Pairs on Air Carbon rims, 12mm hex: front 26mm MX-10A50ACJP; rear 30mm MX-10P50AC / MX-10P50ACJP (JP = pre-cut 62mm front / 64mm rear).",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "Combi Medium",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://yurugix-rc.com/index.php?main_page=index&cPath=12_16",
+    "product_url": "https://yurugix-rc.com/index.php?main_page=product_info&cPath=12_16&products_id=17",
+    "notes": "Japan-only front pair on 10-spoke rims from Matrix importer YURUGIX (\"MATRIX製1/10フロントコンビミディアム\", YTM-A10CMa). No shore given.",
+    "compound_note": "Combination (two-compound) front foam.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "Combi Soft",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://yurugix-rc.com/index.php?main_page=index&cPath=12_16",
+    "product_url": "https://yurugix-rc.com/index.php?main_page=product_info&cPath=12_16&products_id=18",
+    "notes": "Japan-only front pair on 10-spoke rims from Matrix importer YURUGIX (\"MATRIX製1/10フロントコンビソフト\", YTM-A10CSa). No shore given.",
+    "compound_note": "Combination (two-compound) front foam.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "Wet",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-10-gp/",
+    "product_url": "https://matrixtires.net/prodotto/rear-air-carbon/",
+    "notes": "Pairs on Air Carbon rims: front 26mm MX-10AWETAC, rear 30mm MX-10PWETAC.",
+    "compound_note": "Wet-track foam (no shore given).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "OPTION No.1",
+    "discipline": "touring-foam",
+    "model": "Raitsu High Performance",
+    "compound": "35 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "http://www.option-no1.com/products/sp_tire.html",
+    "product_url": "https://option-no1.ocnk.net/product/5106",
+    "notes": "Printed ライツ ハイパフォーマンス (1/10 touring, pre-mounted pairs); the maker does not say GP or electric, or give widths. Front: NO-402F (7-spoke, hard wheel), NO-412F (6-spoke rim type, soft wheel); rear: NO-402R, NO-412R.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "OPTION No.1",
+    "discipline": "touring-foam",
+    "model": "Raitsu High Performance",
+    "compound": "37 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "http://www.option-no1.com/products/sp_tire.html",
+    "product_url": "https://option-no1.ocnk.net/product/5106",
+    "notes": "Printed ライツ ハイパフォーマンス (1/10 touring, pre-mounted pairs); the maker does not say GP or electric, or give widths. Front: NO-400F (7-spoke, hard wheel), NO-410F (6-spoke rim type, soft wheel); rear: NO-400R, NO-410R.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "OPTION No.1",
+    "discipline": "touring-foam",
+    "model": "Raitsu High Performance",
+    "compound": "40 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "http://www.option-no1.com/products/sp_tire.html",
+    "product_url": "https://option-no1.ocnk.net/product/5106",
+    "notes": "Printed ライツ ハイパフォーマンス (1/10 touring, pre-mounted pairs); the maker does not say GP or electric, or give widths. Front: NO-401F (7-spoke, hard wheel; catalogue only), NO-411F (6-spoke rim type, soft wheel); rear: NO-401R, NO-411R.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "RCK",
+    "discipline": "touring-foam",
+    "model": "42M.it",
+    "compound": "42 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.rc-kleinkram.de/en/cat/index/sCategory/2456",
+    "product_url": "https://www.rc-kleinkram.de/en/detail/index/sArticle/54121",
+    "notes": "Sold as \"RCK-42M.it - Touring Car Allround Foam Tires\" (RCK 240153), exclusive to rc-kleinkram.de: set of 4, 24mm wide, pre-glued on white rims, 12mm hex.",
+    "compound_note": "Allround foam, \"perfect for indoor and outdoor use\" (shop text).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC 24mm set of 4",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Gold Competizione Elettrico",
+    "compound": "31 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Espugne.html",
+    "product_url": "https://www.spracing.it/1_10_Espugne.html",
+    "notes": "1/10 electric touring foam, 26mm, glued on Kyosho white or carbon rim; code SP05031-G. Brand page gives no surface.",
+    "compound_note": "Brand grades 31 Shore as \"extramorbida (extra soft)\".",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Gold Competizione Elettrico",
+    "compound": "33 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Espugne.html",
+    "product_url": "https://www.spracing.it/1_10_Espugne.html",
+    "notes": "1/10 electric touring foam, 26mm, glued on Kyosho white or carbon rim; code SP05033-G. Brand page gives no surface.",
+    "compound_note": "Brand grades 33 Shore as \"molto morbida (very soft)\".",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Gold Competizione Elettrico",
+    "compound": "35 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Espugne.html",
+    "product_url": "https://www.spracing.it/1_10_Espugne.html",
+    "notes": "1/10 electric touring foam, 26mm, glued on Kyosho white or carbon rim; code SP05035-G. Brand page gives no surface.",
+    "compound_note": "Brand grades 35 Shore as \"morbida (soft)\".",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Gold Competizione Elettrico",
+    "compound": "37 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Espugne.html",
+    "product_url": "https://www.spracing.it/1_10_Espugne.html",
+    "notes": "1/10 electric touring foam, 26mm, glued on Kyosho white or carbon rim; code SP05037-G. Brand page gives no surface.",
+    "compound_note": "Brand grades 37 Shore as \"medio morbida (medium-soft)\".",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Gold Competizione Elettrico",
+    "compound": "40 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Espugne.html",
+    "product_url": "https://www.spracing.it/1_10_Espugne.html",
+    "notes": "1/10 electric touring foam, 26mm, glued on Kyosho white or carbon rim; code SP05040-G. Brand page gives no surface.",
+    "compound_note": "Brand grades 40 Shore as \"medie (medium)\".",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Gold Competizione Elettrico",
+    "compound": "42 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Espugne.html",
+    "product_url": "https://www.spracing.it/1_10_Espugne.html",
+    "notes": "1/10 electric touring foam, 26mm, glued on Kyosho white or carbon rim; code SP05042-G. Brand page gives no surface.",
+    "compound_note": "Brand grades 42 Shore as \"medio dure (medium-hard)\".",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Gold Competizione Elettrico",
+    "compound": "45 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Espugne.html",
+    "product_url": "https://www.spracing.it/1_10_Espugne.html",
+    "notes": "1/10 electric touring foam, 26mm, glued on Kyosho white or carbon rim; code SP05045-G. Brand page gives no surface.",
+    "compound_note": "Brand grades 45 Shore as \"dura (hard)\".",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC electric 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Gold Competizione",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "product_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "notes": "1/10 nitro touring foam glued on Kyosho white (-K) or carbon (-KC) rims. Front 26mm: SP05135-K / SP05135-KC; rear 30mm: SP05235-K / SP05235-KC.",
+    "compound_note": "Brand grades 35 Shore as \"morbida (soft)\".",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Gold Competizione",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "product_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "notes": "1/10 nitro touring foam glued on Kyosho white (-K) or carbon (-KC) rims. Front 26mm: SP05137-K / SP05137-KC; rear 30mm: SP05237-K / SP05237-KC.",
+    "compound_note": "Brand grades 37 Shore as \"medio morbida (medium-soft)\".",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Gold Competizione",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "product_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "notes": "1/10 nitro touring foam glued on Kyosho white (-K) or carbon (-KC) rims. Front 26mm: SP05140-K / SP05140-KC; rear 30mm: SP05240-K / SP05240-KC.",
+    "compound_note": "Brand grades 40 Shore as \"medie (medium)\".",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Gold Competizione",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "product_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "notes": "1/10 nitro touring foam glued on Kyosho white (-K) or carbon (-KC) rims. Front 26mm: SP05042-K / SP05042-KC; rear 30mm: SP05242-K / SP05242-KC.",
+    "compound_note": "Brand grades 42 Shore as \"medio dure (medium-hard)\".",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Touring a Razze",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "product_url": "https://www.casadelmodellismo.com/sp-racing-coppia-gomme-in-spugna-110-touring-a-razze-35sh-26mm-front-art-sp35-f-p-11861.html",
+    "notes": "SP's own foam (2017) on SP 10-spoke black rim, 64mm dia, 12mm hex. Nitro front 26mm SP35.F, rear 30mm SP35.R; electric 26mm SP35.RCE. Retail name \"Touring a Razze\" from casadelmodellismo.com.",
+    "compound_note": "Electric page grades 35 Shore as \"morbida (soft)\".",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Touring a Razze",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "product_url": "https://www.casadelmodellismo.com/sp-racing-coppia-gomme-in-spugna-110-touring-a-razze-37sh-26mm-front-art-sp37-f-p-11862.html",
+    "notes": "SP's own foam (2017) on SP 10-spoke black rim, 64mm dia, 12mm hex. Nitro front 26mm SP37.F, rear 30mm SP37.R; electric 26mm SP37.RCE. Retail name \"Touring a Razze\" from casadelmodellismo.com.",
+    "compound_note": "Electric page grades 37 Shore as \"media (medium)\".",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Touring a Razze",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "product_url": "https://www.casadelmodellismo.com/sp-racing-coppia-gomme-in-spugna-110-touring-a-razze-40sh-26mm-front-art-sp40-f-p-12916.html",
+    "notes": "SP's own foam (2017) on SP 10-spoke black rim, 64mm dia, 12mm hex. Nitro front 26mm SP40.F, rear 30mm SP40.R; electric 26mm SP40.RCE. Retail name \"Touring a Razze\" from casadelmodellismo.com.",
+    "compound_note": "Electric page grades 40 Shore as \"medio/dura (medium-hard)\".",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Touring a Razze",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "product_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "notes": "SP's own foam (2017) on SP 10-spoke black rim, 64mm dia, 12mm hex. Nitro front 26mm SP42.F, rear 30mm SP42.R; electric 26mm SP42.RCE.",
+    "compound_note": "Electric page grades 42 Shore as \"dura (hard)\".",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "touring-foam",
+    "model": "Wet",
+    "compound": "Wet",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "product_url": "https://www.spracing.it/1_10_Sspugne.html",
+    "notes": "Set of 4 pre-glued 1/10 touring foam tyres for wet asphalt: fronts 26mm, rears 30mm, about 64mm dia, 12mm hex. Code SPWET0010.",
+    "compound_note": "Made for wet to extremely wet asphalt (brand text).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC set of 4, 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SPICE",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "38 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "http://hgd-spice.jp/spgpfr/",
+    "product_url": "http://hgd-spice.jp/spgpfr/",
+    "notes": "SPICE (HGD Spice, Japan) 1/10 touring foam pre-mounted on mesh-type wheels, sold as pairs; the page does not say GP or electric, but the SPGP part codes and 26/30mm widths point to 1/10 GP touring. Rear only: SPGP-R38 (30mm).",
+    "compound_note": "High-rigidity mesh wheel and compound chosen by track testing; grip feel stays the same to the end of the run.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear 30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "SPICE",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "http://hgd-spice.jp/spgpfr/",
+    "product_url": "http://hgd-spice.jp/spgpfr/",
+    "notes": "SPICE (HGD Spice, Japan) 1/10 touring foam pre-mounted on mesh-type wheels, sold as pairs; the page does not say GP or electric, but the SPGP part codes and 26/30mm widths point to 1/10 GP touring. Rear only: SPGP-R40 (30mm).",
+    "compound_note": "High-rigidity mesh wheel and compound chosen by track testing; grip feel stays the same to the end of the run.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear 30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "SPICE",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "Combi Medium",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "http://hgd-spice.jp/spgpfr/",
+    "product_url": "http://hgd-spice.jp/spgpfr/",
+    "notes": "SPICE (HGD Spice, Japan) 1/10 touring foam pre-mounted on mesh-type wheels, sold as pairs; the page does not say GP or electric, but the SPGP part codes and 26/30mm widths point to 1/10 GP touring. Front only: SPGP-FM (26mm).",
+    "compound_note": "High-rigidity mesh wheel and compound chosen by track testing; grip feel stays the same to the end of the run.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "SPICE",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "Combi Soft",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "http://hgd-spice.jp/spgpfr/",
+    "product_url": "http://hgd-spice.jp/spgpfr/",
+    "notes": "SPICE (HGD Spice, Japan) 1/10 touring foam pre-mounted on mesh-type wheels, sold as pairs; the page does not say GP or electric, but the SPGP part codes and 26/30mm widths point to 1/10 GP touring. Front only: SPGP-FS (26mm).",
+    "compound_note": "High-rigidity mesh wheel and compound chosen by track testing; grip feel stays the same to the end of the run.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.tamiya.com/japan/products/53745/index.html",
+    "product_url": "https://www.tamiya.com/japan/products/53745/index.html",
+    "notes": "Hop-Up Option OP.745 rear 30mm (item 53745) for 1/10 glow engine R/C cars (1/10 GP touring size, 65mm dia), pair pre-glued on Tamiya wheels. Rear only (the only rear found); not currently sold in Tamiya's own online shop.",
+    "compound_note": "Grip for the power of engine cars with little change in grip with temperature; the higher the number the harder the tyre.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear 30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.tamiya.com/japan/products/53742/index.html",
+    "product_url": "https://www.tamiya.com/japan/products/53742/index.html",
+    "notes": "Hop-Up Option OP.742 front 26mm (item 53742) for 1/10 glow engine R/C cars (1/10 GP touring size, 65mm dia), pair pre-glued on Tamiya wheels. Front only; not currently sold in Tamiya's own online shop.",
+    "compound_note": "Grip for the power of engine cars with little change in grip with temperature; the higher the number the harder the tyre.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.tamiya.com/japan/products/53743/index.html",
+    "product_url": "https://www.tamiya.com/japan/products/53743/index.html",
+    "notes": "Hop-Up Option OP.743 front 26mm (item 53743) for 1/10 glow engine R/C cars (1/10 GP touring size, 65mm dia), pair pre-glued on Tamiya wheels. Front only.",
+    "compound_note": "Grip for the power of engine cars with little change in grip with temperature; the higher the number the harder the tyre.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "43 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.tamiya.com/japan/products/53744/index.html",
+    "product_url": "https://www.tamiya.com/japan/products/53744/index.html",
+    "notes": "Hop-Up Option OP.744 front 26mm (item 53744) for 1/10 glow engine R/C cars (1/10 GP touring size, 65mm dia), pair pre-glued on Tamiya wheels. Front only.",
+    "compound_note": "Grip for the power of engine cars with little change in grip with temperature; the higher the number the harder the tyre.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front 26mm",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Electric Touring Foam",
+    "compound": "35 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=2349",
+    "notes": "1/10 EP (electric) touring foam 10ES-35, about 64mm dia on hard carbon rims, sold per pair. The page names no surface.",
+    "compound_note": "High-grip 35 shore foam.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 TC 64mm",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Invincible R177",
+    "compound": "Hard",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=1162",
+    "notes": "Rear 10R-H-R177 on hard carbon rims; listed as 1/10 nitro GP sedan. No front pack in this hardness.",
+    "compound_note": "Harder shore for less wear, with forward bite similar to the Medium.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Invincible R177",
+    "compound": "Medium",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=948",
+    "notes": "Front 10F-M-R177, rear 10R-M-R177 (pre-order), on hard carbon rims; listed as 1/10 nitro GP sedan.",
+    "compound_note": "New blend: more grip than conventional tyres, good front/rear balance, consistent lap times in long races.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Invincible R177",
+    "compound": "Medium Hard",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=1741",
+    "notes": "Front 10F-MH-R177 on hard carbon rims; listed as 1/10 nitro GP sedan. No rear pack in this hardness.",
+    "compound_note": "New blend: more grip than conventional tyres, consistent lap times in long races.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Invincible RS170",
+    "compound": "Hard",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=3457",
+    "notes": "Rear 10R-H-RS170 on hard carbon rims; listed as 1/10 nitro GP sedan. No front pack in this hardness.",
+    "compound_note": "High-grade blend developed for low-grip circuits; improves grip when traction is low.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Invincible RS170",
+    "compound": "Medium",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=3402",
+    "notes": "Front 10F-M-RS170, rear 10R-M-RS170, on hard carbon rims; listed as 1/10 nitro GP sedan.",
+    "compound_note": "High-grade blend developed for low-grip circuits; improves grip when traction is low.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Invincible RS170",
+    "compound": "Medium Hard",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=3458",
+    "notes": "Front 10F-MH-RS170 on hard carbon rims; listed as 1/10 nitro GP sedan. No rear pack in this hardness.",
+    "compound_note": "High-grade blend developed for low-grip circuits; improves grip when traction is low.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=1714",
+    "notes": "Front 10F-32-H, pre-glued on hard carbon rims, pairs. No rear 32 pack listed.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=3850",
+    "notes": "Front 10F-35-HJP (\"Japan Edition\": OD cut down to 63mm), hard carbon rims. UK shop Zen Racing sells the same SKU. No rear 35 pack listed.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "38 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=3821",
+    "notes": "Japan Edition on hard carbon rims (OD cut down to 63mm front / 65mm rear): front 10F-38-HJP (pre-order), rear 10R-38-HJP.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=283",
+    "notes": "Hard carbon rims. Front 10F-40-H; rear 10R-40-HJP (Japan Edition, OD cut down to 65mm).",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://ultiracing.com/index.php?route=product/category&path=247_170",
+    "product_url": "https://ultiracing.com/index.php?route=product/product&path=247_170&product_id=287",
+    "notes": "Rear 10R-42-H on hard carbon rims (its page text says \"Shore 40\", title and SKU say 42). No front 42 pack listed.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear",
+    "discontinued": false
+  },
+  {
+    "brand": "UNO",
+    "discipline": "touring-foam",
+    "model": "Boost2",
+    "compound": "High Grip",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "http://www.asukacreate.com/new_product/uno_tyres.html",
+    "product_url": "https://super-rc.co.jp/rc/product/view?id=103458",
+    "notes": "UNO Racing Tyre by Asuka Create (Japan), made in Japan; 1/10 GP touring, pre-glued pairs on carbon-composite wheels. Front UN100CMCB#2, rear UN10137CB#2, front+rear set UN10CBS#2. One compound only, no shore number published.",
+    "compound_note": "High-grip type for low-to-medium traction tracks, sharper and more aggressive; use as a front/rear set, and try the V2 front combi if the car turns in too much.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "UNO",
+    "discipline": "touring-foam",
+    "model": "V2",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "http://www.asukacreate.com/new_product/uno_tyres.html",
+    "product_url": "https://super-rc.co.jp/rc/product/view?id=103872",
+    "notes": "UNO Racing Tyre by Asuka Create (Japan), made in Japan; 1/10 GP touring, pre-glued pair on carbon-composite wheels. Front only: UN10032C#2 (older code UN10032C#).",
+    "compound_note": "V2: the stable standard type with improved grip feel, for medium-to-high traction tracks.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "UNO",
+    "discipline": "touring-foam",
+    "model": "V2",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "http://www.asukacreate.com/new_product/uno_tyres.html",
+    "product_url": "https://super-rc.co.jp/rc/product/view?id=103456",
+    "notes": "UNO Racing Tyre by Asuka Create (Japan), made in Japan; 1/10 GP touring, pre-glued pair on carbon-composite wheels. Front only: UN10035C#2; UN10035C63#2 comes pre-trued to 63mm diameter, ready to run.",
+    "compound_note": "V2: the stable standard type with improved grip feel, for medium-to-high traction tracks.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "UNO",
+    "discipline": "touring-foam",
+    "model": "V2",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "http://www.asukacreate.com/new_product/uno_tyres.html",
+    "product_url": "https://super-rc.co.jp/rc/product/view?id=104430",
+    "notes": "UNO Racing Tyre by Asuka Create (Japan), made in Japan; 1/10 GP touring, pre-glued pairs on carbon-composite wheels. Front: UN10037C#2; rear: UN10137C#2, and UN10137C65#2 pre-trued to 65mm diameter.",
+    "compound_note": "V2: the stable standard type with improved grip feel, for medium-to-high traction tracks.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "UNO",
+    "discipline": "touring-foam",
+    "model": "V2",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "http://www.asukacreate.com/new_product/uno_tyres.html",
+    "product_url": "https://super-rc.co.jp/rc/product/view?id=103766",
+    "notes": "UNO Racing Tyre by Asuka Create (Japan), made in Japan; 1/10 GP touring, pre-glued pair on carbon-composite wheels. Rear only: UN10140C#2.",
+    "compound_note": "V2: the stable standard type with improved grip feel, for medium-to-high traction tracks.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC rear",
+    "discontinued": false
+  },
+  {
+    "brand": "UNO",
+    "discipline": "touring-foam",
+    "model": "V2",
+    "compound": "Combi",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "http://www.asukacreate.com/new_product/uno_tyres.html",
+    "product_url": "https://super-rc.co.jp/rc/product/view?id=103703",
+    "notes": "UNO Racing Tyre by Asuka Create (Japan), made in Japan; 1/10 GP touring, pre-glued pair on carbon-composite wheels. Front only: UN100CMC#2 (V2 front combi); no shore number published.",
+    "compound_note": "V2: the stable standard type with improved grip feel, for medium-to-high traction tracks. Asuka suggests this front combi when Boost2 fronts turn in too much.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 TC front",
+    "discontinued": false
+  },
+  {
+    "brand": "WIRC Racing",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://wircracing.com/collections/all",
+    "product_url": "https://wircracing.com/products/foam-front-ntx-tyres-35-shore",
+    "notes": "Italian maker's 1/10 nitro touring foam pairs on white 8-spoke rims. Front: GA10-35; rear: GP10-35. Widths not stated on the pages.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "WIRC Racing",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://wircracing.com/collections/all",
+    "product_url": "https://wircracing.com/products/1-10-nitro-touring-car-foam-front-tyres-37-shore",
+    "notes": "Italian maker's 1/10 nitro touring foam pairs on white 8-spoke rims. Front: GA10-37; rear: GP10-37. Widths not stated on the pages.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "WIRC Racing",
+    "discipline": "touring-foam",
+    "model": "Touring Foam",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://wircracing.com/collections/all",
+    "product_url": "https://wircracing.com/products/1-10-nitro-touring-car-foam-front-tyres-40-shore",
+    "notes": "Italian maker's 1/10 nitro touring foam pairs on white 8-spoke rims. Front: GA10-40; rear: GP10-40. Widths not stated on the pages.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC front / rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "touring-foam",
+    "model": "Enneti Nitro Sedan",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/xceed-rc-on-road-tires-wheels-cars-trucks/c83?fb=684",
+    "product_url": "https://www.amainhobbies.com/xceed-rc-26mm-enneti-1-10-light-nitro-sedan-front-tires-2-40-shore-xcd101523/p385283?v=171298",
+    "notes": "Italian foam made by Enneti, pre-mounted pairs, 26mm front / 30mm rear on light, carbon or white twin-six-spoke wheels. Shore listed in AMain's product text (\"available in 32, 35, 37, 40, 42 and 45 shore\"); no SKU for it seen. AMain shows these as sold out.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "touring-foam",
+    "model": "Enneti Nitro Sedan",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/xceed-rc-on-road-tires-wheels-cars-trucks/c83?fb=684",
+    "product_url": "https://www.amainhobbies.com/xceed-rc-26mm-enneti-1-10-light-nitro-sedan-front-tires-2-40-shore-xcd101523/p385283?v=171298",
+    "notes": "Italian foam made by Enneti, pre-mounted pairs, 26mm front / 30mm rear on light, carbon or white twin-six-spoke wheels. Shore listed in AMain's product text (\"available in 32, 35, 37, 40, 42 and 45 shore\"); no SKU for it seen. AMain shows these as sold out.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "touring-foam",
+    "model": "Enneti Nitro Sedan",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/xceed-rc-on-road-tires-wheels-cars-trucks/c83?fb=684",
+    "product_url": "https://www.amainhobbies.com/xceed-rc-30mm-enneti-1-10-carbon-nitro-sedan-rear-tires-2-37-shore-xcd101540/p385286?v=208461",
+    "notes": "Italian foam made by Enneti, pre-mounted pairs, 26mm front / 30mm rear on light, carbon or white twin-six-spoke wheels. SKUs seen at AMain: rear XCD101540 (carbon wheel), rear XCD101528 (light wheel). AMain shows these as sold out.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "touring-foam",
+    "model": "Enneti Nitro Sedan",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/xceed-rc-on-road-tires-wheels-cars-trucks/c83?fb=684",
+    "product_url": "https://www.amainhobbies.com/xceed-rc-26mm-enneti-1-10-light-nitro-sedan-front-tires-2-40-shore-xcd101523/p385283?v=171298",
+    "notes": "Italian foam made by Enneti, pre-mounted pairs, 26mm front / 30mm rear on light, carbon or white twin-six-spoke wheels. SKUs seen at AMain: front XCD101523 (light wheel), rear XCD101541 (carbon wheel). AMain shows these as sold out.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "touring-foam",
+    "model": "Enneti Nitro Sedan",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/xceed-rc-on-road-tires-wheels-cars-trucks/c83?fb=684",
+    "product_url": "https://www.amainhobbies.com/xceed-rc-30mm-enneti-1-10-nitro-sedan-rear-tire-2-white-42-shore-xcd101510/p385280?v=171283",
+    "notes": "Italian foam made by Enneti, pre-mounted pairs, 26mm front / 30mm rear on light, carbon or white twin-six-spoke wheels. SKUs seen at AMain: rear XCD101510 (white wheel). AMain shows these as sold out.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "touring-foam",
+    "model": "Enneti Nitro Sedan",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/xceed-rc-on-road-tires-wheels-cars-trucks/c83?fb=684",
+    "product_url": "https://www.amainhobbies.com/xceed-rc-30mm-enneti-1-10-nitro-sedan-rear-tire-2-white-45-shore-xcd101511/p385280?v=171284",
+    "notes": "Italian foam made by Enneti, pre-mounted pairs, 26mm front / 30mm rear on light, carbon or white twin-six-spoke wheels. SKUs seen at AMain: rear XCD101511 (white wheel). AMain shows these as sold out.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "touring",
+        "position": "front"
+      },
+      {
+        "class": "touring",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 TC 26mm front / 30mm rear",
+    "discontinued": false
+  }
+]

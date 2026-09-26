@@ -1,0 +1,3605 @@
+[
+  {
+    "brand": "Arrowmax",
+    "discipline": "formula",
+    "model": "F1 Tyre Rim Front",
+    "compound": "Medium",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://am-arrowmax.com/collections/formula-tires",
+    "product_url": "https://am-arrowmax.com/products/1-10-f1-tyre-rim-front-medium-glued-2-korea-am-042402",
+    "notes": "AM-042402, glued on black 10-spoke bearing wheels, 2 pcs, made in Korea. Sold out on Arrowmax's store (Sep 2026).",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Arrowmax",
+    "discipline": "formula",
+    "model": "F1 Tyre Rim Rear",
+    "compound": "24 Shore",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://am-arrowmax.com/collections/formula-tires",
+    "product_url": "https://am-arrowmax.com/products/1-10-f1-tyre-rim-rear-24-shore-2-korea-am-042406",
+    "notes": "AM-042406, glued on black 10-spoke 14mm-hex wheels, 2 pcs, made in Korea. AMain titles it 25 shore rubber; Arrowmax and AMain's text say 24 shore. Sold out on Arrowmax's store (Sep 2026).",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 14mm hex",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "42 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.racing-cars.com/news/news529/new-contact-rc-foam-f1-tyres",
+    "product_url": "https://www.amainhobbies.com/contact-premounted-f1-front-foam-tires-59mm-conjf1-42fa-p/p1250275",
+    "notes": "JF1-42FA, foam mounted on grey spoke wheels and trued to 63mm (shops also list them as 59mm front / 61mm rear, probably the worn-in size). 2 pcs.",
+    "compound_note": "Contact offers two front foams (42 and 45 shore) and two rear foams (28 and 30 shore) for carpet and asphalt.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 63mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "45 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.racing-cars.com/news/news529/new-contact-rc-foam-f1-tyres",
+    "product_url": "https://naughtyboyrc.com/products/contact-rc-f1-front-foam-tires-pre-mounted-45-shore-59mm-2-rc-car-formula-1",
+    "notes": "JF1-45FA, foam mounted on grey spoke wheels and trued to 63mm (shops also list them as 59mm front / 61mm rear, probably the worn-in size). 2 pcs.",
+    "compound_note": "Contact offers two front foams (42 and 45 shore) and two rear foams (28 and 30 shore) for carpet and asphalt.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 63mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "28 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.racing-cars.com/news/news529/new-contact-rc-foam-f1-tyres",
+    "product_url": "https://www.racing-cars.com/wheels-tyres/on-road-tyres/f1-rear-28sh-dia-61mm-jf1--28ra",
+    "notes": "JF1-28RA, foam mounted on grey spoke wheels and trued to 63mm (shops also list them as 59mm front / 61mm rear, probably the worn-in size). 2 pcs.",
+    "compound_note": "Contact offers two front foams (42 and 45 shore) and two rear foams (28 and 30 shore) for carpet and asphalt.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 63mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "30 Shore",
+    "surface": "mixed",
+    "tire_type": "foam",
+    "source_url": "https://www.racing-cars.com/news/news529/new-contact-rc-foam-f1-tyres",
+    "product_url": "https://www.mibosport.com/en/contact-rc-foam-tyres-f1-rear-30sh-dia-61mm",
+    "notes": "JF1-30RA, foam mounted on grey spoke wheels and trued to 63mm (shops also list them as 59mm front / 61mm rear, probably the worn-in size). 2 pcs.",
+    "compound_note": "Contact offers two front foams (42 and 45 shore) and two rear foams (28 and 30 shore) for carpet and asphalt.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 63mm",
+    "discontinued": false
+  },
+  {
+    "brand": "CRC",
+    "discipline": "formula",
+    "model": "F1 LPR Front",
+    "compound": null,
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.michaelsrchobbies.com/tires/110-on-road-pan-car-f1-tires/110-f1-wheels-tires/",
+    "product_url": "https://www.michaelsrchobbies.com/cln2317-f1-lpr-front-tires-formula-1.html",
+    "notes": "CLN2317, low-profile rubber (LPR) on the CRC GT wheel with a front bearing fit; 2.15 in (54.5mm) diameter to match foam-tyre sizes. Single compound.",
+    "compound_note": "High-grip rubber with very high lateral grip (CRC text).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 54.5mm",
+    "discontinued": false
+  },
+  {
+    "brand": "CRC",
+    "discipline": "formula",
+    "model": "F1 LPR Rear",
+    "compound": null,
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.michaelsrchobbies.com/tires/110-on-road-pan-car-f1-tires/110-f1-wheels-tires/",
+    "product_url": "https://www.michaelsrchobbies.com/cln2318-f1-lpr-rear-tires-formula-1.html",
+    "notes": "CLN2318, low-profile rubber (LPR) on the CRC F1 wheel for 14mm hex; 2.15 in (54.5mm) diameter to match foam-tyre sizes. Single compound.",
+    "compound_note": "High-grip rubber with very high lateral grip (CRC text).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 54.5mm",
+    "discontinued": false
+  },
+  {
+    "brand": "CRC",
+    "discipline": "formula",
+    "model": "RT-1 F1 Pre-Mount",
+    "compound": null,
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.amainhobbies.com/crc-rt1-premounted-f1-front-rear-rubber-tires-4-cln2320/p489145",
+    "product_url": "https://www.amainhobbies.com/crc-rt1-premounted-f1-front-rear-rubber-tires-4-cln2320/p489145",
+    "notes": "CLN2320, set of 4 (2 front + 2 rear) pre-glued on CRC F1 wheels; sold only as a set. AMain lists it as discontinued. Single compound.",
+    "compound_note": "The belted RT-1 tyre from World GT; CRC claims no degradation and seasons of wear on carpet.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 F1 front + rear set",
+    "discontinued": true
+  },
+  {
+    "brand": "Cross",
+    "discipline": "formula",
+    "model": "F1 Front Foam",
+    "compound": "35 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.the-border.com/product-category/tyres-wheels-accessory/110-onroad-wgtgt10-f1/",
+    "product_url": "https://www.the-border.com/product/cross-front-foam-tireswheel-35sh-cf-35fk/",
+    "notes": "CF-35FK, foam tyre on wheel; fits all Cross cars and Tamiya (F1/F103 front). No other Cross grades were found.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Enneti",
+    "discipline": "formula",
+    "model": "F1 Front Foam Carpet",
+    "compound": "Medium",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://www.the-border.com/product-category/tyres-wheels-accessory/110-onroad-wgtgt10-f1/",
+    "product_url": "https://www.the-border.com/product/enneti-f1-front-foam-carpet-medium-10060/",
+    "notes": "Enneti 10060, handmade in Italy and pre-glued on black wheels (5x8x2.5 bearing). Enneti also makes Xceed's foam tyres. No other Enneti F1 grades were found.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "eXcelerate",
+    "discipline": "formula",
+    "model": "F1 Front Asphalt",
+    "compound": "Medium (Purple)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://interstatehobby.com/collections/excelerate-rc",
+    "product_url": "https://www.michaelsrchobbies.com/xce-3065pr-f1-pre-mounted-front-asphalt-rubber-tir.html",
+    "notes": "XCE-3065.PR, pre-mounted, 2 pcs, 63mm diameter, 30mm wide; ROAR legal. Ultra-thin belt; inserts made to hold their shape.",
+    "compound_note": "Purple = medium asphalt front compound.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 63x30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "eXcelerate",
+    "discipline": "formula",
+    "model": "F1 Front Asphalt",
+    "compound": "Soft (Pink)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://interstatehobby.com/collections/excelerate-rc",
+    "product_url": "https://www.amainhobbies.com/excelerate-f1-premounted-front-asphalt-rubber-tires-2-xce-3065.pr-p/p1791192",
+    "notes": "XCE-3065.PK, pre-mounted, 2 pcs, 63mm diameter, 30mm wide; ROAR legal. Ultra-thin belt; inserts made to hold their shape.",
+    "compound_note": "Pink = soft asphalt front compound.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 63x30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "eXcelerate",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "Carpet Medium (CM)",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.amainhobbies.com/1-10-formula-1-on-road-tires-wheels-cars-trucks/c10839",
+    "product_url": "https://www.amainhobbies.com/excelerate-f1-front-premounted-rubber-tires-2-medium-xce-3060.cm/p1663604",
+    "notes": "Pre-mounted XCE-3060.CM (2 pcs); tyres only XCE-3050.CM. Also in the front/rear set XCE-3062 (CM front, CS rear). Ultra-thin belt; inserts made to hold their shape.",
+    "compound_note": "Carpet medium front compound, for steering balance (997 RC Raceway, eXcelerate text).",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "eXcelerate",
+    "discipline": "formula",
+    "model": "F1 Rear Asphalt",
+    "compound": "Medium (Green)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://interstatehobby.com/collections/excelerate-rc",
+    "product_url": "https://www.michaelsrchobbies.com/xce-3066gn-f1-pre-mounted-rear-asphalt-rubber-tire.html",
+    "notes": "XCE-3066.GN, pre-mounted on 14mm-hex wheels, 2 pcs, 63.5mm diameter, 38mm wide; ROAR legal. Ultra-thin belt; inserts made to hold their shape.",
+    "compound_note": "Green = medium asphalt rear compound.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 63.5x38mm",
+    "discontinued": false
+  },
+  {
+    "brand": "eXcelerate",
+    "discipline": "formula",
+    "model": "F1 Rear Asphalt",
+    "compound": "Soft (Yellow)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://interstatehobby.com/collections/excelerate-rc",
+    "product_url": "https://www.amainhobbies.com/excelerate-f1-premounted-rear-asphalt-rubber-tires-2-xce-3066.ye-p/p1791197",
+    "notes": "XCE-3066.YE, pre-mounted on 14mm-hex wheels, 2 pcs, 63.5mm diameter, 38mm wide; ROAR legal. Ultra-thin belt; inserts made to hold their shape.",
+    "compound_note": "Yellow = soft asphalt rear compound.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 63.5x38mm",
+    "discontinued": false
+  },
+  {
+    "brand": "eXcelerate",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "Carpet Soft (CS)",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.amainhobbies.com/1-10-formula-1-on-road-tires-wheels-cars-trucks/c10839",
+    "product_url": "https://www.amainhobbies.com/excelerate-f1-rear-premounted-rubber-tires-2-soft-xce-3061.cs/p1663605",
+    "notes": "Pre-mounted XCE-3061.CS (2 pcs); tyres only XCE-3051-CS (Team EAM). Also in the front/rear set XCE-3062. Ultra-thin belt; inserts made to hold their shape.",
+    "compound_note": "Carpet soft rear compound, for traction on low and high bite (997 RC Raceway, eXcelerate text).",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Exotek",
+    "discipline": "formula",
+    "model": "F1 Front V2",
+    "compound": "36X Double Red (Soft)",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://speedyrc.com.au/collections/f-1-tires-rims",
+    "product_url": "https://speedyrc.com.au/products/exotek-f1-1-10-rubber-tires-v2-front-36x-double-red-soft-2pc",
+    "notes": "EXO2199, 1 pair with foam inserts, tyres only. Not on Exotek's current F1 list (Sep 2026) and out of stock at Speedy RC.",
+    "compound_note": "For carpet; more aggressive steering than the 38X red front.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Exotek",
+    "discipline": "formula",
+    "model": "F1 Front V2",
+    "compound": "38X Red (Medium)",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.exotekracing.com/f1-ultra?viewall=1",
+    "product_url": "https://www.exotekracing.com/f1-1-10-rubber-tires-front-v2-38x-red-medium-1-pair-belted-rubber-tires-with-foams",
+    "notes": "EXO2194, 1 pair belted tyres with foam inserts; tyres only, glue to Exotek F1 front wheels. V2 mould gives a rounder tread than the V1 front.",
+    "compound_note": "For carpet and high-grip asphalt; more steering than the 40X. Exotek says 38X or 40X is the right front 90% of the time.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Exotek",
+    "discipline": "formula",
+    "model": "F1 Front V2",
+    "compound": "40X Yellow (Firm)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.exotekracing.com/f1-ultra?viewall=1",
+    "product_url": "https://www.exotekracing.com/f1-1-10-rubber-tires-front-v2-40x-yellow-firm-1-pair-belted-rubber-tires-with-foams",
+    "notes": "EXO2193, 1 pair belted tyres with foam inserts; tyres only, glue to Exotek F1 front wheels.",
+    "compound_note": "For hot asphalt or low-grip tracks; less aggressive steering than the 38X.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Exotek",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "33X Soft (Carpet)",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.exotekracing.com/f1-ultra?viewall=1",
+    "product_url": "https://www.exotekracing.com/exotek-f1-110-rubber-tires-front-soft-33x-carpet-1-pair-belted-rubber-tires-with-foams.html",
+    "notes": "EXO2354, 1 pair belted tyres with foam inserts; tyres only, glue to Exotek F1 front wheels (sold separately).",
+    "compound_note": "Aggressive soft front for high-grip carpet, made to pair with the 22X carpet rear.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Exotek",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "22X (Carpet)",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.exotekracing.com/f1-ultra?viewall=1",
+    "product_url": "https://www.exotekracing.com/f1-1-10-rubber-tires-rear-22x-carpet",
+    "notes": "EXO2252, 1 pair with carpet foam inserts; tyres only, needs Exotek F1 rear wheels.",
+    "compound_note": "Hyper-soft carpet compound; Exotek says it is not suited to asphalt because it may overheat.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Exotek",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "28X Double Red (Super Soft)",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.exotekracing.com/f1-ultra?viewall=1",
+    "product_url": "https://www.exotekracing.com/f1-1-10-rubber-tires-rear-28x-double-red-super-soft",
+    "notes": "EXO2133, 1 pair with foam inserts; tyres only, needs Exotek F1 rear wheels. Exotek's number is a track-temperature rating in Celsius (36X = 36C); pick the rear closest to track temperature.",
+    "compound_note": "For carpet and cooler asphalt.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Exotek",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "33X Red (Soft)",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.exotekracing.com/f1-ultra?viewall=1",
+    "product_url": "https://www.exotekracing.com/f1-1-10-rubber-tires-rear-33x-red-soft",
+    "notes": "EXO2119, 1 pair belted tyres with foam inserts; tyres only, needs Exotek F1 rear wheels. Exotek's number is a track-temperature rating in Celsius (36X = 36C); pick the rear closest to track temperature.",
+    "compound_note": "For carpet and cooler asphalt.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Exotek",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "36X Yellow (Medium)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.exotekracing.com/f1-ultra?viewall=1",
+    "product_url": "https://www.exotekracing.com/f1-1-10-rubber-tires-rear-36x-yellow-medium",
+    "notes": "EXO2118, 1 pair with foam inserts; tyres only, needs Exotek F1 rear wheels (AMain EXO2118). Exotek's number is a track-temperature rating in Celsius (36X = 36C); pick the rear closest to track temperature.",
+    "compound_note": "Exotek's first F1 rear compound; rated for about 36C asphalt.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Fenix Racing",
+    "discipline": "formula",
+    "model": "F1-104 F104-style Foam Tyres",
+    "compound": null,
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.fenixracingshop.com/index.php?controller=search&s=F1+tyres",
+    "product_url": "https://www.fenixracingshop.com/f104-and-modern-f1-tyres/352-f1-f104-style-foam-tyres-aka-sponge-tyres.html",
+    "notes": "F1-104, set of 4 (front and rear) glued and trued; made to fit modern F1 cars such as the Fenix Mistral, Xray X1 and Serpent. Same foam as Fenix's F1-70 tyres.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 F1 front + rear set",
+    "discontinued": false
+  },
+  {
+    "brand": "Fenix Racing",
+    "discipline": "formula",
+    "model": "F1-104 F104-style Foam Tyres",
+    "compound": "Wet",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.fenixracingshop.com/index.php?controller=search&s=F1+tyres",
+    "product_url": "https://www.fenixracingshop.com/f104-and-modern-f1-tyres/149-f1-f104-style-foam-tyres-aka-sponge-tyres-wet.html",
+    "notes": "F1-104 wet version (\"Foam for Wet racing!\"). Pack contents are not stated on the page; probably a 4-tyre set like the dry F1-104.",
+    "compound_note": "For wet racing.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 F1 front + rear set",
+    "discontinued": false
+  },
+  {
+    "brand": "Fenix Racing",
+    "discipline": "formula",
+    "model": "F1-70 Foam Tyres",
+    "compound": null,
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.fenixracingshop.com/index.php?controller=search&s=F1+tyres",
+    "product_url": "https://www.fenixracingshop.com/f1-70-foam-tyres-also-f103/525-f1-70-tyres-set-tyres-set.html",
+    "notes": "F1-70-8 tyre set for Fenix's F1-70 vintage-style F1 kit; Fenix files it under \"F1-70 Foam Tyres (also F103)\".",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 F1 set (F1-70 / F103)",
+    "discontinued": false
+  },
+  {
+    "brand": "Fenix Racing",
+    "discipline": "formula",
+    "model": "F1-70 Foam Tyres",
+    "compound": "Wet",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.fenixracingshop.com/index.php?controller=search&s=F1+tyres",
+    "product_url": "https://www.fenixracingshop.com/tyres/276-wet-f1-70-tyres-set.html",
+    "notes": "Wet F1-70 tyre set for the Fenix F1-70 (and F103-type cars).",
+    "compound_note": "For wet racing.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 F1 set (F1-70 / F103)",
+    "discontinued": false
+  },
+  {
+    "brand": "GP Speed Tires",
+    "discipline": "formula",
+    "model": "F1 Rear Foam (F104 rim)",
+    "compound": "32 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.rc-kleinkram.de/en/cat/index/sCategory/2462",
+    "product_url": "https://www.rc-kleinkram.de/en/gp-speed-tires-formula-1-foam-tires-f104-rim-rear-shore-2-pcs?c=1463",
+    "notes": "Foam glued on genuine Tamiya F104 rims, 2 pcs (RC-KleinKram item 39049).",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear (Tamiya F104 rim)",
+    "discontinued": false
+  },
+  {
+    "brand": "GP Speed Tires",
+    "discipline": "formula",
+    "model": "F1 Rear Foam (F104 rim)",
+    "compound": "36 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.rc-kleinkram.de/en/cat/index/sCategory/2462",
+    "product_url": "https://www.rc-kleinkram.de/en/gp-speed-tires-formula-1-foam-tires-f104-rim-rear-36-shore-2-pcs?c=1463",
+    "notes": "Foam glued on genuine Tamiya F104 rims, 2 pcs (RC-KleinKram item 39050).",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear (Tamiya F104 rim)",
+    "discontinued": false
+  },
+  {
+    "brand": "GP Speed Tires",
+    "discipline": "formula",
+    "model": "F103 Front Foam",
+    "compound": "38 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.the-border.com/product-category/tyres-wheels-accessory/110-onroad-wgtgt10-f1/",
+    "product_url": "https://www.the-border.com/product/gp-speed-tires-front-foam-tyres-38-shore-f103-710038/",
+    "notes": "710038, front foam for Tamiya F103, Japanese made, 30mm wide, 63mm diameter, bearing mount. Sold out at The-Border.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 63x30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "GP Speed Tires",
+    "discipline": "formula",
+    "model": "F103 Front Foam",
+    "compound": "40 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.the-border.com/product/gp-speed-tires-front-foam-tyres-38-shore-f103-710038/",
+    "product_url": null,
+    "notes": "710040, seen only as the next item on The-Border's 38-shore page; its own page did not load.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Gravity RC",
+    "discipline": "formula",
+    "model": "G-Spec F1 Front",
+    "compound": null,
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.amainhobbies.com/1-10-formula-1-on-road-tires-wheels-cars-trucks/c10839",
+    "product_url": "https://www.amainhobbies.com/gravity-rc-gspec-f1-front-premounted-rubber-tire-set-2-standard-grc139f/p1449425",
+    "notes": "GRC139F, 2 pcs pre-mounted on black wheels (front runs a bearing on the axle). Single compound; AMain labels it Standard. Also in the 4-pc set GRC138.",
+    "compound_note": "G-Spec: works on most surfaces with consistent grip; Speedy RC calls it all-surface.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Gravity RC",
+    "discipline": "formula",
+    "model": "G-Spec F1 Rear",
+    "compound": null,
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.amainhobbies.com/1-10-formula-1-on-road-tires-wheels-cars-trucks/c10839",
+    "product_url": "https://www.amainhobbies.com/gravity-rc-gspec-f1-rear-premounted-rubber-tire-set-2-standard-grc139r/p1449426",
+    "notes": "GRC139R, 2 pcs pre-mounted on black hex wheels. Single compound; AMain labels it Standard. Also in the 4-pc set GRC138.",
+    "compound_note": "G-Spec: works on most surfaces with consistent grip.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "formula",
+    "model": "F1 Asphalt Rubber Tyres",
+    "compound": "Asphalt (Blue front / Green rear)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.hotracetyres.eu/268-110-formula",
+    "product_url": "https://www.hotracetyres.eu/110-formula/2218-f1-asphalt-rubber-tyres-hot-race.html",
+    "notes": "Set of 4 (a pair of blue fronts and a pair of green rears) on grey wheels, part 008-0031; fits most formula pan cars. Monitex sells it as the BRCA F1 control tyre (SKU HRF1ABRCA).",
+    "compound_note": "Hot Race's asphalt compounds: blue for the front, green for the rear.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 F1 front + rear set",
+    "discontinued": false
+  },
+  {
+    "brand": "Hudy",
+    "discipline": "formula",
+    "model": "Formula Foam Tire Front",
+    "compound": "50 Sh",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.hudy-shop.net/231-110-formula",
+    "product_url": "https://www.hudy-shop.net/tires/8494-1-10-formula-foam-tire-front-2-hudy-803073-8581708030732.html",
+    "notes": "HUDY 803073, 2 pcs (rccarshop.co.uk lists it as MICC foam).",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Hudy",
+    "discipline": "formula",
+    "model": "Formula Foam Tire Rear",
+    "compound": "35 Sh",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.hudy-shop.net/231-110-formula",
+    "product_url": "https://www.hudy-shop.net/tires/8495-1-10-formula-foam-tire-rear-2-hudy-803083-8581708030831.html",
+    "notes": "HUDY 803083, 2 pcs (rccarshop.co.uk lists it as MICC foam).",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Hudy",
+    "discipline": "formula",
+    "model": "Formula Rubber Tire Front V2",
+    "compound": null,
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://teamxray.com/downloads/64/x1_2024_part_list.pdf",
+    "product_url": "https://www.hudy-shop.net/tires/1879-hudy-1-10-formula-rubber-tire-front-2-803072-hudy-8581708030725.html",
+    "notes": "HUDY 803072, 2 pcs pre-glued with inserts; the rubber tyre in the XRAY X1'24 parts list. Single compound, no grade in the name.",
+    "compound_note": "Tough rubber compound for carpet and asphalt, long life (HUDY text on The-Border).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Hudy",
+    "discipline": "formula",
+    "model": "Formula Rubber Tire Front",
+    "compound": null,
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.amainhobbies.com/hudy-f1-front-premounted-rubber-tires-2-hud803070/p673604",
+    "product_url": "https://www.amainhobbies.com/hudy-f1-front-premounted-rubber-tires-2-hud803070/p673604",
+    "notes": "HUDY 803070, the first version (2017), 2 pcs pre-mounted; replaced by the V2 (803072). AMain lists it as discontinued. No matching first-version rear page was found.",
+    "compound_note": "Tough rubber compound for carpet and asphalt (AMain, HUDY text).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": true
+  },
+  {
+    "brand": "Hudy",
+    "discipline": "formula",
+    "model": "Formula Rubber Tire Rear V2",
+    "compound": null,
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://teamxray.com/downloads/64/x1_2024_part_list.pdf",
+    "product_url": "https://www.hudy-shop.net/tires/1880-hudy-1-10-formula-rubber-tire-rear-2-803082-hudy-8581708030824.html",
+    "notes": "HUDY 803082, 2 pcs pre-glued with inserts; the rubber tyre in the XRAY X1'24 parts list. Single compound, no grade in the name.",
+    "compound_note": "Tough rubber compound for carpet and asphalt, long life (HUDY text on The-Border).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "formula",
+    "model": "F1 Front Foam",
+    "compound": "40 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/matrix-1-10-premounted-f1-foam-front-tires-59mm-2-bearing-style-mtx-10a40f1-p/p1546845",
+    "product_url": "https://www.amainhobbies.com/matrix-1-10-premounted-f1-foam-front-tires-59mm-2-bearing-style-mtx-10a40f1-p/p1546845",
+    "notes": "MTX-10A40F1, pre-mounted on ten-spoke bearing-style wheels, precut 59mm, 2 pcs. Made in Italy.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 59mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "formula",
+    "model": "F1 Front Foam",
+    "compound": "42 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/matrix-1-10-premounted-f1-foam-front-tires-59mm-2-bearing-style-mtx-10a40f1-p/p1546845",
+    "product_url": "https://www.mibosport.com/en/matrix-front-f1-foam-tires-42-shore-2pcs",
+    "notes": "MTX-10A42F1 (AMain variant), pre-mounted, precut 59mm, 2 pcs.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 59mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "formula",
+    "model": "F1 Front Foam",
+    "compound": "45 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/matrix-1-10-premounted-f1-foam-front-tires-59mm-2-bearing-style-mtx-10a40f1-p/p1546845",
+    "product_url": "https://monitexracing.com/products/matrix-1-10-f1-front-foam-tire-45-shore-precut-59mm",
+    "notes": "MTX-10A45F1 (AMain variant), pre-mounted, precut 59mm, 2 pcs.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 59mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "formula",
+    "model": "F1 Front Foam",
+    "compound": "50 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/matrix-1-10-premounted-f1-foam-front-tires-59mm-2-bearing-style-mtx-10a40f1-p/p1546845",
+    "product_url": "https://monitexracing.com/products/matrix-1-10-f1-front-foam-tire-50-shore-precut-59mm-mx-10a50f1",
+    "notes": "MX-10A50F1, pre-mounted, precut 59mm, 2 pcs.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 59mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "formula",
+    "model": "F1 Rear Foam",
+    "compound": "25 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/matrix-1-10-premounted-f1-foam-rear-tires-2-14mm-hex-mtx-10p25f1-p/p1551664",
+    "product_url": "https://www.amainhobbies.com/matrix-1-10-premounted-f1-foam-rear-tires-2-14mm-hex-mtx-10p25f1-p/p1551664",
+    "notes": "MTX-10P25F1, pre-mounted on 14mm-hex ten-spoke wheels, 2 pcs. Made in Italy.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 62mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "formula",
+    "model": "F1 Rear Foam",
+    "compound": "30 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.mibosport.com/en/formula-1-tires",
+    "product_url": "https://monitexracing.com/products/matrix-1-10-f1-rear-foam-tire-30-shore-precut-62mm",
+    "notes": "Pre-mounted, precut 62mm, 2 pcs (Monitex, Mibosport).",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 62mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "formula",
+    "model": "F1 Rear Foam",
+    "compound": "32 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/matrix-1-10-premounted-f1-foam-rear-tires-2-14mm-hex-mtx-10p25f1-p/p1551664",
+    "product_url": "https://www.mibosport.com/en/matrix-rear-f1-foam-tires-32-shore-2pcs",
+    "notes": "MTX-10P32F1 (AMain variant), pre-mounted on 14mm-hex wheels, 2 pcs.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 62mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "formula",
+    "model": "F1 Rear Foam",
+    "compound": "35 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/matrix-1-10-premounted-f1-foam-rear-tires-2-14mm-hex-mtx-10p25f1-p/p1551664",
+    "product_url": "https://monitexracing.com/products/matrix-1-10-f1-rear-foam-tire-35-shore-precut-62mm-mx-10p35f1",
+    "notes": "MX-10P35F1, pre-mounted, precut 62mm, 2 pcs.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 62mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Pardus Racing",
+    "discipline": "formula",
+    "model": "Rubber Tire Set (3Racing FGX / HPI F10)",
+    "compound": "Medium front / Soft rear",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://store.f1rclab.com/pardus-racing-rubber-tire-set-for-3racing-fgx-hpi-f10/",
+    "product_url": "https://store.f1rclab.com/pardus-racing-rubber-tire-set-for-3racing-fgx-hpi-f10/",
+    "notes": "PR02, set of 4 (medium fronts, soft rears) with 4 plastic rims and foam inserts, for the 3Racing FGX and HPI F10. Control tyre at the 2012 IIC in Las Vegas. Out of stock at F1 RC Lab; an old product.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "all"
+      }
+    ],
+    "size": "1/10 F1 front + rear set",
+    "discontinued": false
+  },
+  {
+    "brand": "Ride",
+    "discipline": "formula",
+    "model": "F-1 Front",
+    "compound": "GR",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.rcpro.it/en/25-ride",
+    "product_url": "https://www.rcpro.it/en/ride/45-ride-f1-gr-front.html",
+    "notes": "Belted slick, pre-glued on black wheels, 2 pcs, Ride 26040. Not on Ride's current F1 list (Sep 2026), so possibly run-out stock.",
+    "compound_note": "GR compound for asphalt and carpet (RcPro.it); the GR-X front is 4 shore harder.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Ride",
+    "discipline": "formula",
+    "model": "F-1 Front",
+    "compound": "GR-X",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.rcpro.it/en/25-ride",
+    "product_url": "https://www.rcpro.it/en/ride/773-ride-f1-gomme-anteriori-mescola-gr-x-asfalto.html",
+    "notes": "Belted slick, pre-glued on black wheels, 2 pcs, Ride 26041. Not on Ride's current F1 list (Sep 2026), so possibly run-out stock.",
+    "compound_note": "4 shore harder than the standard GR compound; sold for asphalt.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Ride",
+    "discipline": "formula",
+    "model": "F-1 Front",
+    "compound": "R-1",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "http://rc-ride.co.jp/en/wp-content/uploads/sites/2/RC-RIDE_Partslist_en_160121.pdf",
+    "product_url": "https://www.rcjaz.com/ride-26022-f104-high-grip-rubber-front-tires-premounted-p-90074757.html",
+    "notes": "63mm slick with sponge inner. Tyres only: Ride 24022; pre-glued on F104 wheels: 26022. Out of stock at retailers and not on Ride's current list.",
+    "compound_note": "R-1 high-grip compound, based on Ride's Re-series touring-car rubber (2013 ETS spec tyre).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 63mm",
+    "discontinued": true
+  },
+  {
+    "brand": "Ride",
+    "discipline": "formula",
+    "model": "F-1 Front",
+    "compound": "VR",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.rc-ride.com/p/6/",
+    "product_url": "https://thelapfactoryshop.com/products/ride-vr-f-1-front-tire-pre-glued-26201",
+    "notes": "Belted slick, pre-glued on a hub-type wheel for Tamiya F104 and similar, 2 pcs. Ride's current number is 46201; retailers still list it as 26201.",
+    "compound_note": "Ride's standard F1 front compound; the VR-X front is harder.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Ride",
+    "discipline": "formula",
+    "model": "F-1 Front",
+    "compound": "VR-X",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.rc-ride.com/p/6/",
+    "product_url": null,
+    "notes": "Belted slick, pre-glued, 2 pcs, Ride 46203. Ride lists it for Tamiya F104 and similar with the axle-type wheel (the VR front is hub-type).",
+    "compound_note": "Harder than the VR front compound; Ride says it helps on surfaces with little rear traction.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Ride",
+    "discipline": "formula",
+    "model": "F-1 Front",
+    "compound": "XR",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.rcjaz.com/ride-tires-c-4182_4186.html",
+    "product_url": "https://www.rcjaz.com/ride-26030-f104-61mm-xr-high-grip-preglued-front-tires-pcs-for-f1-p-90074760.html",
+    "notes": "Pre-glued on F104 wheels, 2 pcs, Ride 26030, 61mm. rcMart lists 26030 as discontinued.",
+    "compound_note": "XR high-grip compound.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 61mm",
+    "discontinued": true
+  },
+  {
+    "brand": "Ride",
+    "discipline": "formula",
+    "model": "F-1 Rear",
+    "compound": "GR",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.rcpro.it/en/25-ride",
+    "product_url": "https://www.rcpro.it/en/ride/46-ride-f1-gr-rear.html",
+    "notes": "Belted slick, pre-glued on black wheels, 2 pcs, Ride 26042. RcPro.it says it was the tyre chosen for the ETS F1 class. Not on Ride's current F1 list (Sep 2026).",
+    "compound_note": "GR compound for asphalt, more grip and life than the previous compound (RcPro.it).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Ride",
+    "discipline": "formula",
+    "model": "F-1 Rear",
+    "compound": "R-1",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.tqrcracing.com/shop/product_view.asp?p_id=4742",
+    "product_url": "https://www.rcjaz.com/ride-26023-f104-high-grip-rear-slick-tires-for-formula-p-90074758.html",
+    "notes": "63mm slick with sponge inner. Tyres only: Ride 24023; pre-glued on F104 silver wheels: 26023. Out of stock at retailers and not on Ride's current list.",
+    "compound_note": "R-1 high-grip compound, based on Ride's Re-series touring-car rubber; new rear profile for traction on low-bite tracks (2013 ETS spec tyre).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 63mm",
+    "discontinued": true
+  },
+  {
+    "brand": "Ride",
+    "discipline": "formula",
+    "model": "F-1 Rear",
+    "compound": "VR",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.rc-ride.com/p/6/",
+    "product_url": "https://thelapfactoryshop.com/products/ride-vr-f-1-rear-tire-pre-glued-26202",
+    "notes": "Belted slick, pre-glued on a hub-type wheel for Tamiya F104 and similar, 2 pcs. Ride's current number is 46202; retailers still list it as 26202.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Ride",
+    "discipline": "formula",
+    "model": "F-1 Rear",
+    "compound": "XR",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "http://rc-ride.co.jp/en/wp-content/uploads/sites/2/RC-RIDE_Partslist_en_160121.pdf",
+    "product_url": "http://www.rcmart.com/ride-26031-rear-62mm-high-grip-compound-p-64456.html",
+    "notes": "Pre-glued on F104 wheels, 2 pcs, Ride 26031 (Ride parts list: 61mm; rcMart title: 62mm). rcMart lists it as discontinued; its page blocks direct reads, so the title was seen in search results only.",
+    "compound_note": "XR high-grip compound.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 61-62mm",
+    "discontinued": true
+  },
+  {
+    "brand": "Shimizu",
+    "discipline": "formula",
+    "model": "F1 Front V2",
+    "compound": "Soft",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.racing-cars.com/wheels-tyres/on-road-tyres/shimizu-f1-front-tyre-soft-pre-glued-v2-pr-xg--571c",
+    "product_url": "https://www.racing-cars.com/wheels-tyres/on-road-tyres/shimizu-f1-front-tyre-soft-pre-glued-v2-pr-xg--571c",
+    "notes": "Schumacher XG-571C, V2, pre-glued pair on the CRC wheel (AMain SCHXG-571C).",
+    "compound_note": "V2 spec, best suited to carpet racing (Schumacher).",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Shimizu",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "Medium",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://speedyrc.com.au/collections/f-1-tires-rims",
+    "product_url": "https://speedyrc.com.au/products/xg-573-shimizu-med-f1-front-tyre-med-pre-glued-pr",
+    "notes": "Schumacher XG-573, the Shimizu 573 front pre-glued by Schumacher on the Tuning Haus 10-spoke F104 grey wheel; pair. Out of stock at Speedy RC.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Shimizu",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://speedyrc.com.au/collections/f-1-tires-rims",
+    "product_url": "https://speedyrc.com.au/products/schumacher-xg-571-shimizu-f1-front-tyre-soft-pre-glued",
+    "notes": "Schumacher XG-571, pre-glued pair. Speedy RC titles it the front asphalt tyre. Made and packed by Schumacher under the Shimizu name.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Shimizu",
+    "discipline": "formula",
+    "model": "F1 Rear V2",
+    "compound": "Medium",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.racing-cars.com/shimizu-f1-rear-tyre-med-pre-glued-v2-pr-xg--572c",
+    "product_url": "https://www.racing-cars.com/shimizu-f1-rear-tyre-med-pre-glued-v2-pr-xg--572c",
+    "notes": "Schumacher XG-572C, V2, pre-glued pair on the CRC wheel. Out of stock at Schumacher.",
+    "compound_note": "V2 spec, best suited to carpet racing (Schumacher).",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Shimizu",
+    "discipline": "formula",
+    "model": "F1 Rear V2",
+    "compound": "Soft",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.racing-cars.com/wheels-tyres/on-road-tyres/shimizu-f1-rear-tyre-soft-pre-glued-v2-pr-xg--575c",
+    "product_url": "https://www.racing-cars.com/wheels-tyres/on-road-tyres/shimizu-f1-rear-tyre-soft-pre-glued-v2-pr-xg--575c",
+    "notes": "Schumacher XG-575C, V2, pre-glued pair on the CRC wheel.",
+    "compound_note": "V2 spec, best suited to carpet racing (Schumacher).",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Shimizu",
+    "discipline": "formula",
+    "model": "F1 Rear V3",
+    "compound": "Soft",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.racing-cars.com/shimizu-f1-rear-tyre-soft-pre-glued-v3-pr-xg--575d",
+    "product_url": "https://www.racing-cars.com/shimizu-f1-rear-tyre-soft-pre-glued-v3-pr-xg--575d",
+    "notes": "Schumacher XG-575D, V3, hand-glued pair on the CRC wheel, green dot and sticker. Out of stock at Schumacher.",
+    "compound_note": "V3 spec with a larger-diameter insert for support and durability; best suited to carpet racing (Schumacher).",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Shimizu",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://speedyrc.com.au/collections/f-1-tires-rims",
+    "product_url": "https://speedyrc.com.au/products/xg-575-shimizu-f1-reartyre-soft-pre-glued-pr",
+    "notes": "Schumacher XG-575, the Shimizu 575 rear pre-glued by Schumacher on the Tuning Haus 10-spoke F104 grey wheel; pair. Out of stock at Speedy RC.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Shimizu",
+    "discipline": "formula",
+    "model": "Rear Racing Rubber Slick",
+    "compound": "36deg Hard",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.the-border.com/product-category/tyres-wheels-accessory/110-onroad-wgtgt10-f1/",
+    "product_url": "https://www.the-border.com/product/shimizu-rear-racing-rubber-slick-tyre-36deg-hard-pr-ps-0590/",
+    "notes": "Pit Shimizu PS-0590, pair of tyres only; needs foam-type F1 wheels (Tamiya 51378/54400/54526 or Tuning Haus). Sold out at The-Border.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Shimizu",
+    "discipline": "formula",
+    "model": "Rear Racing Rubber Slick",
+    "compound": "R3",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.the-border.com/product-category/tyres-wheels-accessory/110-onroad-wgtgt10-f1/",
+    "product_url": "https://www.the-border.com/product/shimizu-rear-racing-rubber-slick-tyre-r3-pr-ps-0578/",
+    "notes": "Pit Shimizu PS-0578, pair of tyres only; needs foam-type F1 wheels (Tamiya 51378/54400/54526 or Tuning Haus). About 30mm wide, 60mm outer diameter.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 60x30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Square",
+    "discipline": "formula",
+    "model": "F103 Front Foam",
+    "compound": "Hard (35 Shore)",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.rc-kleinkram.de/en/cat/index/sCategory/2462",
+    "product_url": "https://www.rc-kleinkram.de/en/detail/index/sArticle/56267/sCategory/2462",
+    "notes": "SFC-101HR, pre-glued on Square F103 wheels with 5x8x2.5 bearing hub, about 56mm diameter, 30mm wide; 2 pcs.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front (F103), 56x30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Square",
+    "discipline": "formula",
+    "model": "F103 Rear Foam",
+    "compound": "Soft",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.rc-kleinkram.de/en/cat/index/sCategory/2462",
+    "product_url": "https://www.rc-kleinkram.de/en/detail/index/sArticle/58622/sCategory/2462",
+    "notes": "SFC-102AZL, pre-glued on Square F103 wheels with 14mm hex hub, about 58mm diameter, 44mm wide; 2 pcs. Shore not stated.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear (F103), 58x44mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F1 V2 Front",
+    "compound": "Hard",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://speedyrc.com.au/collections/f-1-tires-rims",
+    "product_url": "https://speedyrc.com.au/products/sweep-sw-f1fh-1-10-formula-1-front-tires-v2-hard-2pcs",
+    "notes": "SW-F1FH, 2 pcs. Older generation; out of stock at Speedy RC and not on Sweep's current site. Other V2 front compounds probably existed but no page was found.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F1 V2 Rear",
+    "compound": "Hard",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.the-border.com/product-category/tyres-wheels-accessory/110-onroad-wgtgt10-f1/",
+    "product_url": "https://www.the-border.com/product/sweep-110-formula-1-rear-tires-hard-sw-f1rh/",
+    "notes": "SW-F1RH, tyres with double-sided bar-type medium inserts, for F104-style chassis. Older generation; not on Sweep's current site.",
+    "compound_note": "Designed for asphalt and carpet; Sweep says warmers or additive are hardly needed.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F1 V2 Rear",
+    "compound": "Soft",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://speedyrc.com.au/collections/f-1-tires-rims",
+    "product_url": "https://speedyrc.com.au/products/sweep-sw-f1rs-1-10-formula-1-rear-tires-v2-soft-2pcs",
+    "notes": "SW-F1RS, 2 pcs with insert, for F104-style chassis. Older generation; not on Sweep's current site.",
+    "compound_note": "Designed for asphalt and carpet; on asphalt choose the rear by track temperature.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F1 V2 Rear",
+    "compound": "Super Soft",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://speedyrc.com.au/collections/f-1-tires-rims",
+    "product_url": "https://speedyrc.com.au/products/sweep-sw-f1rss-1-10-formula-1-rear-tires-v2-super-soft-2pcs",
+    "notes": "SW-F1RSS, 2 pcs with insert, for F104-style chassis. Older generation; not on Sweep's current site. Sweep's text suggests the super soft rear as the carpet starting point.",
+    "compound_note": "Designed for asphalt and carpet; on asphalt choose the rear by track temperature.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F1 V4 Grooved Front",
+    "compound": "Medium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f1fv4g-mpg",
+    "notes": "F1FV4G-MPG, grooved wet tyre, 2 pcs, sidewall stickers included. rccarshop.co.uk lists a BRCA pack as \"V5 grooved\" (SW-F1FV5G-MPG-BRCA).",
+    "compound_note": "For wet outdoor asphalt.",
+    "softness": null,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F1 V4 Grooved Rear",
+    "compound": "24E",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f1rv4g-24epg",
+    "notes": "F1RV4G-24EPG, pre-glued grooved tyre, 2 pcs, sidewall sticker included.",
+    "compound_note": "For wet conditions or low-grip asphalt.",
+    "softness": null,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F1 V4 Grooved Rear",
+    "compound": "28R",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f1rv4g-28rpg",
+    "notes": "F1RV4G-28RPG, pre-glued grooved tyre, 2 pcs, sidewall sticker included. rccarshop.co.uk lists a BRCA pack as \"V5 grooved 28R\".",
+    "compound_note": "28-degree compound for wet conditions; works on standing water or heavy rain.",
+    "softness": null,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F1 V5 Slick Front",
+    "compound": "Hard",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f1fv4s-hpg",
+    "notes": "F1FV5S-HPG, pre-glued, 2 pcs, sidewall sticker included. Earlier generation than the F21 low profile.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F1 V5 Slick Front",
+    "compound": "Medium",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f1fv4s-mpg",
+    "notes": "F1FV5S-MPG, pre-glued, 2 pcs, sidewall sticker included. Earlier generation than the F21 low profile.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F1 V5 Slick Rear",
+    "compound": "24E",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f1rv4s-24epg",
+    "notes": "F1RV5S-24EPG, pre-glued, 2 pcs, sidewall sticker included. Earlier generation than the F21 low profile.",
+    "compound_note": "24-degree compound for outdoor asphalt in hot conditions.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F1 V5 Slick Rear",
+    "compound": "28R",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f1rv4s-28rpg",
+    "notes": "F1RV5S-28RPG, pre-glued, 2 pcs, sidewall sticker included. Earlier generation than the F21 low profile.",
+    "compound_note": "28-degree compound for carpet or low-grip asphalt.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Front",
+    "compound": "Hard (H)",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/%EB%B3%B5%EC%A0%9C-f21-front-medium-compound-2pcs",
+    "notes": "F21F-HPG, pre-glued belted slick, 2 pcs, white sidewall sticker. Sold in the US as the V6 Low Profile front. About 27mm wide, 61mm diameter.",
+    "compound_note": "For carpet and asphalt on high grip; Sweep USA recommends it for hot surfaces.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 27mm wide",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Front",
+    "compound": "Medium (M)",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f21-front-medium-compound",
+    "notes": "F21F-MPG, pre-glued belted slick, 2 pcs, yellow sidewall sticker. Sold in the US as the V6 Low Profile front. About 27mm wide, 61mm diameter.",
+    "compound_note": "For carpet and asphalt, mid to high grip; balanced steering.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 27mm wide",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Front",
+    "compound": "Medium-X (MX)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f21f-mxpg-f21-front-medium-x-long-life-compound-2pcs",
+    "notes": "F21F-MXPG, pre-glued, 2 pcs, yellow sidewall sticker; Sweep USA calls it X-Medium long wear (black dot). Sweep says it was the BRCA control tyre in 2021 and 2022.",
+    "compound_note": "Long-life compound for outdoor asphalt, consistent with high grip.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 27mm wide",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Front",
+    "compound": "Soft (S)",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f21-front-soft-compound",
+    "notes": "F21F-SPG, pre-glued belted slick, 2 pcs, red sidewall sticker. Sold in the US as the V6 Low Profile front (AMain SWP-661724 soft). About 27mm wide, 61mm diameter.",
+    "compound_note": "For carpet and asphalt, low to mid grip; most steering.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet",
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 27mm wide",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Front",
+    "compound": "X-Hard (HX)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/10th-F1_c_32.html",
+    "product_url": "https://www.sweepracingusa.com/F1-Front-X-HARD-comp-PREGLUED-Long-wear-V6-Black-dot-Low-Profile-2pc-belted-tire-set_p_969.html",
+    "notes": "F21F-HXPG, pre-glued belted, 2 pcs, 27mm wide, 61mm diameter. Listed on Sweep USA only; Sweep calls it the 2022 EU Champ version.",
+    "compound_note": "Long-wear compound made for asphalt tracks that eat tyres; Sweep says it also works on carpet. Sweep USA pairs it with the D-SPEC rear on asphalt.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 27mm wide",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Rear",
+    "compound": "D-SPEC Soft (D24)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/10th-F1_c_32.html",
+    "product_url": "https://www.sweepracingusa.com/F1-Rear-D-SPEC-SOFT-PREGLUED-Red-dot-V6-Low-Profile-2pc-Asphalt-belted-tire-set_p_935.html",
+    "notes": "F21R-D24PG, red dot, pre-glued on ROK HARD 40mm wheels with medium inserts, 61.5mm diameter. Listed on Sweep USA.",
+    "compound_note": "Based on Sweep's D-SPEC touring-car rubber: long-lasting and easy to drive on asphalt; needs 1-2 packs of break-in.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 40mm wheel, 61.5mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Rear",
+    "compound": "EXP Soft",
+    "surface": "mixed",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/10th-F1_c_32.html",
+    "product_url": "https://www.sweepracingusa.com/F1-EXP-Rear-SOFT-PREGLUED-V6-Low-Profile-2pc-belted-tire-set_p_867.html",
+    "notes": "F21R-SAV2PG (AMain SWP-661920, 14mm hex), pre-glued on ROK HARD 40mm wheels with medium inserts, 61.5mm diameter. Listed on Sweep USA; also sold as a 4-pc set with a choice of front.",
+    "compound_note": "EXP synthetic rubber for asphalt and carpet; needs 1-2 packs of break-in.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt",
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 40mm wheel, 61.5mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Rear",
+    "compound": "Hard Asphalt (HA)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f21-rear-hard-asphalt-tires-2pcs",
+    "notes": "F21R-HAPG, pre-glued belted slick, 2 pcs, white sidewall sticker; 40mm-wide wheel.",
+    "compound_note": "For asphalt.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 40mm wheel",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Rear",
+    "compound": "Hard Carpet (HC)",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f21-rear-hard-carpet-tires-2pcs",
+    "notes": "F21R-HCPG, pre-glued belted slick, 2 pcs, white sidewall sticker; 40mm-wide wheel. Also listed on Sweep USA as the V6 rear Hard Carpet.",
+    "compound_note": "For high-grip carpet (ETS carpet).",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 40mm wheel",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Rear",
+    "compound": "Medium Asphalt (MA)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f21-rear-medium-asphalt-tires-2pcs",
+    "notes": "F21R-MAPG, pre-glued belted slick, 2 pcs, yellow sidewall sticker; 40mm-wide wheel.",
+    "compound_note": "For asphalt.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 40mm wheel",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Rear",
+    "compound": "Medium Carpet (MC)",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f21-rear-medium-carpet-tires-2pcs",
+    "notes": "F21R-MCPG, pre-glued belted slick, 2 pcs, yellow sidewall sticker; 40mm-wide wheel.",
+    "compound_note": "For low to mid grip carpet.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 40mm wheel",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Rear",
+    "compound": "Soft Asphalt (SA)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f21-rear-soft-asphalt-tires-2pcs",
+    "notes": "F21R-SAPG, pre-glued belted slick, 2 pcs, red sidewall sticker; 40mm-wide wheel.",
+    "compound_note": "For asphalt.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 40mm wheel",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "formula",
+    "model": "F21 Low Profile Rear",
+    "compound": "Soft Carpet (SC)",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/1-10th-mini",
+    "product_url": "https://www.sweepracing.com/product-page/f21-rear-soft-carpet-tires-2pcs",
+    "notes": "F21R-SCPG, pre-glued belted slick, 2 pcs, red sidewall sticker; 40mm-wide wheel.",
+    "compound_note": "For low-grip carpet.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 40mm wheel",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "formula",
+    "model": "F104 Rubber Tires Front",
+    "compound": "Hard",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.tamiya.com/english/products/product_info_ex.html?genre_item=e_3202",
+    "product_url": "https://www.tamiya.com/english/products/54198/index.html",
+    "notes": "Hop-up 54198 (1 pair); some US shops call it \"Type A\". Fits Tamiya mesh wheels for rubber tyres (51398, 54201, 54527, 54528).",
+    "compound_note": "Harder than kit-standard; for high-grip surfaces. Tamiya suggests pairing with the 54199 soft rears when the track is cold.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front (Tamiya F104)",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "formula",
+    "model": "F104 Rubber Tires Front",
+    "compound": "Standard",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.tamiya.com/english/products/product_info_ex.html?genre_item=e_3202",
+    "product_url": "https://www.tamiya.com/english/products/51399/index.html",
+    "notes": "Kit-standard F104 front rubber tyre, sold as spare part 51399 (1 pair); Michael's RC Hobbies calls it \"Type B\". Fits Tamiya mesh wheels for rubber tyres (51398, 54201, 54527, 54528).",
+    "compound_note": "Kit-standard compound; 54198 is harder.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front (Tamiya F104)",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "formula",
+    "model": "F104 Rubber Tires Rear",
+    "compound": "Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.tamiya.com/english/products/product_info_ex.html?genre_item=e_3202",
+    "product_url": "https://www.tamiya.com/english/products/54199/index.html",
+    "notes": "Hop-up 54199 (1 pair); some US shops call it \"Type A\". Fits Tamiya mesh wheels for rubber tyres (51398, 54201, 54527, 54528).",
+    "compound_note": "Softer than kit-standard; for when the rear lacks grip. Tamiya suggests pairing with the 54198 hard fronts when the track is cold.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear (Tamiya F104)",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "formula",
+    "model": "F104 Rubber Tires Rear",
+    "compound": "Standard",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.tamiya.com/english/products/product_info_ex.html?genre_item=e_3202",
+    "product_url": "https://www.tamiya.com/english/products/51400/index.html",
+    "notes": "Kit-standard F104 rear rubber tyre, sold as spare part 51400 (1 pair). Fits Tamiya mesh wheels for rubber tyres (51398, 54201, 54527, 54528).",
+    "compound_note": "Kit-standard compound; 54199 is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear (Tamiya F104)",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "formula",
+    "model": "F104 Sponge Tires (4430) Front",
+    "compound": "A",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.tamiya.com/english/products/product_info_ex.html?genre_item=e_3202",
+    "product_url": "https://www.tamiya.com/english/products/51384/index.html",
+    "notes": "Sponge tyre, spare part 51384 (1 pair). Fits Tamiya F104 sponge-tyre wheels (51378, 54400, 54525, 54526).",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front (Tamiya F104)",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "formula",
+    "model": "F104 Sponge Tires (4430) Front",
+    "compound": "B",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.tamiya.com/english/products/product_info_ex.html?genre_item=e_3202",
+    "product_url": "https://www.tamiya.com/english/products/54167/index.html",
+    "notes": "Sponge tyre, hop-up 54167 (1 pair), an alternative to the A type. Fits Tamiya F104 sponge-tyre wheels (51378, 54400, 54525, 54526).",
+    "compound_note": "Tamiya only says to use the different types to suit conditions.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front (Tamiya F104)",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "formula",
+    "model": "F104 Sponge Tires (4435) Rear",
+    "compound": "A",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.tamiya.com/english/products/product_info_ex.html?genre_item=e_3202",
+    "product_url": "https://www.tamiya.com/english/products/51385/index.html",
+    "notes": "Sponge tyre, spare part 51385 (1 pair). Fits Tamiya F104 sponge-tyre wheels (51378, 54400, 54525, 54526).",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear (Tamiya F104)",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "formula",
+    "model": "F104 Sponge Tires (4435) Rear",
+    "compound": "B",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.tamiya.com/english/products/product_info_ex.html?genre_item=e_3202",
+    "product_url": "https://www.tamiya.com/english/products/54168/index.html",
+    "notes": "Sponge tyre, hop-up 54168 (1 pair), an alternative to the A type. Fits Tamiya F104 sponge-tyre wheels (51378, 54400, 54525, 54526).",
+    "compound_note": "Tamiya only says to use the different types to suit conditions.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear (Tamiya F104)",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "formula",
+    "model": "RC F1 Tire Front",
+    "compound": "Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "http://rcf1blog.blogspot.com/2012/07/new-tamiya-f1-tires.html",
+    "product_url": "https://www.tamiyausa.com/shop/tiresspareoption/rc-f1-tire-front-soft/",
+    "notes": "Tamiya USA item 1031 (TCS series), a rubber tyre that fits the F104 sponge-tyre wheels 51378 and 54400. Tamiya USA's page blocks automated reads; details from Tamiya USA's 2012 announcement quoted on rc.F1.blog.",
+    "compound_note": "Soft front compound for steering.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front (Tamiya F104)",
+    "discontinued": false
+  },
+  {
+    "brand": "Tamiya",
+    "discipline": "formula",
+    "model": "RC F1 Tire Rear",
+    "compound": "Hard",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "http://rcf1blog.blogspot.com/2012/07/new-tamiya-f1-tires.html",
+    "product_url": null,
+    "notes": "Tamiya USA item 1032 (TCS series), a rubber tyre that fits the F104 sponge-tyre wheels 51378 and 54400. Details from Tamiya USA's 2012 announcement quoted on rc.F1.blog; current availability not confirmed.",
+    "compound_note": "Hard rear compound: traction with long life.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear (Tamiya F104)",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Powers",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "Hard (42R)",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.amainhobbies.com/team-powers-f1-premounted-front-rubber-tires-black-2-tprfpgf1bf-p/p1300450",
+    "product_url": "https://www.asiatees.com/display?brand=Ana-Digit+Ltd&model=All&id=189570",
+    "notes": "TP-FPG_F1BF, pre-glued on black wheels with a hard foam insert, 2 pcs. AMain's text lists 42R hard but its variant menu only offers 34R and 38R.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Powers",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "Medium (38R)",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.amainhobbies.com/team-powers-f1-premounted-front-rubber-tires-black-2-tprfpgf1bf-p/p1300450",
+    "product_url": "https://www.asiatees.com/display?brand=Ana-Digit+Ltd&model=All&id=189571",
+    "notes": "TP-FPG_F1BF (AMain TPRFPGF1BF), pre-glued on black wheels with a hard foam insert, 2 pcs.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Powers",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "Soft (34R)",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.amainhobbies.com/team-powers-f1-premounted-front-rubber-tires-black-2-tprfpgf1bf-p/p1300450",
+    "product_url": "https://www.asiatees.com/display?brand=Ana-Digit+Ltd&model=All&id=189572",
+    "notes": "TP-FPG_F1BF (AMain TPRFPGF1BF), pre-glued on black wheels with a hard foam insert, 2 pcs.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Powers",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "Medium (36R)",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.amainhobbies.com/team-powers-f1-premounted-rear-rubber-tires-black-2-tprfpgf1br-p/p1300451",
+    "product_url": "https://www.asiatees.com/display?brand=Ana-Digit+Ltd&model=All&id=189573",
+    "notes": "TP-FPG_F1BR (AMain TPRFPGF1BR), pre-glued on black wheels with a soft foam insert, 2 pcs.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Powers",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "Soft (32R)",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.amainhobbies.com/team-powers-f1-premounted-rear-rubber-tires-black-2-tprfpgf1br-p/p1300451",
+    "product_url": "https://www.asiatees.com/display?brand=Ana-Digit+Ltd&model=All&id=189574",
+    "notes": "TP-FPG_F1BR (AMain TPRFPGF1BR), pre-glued on black wheels with a soft foam insert, 2 pcs. AMain's variant menu and Michael's RC Hobbies say 32R; AMain's text says 34R, and one Michael's title calls 32R super soft.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Saxo",
+    "discipline": "formula",
+    "model": "F1 Front Foam",
+    "compound": "35 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://naughtyboyrc.com/collections/f1-tires",
+    "product_url": "https://naughtyboyrc.com/products/team-saxo-ts01199-1-10-pre-glued-foam-tire-front-35sh-2-rc-car-racing-part",
+    "notes": "TS01199, pre-glued foam, 2 pcs, 59mm diameter, 30mm wide; fits Team Saxo F1-200-V2 / MF-1-200 and other bearing-type cars.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 59x30mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Saxo",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "Medium",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://naughtyboyrc.com/collections/f1-tires",
+    "product_url": "https://naughtyboyrc.com/products/team-saxo-1-10-f1-rc-car-front-tires-pre-mounted-2-black-rim-bearing-rubber",
+    "notes": "Pre-mounted on bearing-type wheels, 2 pcs: TS01211-M-RB (black) or TS01211-M-RW (white).",
+    "compound_note": "Premium touring-car rubber on nylon wheels; sidewalls made for traction on low and medium grip.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Saxo",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "Medium-Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://naughtyboyrc.com/collections/f1-tires",
+    "product_url": "https://naughtyboyrc.com/products/team-saxo-1-10-f1-rc-car-front-tires-pre-mounted-2-black-rim-bearing-rubber",
+    "notes": "Pre-mounted on bearing-type wheels, 2 pcs: TS01211-MS-RB (black) or TS01211-MS-RW (white).",
+    "compound_note": "Premium touring-car rubber on nylon wheels; sidewalls made for traction on low and medium grip.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Saxo",
+    "discipline": "formula",
+    "model": "F1 Front",
+    "compound": "Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://naughtyboyrc.com/collections/f1-tires",
+    "product_url": "https://naughtyboyrc.com/products/team-saxo-1-10-f1-rc-car-front-tires-pre-mounted-2-black-rim-bearing-rubber",
+    "notes": "Pre-mounted on bearing-type wheels, 2 pcs: TS01211-S-RB (black) or TS01211-S-RW (white).",
+    "compound_note": "Premium touring-car rubber on nylon wheels; sidewalls made for traction on low and medium grip.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Saxo",
+    "discipline": "formula",
+    "model": "F1 Rear Foam",
+    "compound": "25 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://naughtyboyrc.com/collections/f1-tires",
+    "product_url": "https://naughtyboyrc.com/products/team-saxo-ts01198-1-10-pre-glued-foam-tire-rear-25sh-2-rc-car-racing-part",
+    "notes": "TS01198, pre-glued foam on 14mm-hex wheels, 2 pcs, 60mm diameter, 44mm wide, 6mm foam depth.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 60x44mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Saxo",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "Medium-Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://naughtyboyrc.com/collections/f1-tires",
+    "product_url": "https://naughtyboyrc.com/products/team-saxo-1-10-f1-rc-car-rear-tires-pre-mounted-2-black-rim-14mm-hex-rubber",
+    "notes": "Pre-mounted on 14mm-hex wheels, wide profile, 2 pcs: TS01212-MS-RB (black) or TS01212-MS-RW (white).",
+    "compound_note": "Premium touring-car rubber on nylon wheels; sidewalls made for traction on low and medium grip.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 14mm hex",
+    "discontinued": false
+  },
+  {
+    "brand": "Team Saxo",
+    "discipline": "formula",
+    "model": "F1 Rear",
+    "compound": "Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://naughtyboyrc.com/collections/f1-tires",
+    "product_url": "https://naughtyboyrc.com/products/team-saxo-1-10-f1-rc-car-rear-tires-pre-mounted-2-black-rim-14mm-hex-rubber",
+    "notes": "Pre-mounted on 14mm-hex wheels, wide profile, 2 pcs: TS01212-S-RB (black) or TS01212-S-RW (white).",
+    "compound_note": "Premium touring-car rubber on nylon wheels; sidewalls made for traction on low and medium grip.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear, 14mm hex",
+    "discontinued": false
+  },
+  {
+    "brand": "Volante",
+    "discipline": "formula",
+    "model": "F1 Front Rubber Slick",
+    "compound": "Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "http://www.volantetire.com/volante/main.php?pidx=1484",
+    "product_url": "https://www.rcmaker.com.au/products/copy-of-volante-f1-front-rubber-slick-tires-pre-glued",
+    "notes": "VF1-FH, pre-glued, 2 pcs, gold; Volante names it the Asphalt Hard compound.",
+    "compound_note": "For higher traction or higher temperatures, for consistency; Volante suggests hard front with medium-soft rear when hot.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Volante",
+    "discipline": "formula",
+    "model": "F1 Front Rubber Slick",
+    "compound": "Medium",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "http://www.volantetire.com/volante/main.php?pidx=1484",
+    "product_url": "https://www.mibosport.com/en/volante-f1-front-rubber-slick-tires-medium-compound-preglued-blue-2pcs",
+    "notes": "VF1-FM, pre-glued, 2 pcs, blue.",
+    "compound_note": "For lower traction or lower temperatures, for steering; Volante suggests medium front with soft rear in cooler conditions.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Volante",
+    "discipline": "formula",
+    "model": "F1 Front Rubber Slick",
+    "compound": "Medium Hard",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "http://www.volantetire.com/volante/main.php?pidx=1484",
+    "product_url": "https://www.rcmaker.com.au/products/copy-of-volante-f1-front-rubber-slick-tires-pre-glued",
+    "notes": "VF1-FMH, pre-glued, 2 pcs, purple.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Volante",
+    "discipline": "formula",
+    "model": "F1 Front Rubber Slick",
+    "compound": "Medium Soft",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "http://www.volantetire.com/volante/main.php?pidx=1484",
+    "product_url": "https://www.mibosport.com/en/volante-f1-front-rubber-slick-tires-medium-soft-compound-preglued-green-2pcs",
+    "notes": "VF1-FMS, pre-glued, 2 pcs, green. Speedy RC and rccarshop list it as the carpet (AOC carpet spec) front.",
+    "compound_note": "RC Maker (Volante text) says it pairs best with the Carpet Soft rear (VF1-CRS).",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Volante",
+    "discipline": "formula",
+    "model": "F1 Front Rubber Slick",
+    "compound": "Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "http://www.volantetire.com/volante/main.php?pidx=1484",
+    "product_url": "https://www.rcmaker.com.au/products/copy-of-volante-f1-front-rubber-slick-tires-pre-glued",
+    "notes": "VF1-FS, pre-glued, 2 pcs, yellow; low-profile slick on black multi-spoke wheels.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Volante",
+    "discipline": "formula",
+    "model": "F1 Rear Rubber Slick",
+    "compound": "Asphalt Hyper Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "http://www.volantetire.com/volante/main.php?pidx=1483",
+    "product_url": "https://www.mibosport.com/en/volante-f1-rear-rubber-slick-tires-asphalt-hyper-super-soft-compound-preglued-2pink-2pcs",
+    "notes": "VF1-HARSS, pre-glued, 2 pcs, double pink.",
+    "compound_note": "For lower traction or lower temperatures, for rear grip.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Volante",
+    "discipline": "formula",
+    "model": "F1 Rear Rubber Slick",
+    "compound": "Asphalt Medium Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "http://www.volantetire.com/volante/main.php?pidx=1483",
+    "product_url": "https://www.mibosport.com/en/volante-f1-rear-rubber-slick-tires-asphalt-medium-soft-compound-preglued-green-2pcs",
+    "notes": "VF1-ARMS, pre-glued, 2 pcs, green.",
+    "compound_note": "For higher traction or higher temperatures, for more steering.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Volante",
+    "discipline": "formula",
+    "model": "F1 Rear Rubber Slick",
+    "compound": "Asphalt Revolution Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "http://www.volantetire.com/volante/main.php?pidx=1483",
+    "product_url": "https://www.mibosport.com/en/volante-f1-rear-rubber-slick-tires-asphalt-revolution-soft-compound-preglued-white.2pcs",
+    "notes": "VF1-RARSS, pre-glued, 2 pcs, white; marked NEW on Volante's site. Volante does not place it on the soft-to-hard ladder.",
+    "compound_note": "For lower traction or lower temperatures, for rear grip (RC Maker, Volante text).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Volante",
+    "discipline": "formula",
+    "model": "F1 Rear Rubber Slick",
+    "compound": "Asphalt Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "http://www.volantetire.com/volante/main.php?pidx=1483",
+    "product_url": "https://www.mibosport.com/en/volante-f1-rear-rubber-slick-tires-asphalt-soft-compound-preglued-yellow-2pcs",
+    "notes": "VF1-ARS, pre-glued, 2 pcs, yellow.",
+    "compound_note": "For lower traction or lower temperatures, for rear grip.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Volante",
+    "discipline": "formula",
+    "model": "F1 Rear Rubber Slick",
+    "compound": "Asphalt Super Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "http://www.volantetire.com/volante/main.php?pidx=1483",
+    "product_url": "https://www.mibosport.com/en/volante-f1-rear-rubber-slick-tires-asphalt-super-soft-compound-preglued-pink-2pcs",
+    "notes": "VF1-ARSS, pre-glued, 2 pcs, pink.",
+    "compound_note": "For lower traction or lower temperatures, for rear grip.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Volante",
+    "discipline": "formula",
+    "model": "F1 Rear Rubber Slick",
+    "compound": "Carpet Soft",
+    "surface": "carpet",
+    "tire_type": "rubber",
+    "source_url": "http://www.volantetire.com/volante/main.php?pidx=1483",
+    "product_url": "https://www.mibosport.com/en/volante-f1-rear-rubber-slick-tires-carpet-soft-compound-preglued-red-2pcs",
+    "notes": "VF1-CRS, pre-glued, 2 pcs, red.",
+    "compound_note": "For all carpet conditions; best with the Medium Soft front (VF1-FMS).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "WRC Racing",
+    "discipline": "formula",
+    "model": "F1 Front Foam",
+    "compound": "45 Shore",
+    "surface": null,
+    "tire_type": "foam",
+    "source_url": "https://www.the-border.com/product-category/tyres-wheels-accessory/110-onroad-wgtgt10-f1/",
+    "product_url": "https://www.the-border.com/product/wrc-racing-f1-front-tyres-foam-45shore-gf1a-45/",
+    "notes": "GF1A-45, foam on black wheels, 62mm diameter, 33mm wide; handmade and glued in Italy by World Racing Car. No other WRC F1 grades were found.",
+    "compound_note": null,
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front, 62x33mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Front Carpet",
+    "compound": "Hard",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86070&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101818 (listed \"Hard\"). Carpet version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Front Carpet",
+    "compound": "Medium",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86069&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101817 (listed \"Med\"). Carpet version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Front Carpet",
+    "compound": "Soft",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86068&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101816 (listed \"Soft\"). Carpet version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Front",
+    "compound": "Hard",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86064&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101812 (listed \"Hard\"). Non-carpet version; RedRC's 2011 launch story (seen in search results only) calls it the tarmac version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Front",
+    "compound": "Medium",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86063&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101811 (listed \"Med\"). Non-carpet version; RedRC's 2011 launch story (seen in search results only) calls it the tarmac version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Front",
+    "compound": "Soft",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101810 (listed \"Soft\"). Non-carpet version; RedRC's 2011 launch story (seen in search results only) calls it the tarmac version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Rear Carpet",
+    "compound": "Hard",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86073&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101821 (listed \"Hard\"). Carpet version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Rear Carpet",
+    "compound": "Medium",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86072&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101820 (listed \"Med\"). Carpet version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Rear Carpet",
+    "compound": "Soft",
+    "surface": "carpet",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86071&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101819 (listed \"Soft\"). Carpet version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "carpet"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Rear",
+    "compound": "Hard",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86067&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101815 (listed \"Hard\"). Non-carpet version; RedRC's 2011 launch story (seen in search results only) calls it the tarmac version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Rear",
+    "compound": "Medium",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86066&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101814 (listed \"Med\"). Non-carpet version; RedRC's 2011 launch story (seen in search results only) calls it the tarmac version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "formula",
+    "model": "ITA F1/F103 Rear",
+    "compound": "Soft",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://asiatees.com/display?brand=Miscellaneous&id=86062&model=All&pid=1",
+    "product_url": "https://asiatees.com/display?brand=Miscellaneous&id=86065&model=All&pid=1",
+    "notes": "Foam tyre on rim for 1/10 F1 and Tamiya F103-type cars, Xceed 101813 (listed \"Soft\"). Non-carpet version; RedRC's 2011 launch story (seen in search results only) calls it the tarmac version. Range dates from 2011; current stock not confirmed.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Yokomo",
+    "discipline": "formula",
+    "model": "CRT Front (YRF 001)",
+    "compound": "Medium",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.hrcspain.com/en/199-yrf-formula",
+    "product_url": "https://www.hrcspain.com/en/yrf-formula/18044-yokomo-yf-27tm-front-pre-mounted-crt-tire-mediumfor-yrf-001-series.html",
+    "notes": "YF-27TM, pre-mounted, for the YRF 001 series. Out of stock at HRC Spain; older generation.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Yokomo",
+    "discipline": "formula",
+    "model": "CRT Front (YRF 001W)",
+    "compound": "Medium",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.hrcspain.com/en/199-yrf-formula",
+    "product_url": "https://www.hrcspain.com/en/yrf-formula/18055-yokomo-yf-3660m-front-medium-crt-tire-2pcs-for-yrf-001w.html",
+    "notes": "YF-3660M, 2 pcs, for the YRF 001W. Older generation.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Yokomo",
+    "discipline": "formula",
+    "model": "CRT Rear (YRF 001)",
+    "compound": "Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.hrcspain.com/en/199-yrf-formula",
+    "product_url": "https://www.hrcspain.com/en/yrf-formula/18045-yokomo-yf-28ts-rearsoft-crt-tire-mounted-f1.html",
+    "notes": "Pre-mounted YF-28TS; tyres only YF-3621S (2 pcs). For the YRF 001 series; older generation.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Yokomo",
+    "discipline": "formula",
+    "model": "CRT Rear (YRF 001)",
+    "compound": "Super Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.hrcspain.com/en/199-yrf-formula",
+    "product_url": "https://www.hrcspain.com/en/yrf-formula/18046-yokomo-yf-28tss-rear-super-soft-crt-tire-mounted-f1.html",
+    "notes": "Pre-mounted YF-28TSS; tyres only YF-3621SS (2 pcs). For the YRF 001 series; older generation.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Yokomo",
+    "discipline": "formula",
+    "model": "F1 Front Belted Slick",
+    "compound": "Medium",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.hrcspain.com/en/199-yrf-formula",
+    "product_url": "https://www.hrcspain.com/en/yrf-formula/18056-yokomo-yf-36fm-front-belted-slik-tire-medium-f1.html",
+    "notes": "YF-36FM, for the YRF Formula 001 series (Mibosport also lists it).",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Yokomo",
+    "discipline": "formula",
+    "model": "F1 Front Belted Slick",
+    "compound": "Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.hrcspain.com/en/199-yrf-formula",
+    "product_url": "https://www.hrcspain.com/en/yrf-formula/18057-yokomo-yf-36fs-front-belted-slik-tire-soft-f1.html",
+    "notes": "YF-36FS, for the YRF Formula 001 series.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "front"
+      }
+    ],
+    "size": "1/10 F1 front",
+    "discontinued": false
+  },
+  {
+    "brand": "Yokomo",
+    "discipline": "formula",
+    "model": "F1 Rear Belted Slick",
+    "compound": "Soft",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.hrcspain.com/en/199-yrf-formula",
+    "product_url": "https://www.hrcspain.com/en/yrf-formula/18058-yokomo-yf-36rs-rear-belted-slik-tire-soft-f1.html",
+    "notes": "YF-36RS, for the YRF Formula 001 series.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Yokomo",
+    "discipline": "formula",
+    "model": "F1 Rear Belted Slick",
+    "compound": "Soft, heat-resistant inner (RS2)",
+    "surface": null,
+    "tire_type": "rubber",
+    "source_url": "https://www.hrcspain.com/en/199-yrf-formula",
+    "product_url": "https://www.hrcspain.com/en/yrf-formula/21111-rear-belted-slick-tire-soft-with-heat-regist-inner-foam.html",
+    "notes": "YF-36RS2: the soft rear with a heat-resistant inner foam.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [],
+    "fits": [
+      {
+        "class": "formula",
+        "position": "rear"
+      }
+    ],
+    "size": "1/10 F1 rear",
+    "discontinued": false
+  }
+]

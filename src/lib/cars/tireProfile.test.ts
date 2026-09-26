@@ -35,16 +35,19 @@ test("electric touring shops the touring list and keeps the single-tire form", (
   assert.deepEqual(tireProfileForDiscipline("touring"), tireProfileForDiscipline("touring~electric"));
 });
 
-test("nitro touring runs foam: front and rear, each with its diameter, over the whole list", () => {
+test("nitro touring runs foam: front and rear, each with its diameter, over the foam list", () => {
   // Founder call 2026-09-25 on the Infinity IF15II: "one-tenth nitro uses foam tires".
   assert.deepEqual(tireProfileForDiscipline("touring~nitro"), {
-    bucket: null,
+    bucket: "touring-foam",
     split: true,
     boxes: ["diameter", "mods"],
     frontRearSwitch: false,
     foldPrep: false,
   });
-  assert.deepEqual(tireProfileForDiscipline("touring~nitro"), tireProfileForDiscipline("pan-12th~electric"));
+  assert.deepEqual(
+    { ...tireProfileForDiscipline("touring~nitro"), bucket: null },
+    { ...tireProfileForDiscipline("pan-12th~electric"), bucket: null }
+  );
 });
 
 test("1/10 off-road shops the off-road list and logs front and rear with insert and wheel", () => {
@@ -72,25 +75,38 @@ test("power changes the tires on a touring car only", () => {
   }
 });
 
-test("1/8 off-road gets the off-road step but no filter — nothing is imported for it yet", () => {
-  for (const d of ["buggy-8th-4wd~nitro", "buggy-8th-2wd~electric", "truggy-8th~nitro", "other-offroad~electric~Monster"]) {
+test("1/8 off-road gets the off-road step over its own list; an unnamed off-road class the whole list", () => {
+  for (const d of ["buggy-8th-4wd~nitro", "buggy-8th-2wd~electric", "truggy-8th~nitro"]) {
     assert.deepEqual(
       tireProfileForDiscipline(d),
-      { bucket: null, split: true, boxes: ["insert", "wheel", "mods"], frontRearSwitch: false, foldPrep: true },
+      { bucket: "offroad-8th", split: true, boxes: ["insert", "wheel", "mods"], frontRearSwitch: false, foldPrep: true },
       d
     );
   }
+  assert.deepEqual(tireProfileForDiscipline("other-offroad~electric~Monster"), {
+    bucket: null,
+    split: true,
+    boxes: ["insert", "wheel", "mods"],
+    frontRearSwitch: false,
+    foldPrep: true,
+  });
   // Retired ids a pre-2026-09-03 row can still hold.
-  assert.equal(tireProfileForDiscipline("buggy-8th").split, true);
-  assert.equal(tireProfileForDiscipline("truggy").split, true);
+  assert.equal(tireProfileForDiscipline("buggy-8th").bucket, "offroad-8th");
+  assert.equal(tireProfileForDiscipline("truggy").bucket, "offroad-8th");
 });
 
-test("pan cars, formula and 1/8 on-road log front and rear, each with its diameter", () => {
-  // Founder call 2026-09-25: the boxes their own setup sheets ask for.
-  for (const d of ["pan-12th~electric", "pan-10th~electric", "pan-8th~nitro", "formula~electric", "gt-8th~nitro"]) {
+test("pan cars, formula and 1/8 on-road log front and rear, each with its diameter, over their own list", () => {
+  // Founder call 2026-09-25: the boxes their own setup sheets ask for. Lists 2026-09-26.
+  for (const [d, bucket] of [
+    ["pan-12th~electric", "pan"],
+    ["pan-10th~electric", "pan"],
+    ["pan-8th~nitro", "onroad-8th"],
+    ["gt-8th~nitro", "onroad-8th"],
+    ["formula~electric", "formula"],
+  ] as const) {
     assert.deepEqual(
       tireProfileForDiscipline(d),
-      { bucket: null, split: true, boxes: ["diameter", "mods"], frontRearSwitch: false, foldPrep: false },
+      { bucket, split: true, boxes: ["diameter", "mods"], frontRearSwitch: false, foldPrep: false },
       d
     );
   }

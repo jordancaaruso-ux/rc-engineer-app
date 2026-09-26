@@ -28,9 +28,10 @@ export type TireTypeOption = {
  *
  * Raising it was the stopgap. Since 2026-09-19 the list is also cut to what the
  * car races (`bucket`), so a touring driver downloads ~190 rows, not the lot —
- * the limit is what a car nothing can place still needs.
+ * the limit is what a car nothing can place still needs. 5000 since the per-class
+ * lists of 2026-09-26 took the whole catalog to about 2,000 (`TIRE_CATALOG_MAX`).
  */
-const CATALOG_LIMIT = 2000;
+const CATALOG_LIMIT = 5000;
 
 /**
  * Tire type picker — a `PickerSheet`, because the compound list is long enough

@@ -32,19 +32,35 @@ import type { TireEndBox } from "@/lib/tires/tireFitment";
  * Founder call, 2026-09-25, on the Infinity IF15II: "one-tenth nitro uses foam tires … it should
  * have front tires different to rear tires." So 1/10 NITRO touring is the one class where power
  * changes the tires: foam, front and rear, each with its diameter, like the pan cars (both IF15II
- * sheets print a front, a rear and a diameter). It shops the whole list, because the touring list
- * is all rubber.
+ * sheets print a front, a rear and a diameter). It shops its own foam list: the touring list is all
+ * rubber.
  *
  * The `bucket` is the COARSE catalog slice (`TireType.discipline`), not the race class — founder
  * call 2026-09-18: "1/10 offroad is fine for now, they can search for stuff". A class whose tires
  * nobody has imported yet gets `bucket: null`, which means the whole list, exactly as before. An
- * empty bucket would be worse than no filter: the driver would open the picker onto nothing.
+ * empty bucket would be worse than no filter: the driver would open the picker onto nothing, so
+ * the catalog read fails open while a bucket holds no imported rows (`tireCatalogScopeWhere`).
+ *
+ * Founder "fix all of these issues", 2026-09-26, over the review's "pan cars, 1/12, formula,
+ * nitro and 1/8 cars pick from buggy and touring tires": each of those got its own list, swept
+ * from the makers' and big shops' pages the way the 1/10 off-road list was (`seeds/tires_*.json`,
+ * `scripts/import-tire-lists.ts`). 1/8 off-road (buggy and truggy share one list, like 1/10 buggy
+ * and short course), 1/8 on-road (track cars and GT), the pan cars (1/12 and 1/10), formula, and
+ * 1/10 touring foam for nitro touring.
  *
  * Pure on purpose — the form, the API and the tests all ask the same question.
  */
 
 /** The values `TireType.discipline` holds. Widen this when a new sweep is imported. */
-export const TIRE_BUCKETS = ["touring", "offroad-10th"] as const;
+export const TIRE_BUCKETS = [
+  "touring",
+  "offroad-10th",
+  "offroad-8th",
+  "onroad-8th",
+  "pan",
+  "formula",
+  "touring-foam",
+] as const;
 export type TireBucket = (typeof TIRE_BUCKETS)[number];
 
 export type TireProfile = {
@@ -92,11 +108,13 @@ const OFFROAD_10TH: TireProfile = {
   frontRearSwitch: false,
   foldPrep: true,
 };
-/** Off-road, but no tires imported for the scale yet — front/rear form over the whole list. */
+/** 1/8 buggy and truggy: the 1/10 off-road step over their own list. */
+const OFFROAD_8TH: TireProfile = { ...OFFROAD_10TH, bucket: "offroad-8th" };
+/** Off-road with no list of its own ("Other") — front/rear form over the whole list. */
 const OFFROAD_UNCATALOGUED: TireProfile = { ...OFFROAD_10TH, bucket: null };
 /**
  * 1/12, 1/10 and 1/8 pan, formula, 1/8 on-road and 1/10 nitro touring: front and rear, each
- * trued to a diameter.
+ * trued to a diameter. Each shops its own list (below).
  */
 const ONROAD_FRONT_REAR: TireProfile = {
   bucket: null,
@@ -105,9 +123,15 @@ const ONROAD_FRONT_REAR: TireProfile = {
   frontRearSwitch: false,
   foldPrep: false,
 };
+const PAN: TireProfile = { ...ONROAD_FRONT_REAR, bucket: "pan" };
+/** 1/8 on-road track cars and 1/8 GT: one list, as the catalog files both classes' cars alike. */
+const ONROAD_8TH: TireProfile = { ...ONROAD_FRONT_REAR, bucket: "onroad-8th" };
+const FORMULA: TireProfile = { ...ONROAD_FRONT_REAR, bucket: "formula" };
+/** 1/10 nitro touring: the touring list is all rubber, so foam has its own. */
+const TOURING_FOAM: TireProfile = { ...ONROAD_FRONT_REAR, bucket: "touring-foam" };
 /**
  * 1/5 GT: no chassis in the app to read a sheet from. Front and rear (the widths differ), and
- * Modifications only — a guess to confirm with Jordan, not a sheet's answer.
+ * Modifications only — a guess to confirm with Jordan, not a sheet's answer. No list either.
  */
 const GT_5TH: TireProfile = { ...ONROAD_FRONT_REAR, boxes: ["mods"] };
 
@@ -119,12 +143,12 @@ const PROFILE_BY_CLASS: Readonly<Record<string, TireProfile>> = {
   // Onroad
   touring: TOURING,
   fwd: TOURING,
-  "pan-10th": ONROAD_FRONT_REAR,
-  "pan-12th": ONROAD_FRONT_REAR,
-  "gt-8th": ONROAD_FRONT_REAR,
-  "pan-8th": ONROAD_FRONT_REAR,
+  "pan-10th": PAN,
+  "pan-12th": PAN,
+  "gt-8th": ONROAD_8TH,
+  "pan-8th": ONROAD_8TH,
   "gt-5th": GT_5TH,
-  formula: ONROAD_FRONT_REAR,
+  formula: FORMULA,
   "other-onroad": NO_TIRE_PROFILE,
   // Offroad
   "buggy-2wd": OFFROAD_10TH,
@@ -132,13 +156,13 @@ const PROFILE_BY_CLASS: Readonly<Record<string, TireProfile>> = {
   "truggy-10th": OFFROAD_10TH,
   "short-course": OFFROAD_10TH,
   "stadium-truck": OFFROAD_10TH,
-  "truggy-8th": OFFROAD_UNCATALOGUED,
-  "buggy-8th-2wd": OFFROAD_UNCATALOGUED,
-  "buggy-8th-4wd": OFFROAD_UNCATALOGUED,
+  "truggy-8th": OFFROAD_8TH,
+  "buggy-8th-2wd": OFFROAD_8TH,
+  "buggy-8th-4wd": OFFROAD_8TH,
   "other-offroad": OFFROAD_UNCATALOGUED,
   // Retired ids a pre-2026-09-03 row can still hold (see `LEGACY_CLASS_LABELS`).
-  "buggy-8th": OFFROAD_UNCATALOGUED,
-  truggy: OFFROAD_UNCATALOGUED,
+  "buggy-8th": OFFROAD_8TH,
+  truggy: OFFROAD_8TH,
   gt: NO_TIRE_PROFILE,
   "m-chassis": NO_TIRE_PROFILE,
   rally: NO_TIRE_PROFILE,
@@ -151,7 +175,7 @@ const PROFILE_BY_CLASS: Readonly<Record<string, TireProfile>> = {
  */
 const PROFILE_BY_CLASS_AND_POWER: Readonly<Record<string, TireProfile>> = {
   // 1/10 nitro touring runs foam, front and rear (founder call 2026-09-25, header above).
-  "touring~nitro": ONROAD_FRONT_REAR,
+  "touring~nitro": TOURING_FOAM,
 };
 
 /**

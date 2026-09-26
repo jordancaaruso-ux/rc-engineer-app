@@ -10,7 +10,11 @@ import {
 test("only a bucket the catalog holds is accepted from a query string", () => {
   assert.equal(parseTireBucket("touring"), "touring");
   assert.equal(parseTireBucket(" offroad-10th "), "offroad-10th");
-  assert.equal(parseTireBucket("offroad-8th"), null);
+  // The per-class lists of 2026-09-26.
+  for (const list of ["offroad-8th", "onroad-8th", "pan", "formula", "touring-foam"]) {
+    assert.equal(parseTireBucket(list), list);
+  }
+  assert.equal(parseTireBucket("gt-5th"), null);
   // A car's discipline is NOT a bucket — the two vocabularies only look alike.
   assert.equal(parseTireBucket("touring~electric"), null);
   assert.equal(parseTireBucket(""), null);

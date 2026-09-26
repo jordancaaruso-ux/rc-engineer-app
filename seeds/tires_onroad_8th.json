@@ -1,0 +1,5640 @@
+[
+  {
+    "brand": "BSR Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam Low Profile",
+    "compound": "Team Purple",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.michaelsrchobbies.com/tires/18-on-road-tires/1-8-gt-foam-rubber-tires/",
+    "product_url": "https://www.michaelsrchobbies.com/bsrc8034-b-lp-18-team-purple-mounted-low-profile-g.html",
+    "notes": "Low-profile 1/8 GT foam on dish wheels; SKUs BSRC8034-B-LP (black dish).",
+    "compound_note": "Colour-coded foam compound; BSR does not publish a shore number for it.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT, low profile",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam Low Profile",
+    "compound": "XX Pink",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.michaelsrchobbies.com/tires/18-on-road-tires/1-8-gt-foam-rubber-tires/",
+    "product_url": "https://www.michaelsrchobbies.com/bsrc8018-lp-18-double-pink-low-profile-mounted-gt.html",
+    "notes": "Low-profile 1/8 GT foam on dish wheels; SKUs BSRC8018-LP (white dish) / BSRC8018-B-LP (black dish); sold as \"Double Pink\".",
+    "compound_note": "Colour-coded foam compound; BSR does not publish a shore number for it.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT, low profile",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "25 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-bxrc8223-b-p/p1824916",
+    "product_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-25-shore-bxrc8225-b/p1824916?v=1814210",
+    "notes": "1/8 GT foam; SKUs BXRC8225-B / BXRC8225-Y. Pre-mounted pair on 17mm-hex wheels (black -B or yellow -Y; older BSRC80xx on white or black dish wheels). AMain lists them under 1/8 GT on-road; BSR also pitches them for speed runs.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-bxrc8223-b-p/p1824916",
+    "product_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-30-shore-bxrc8230-b/p1824916?v=1814212",
+    "notes": "1/8 GT foam; SKUs BXRC8230-B; older BSRC8030 / BSRC8030-B (dish). Pre-mounted pair on 17mm-hex wheels (black -B or yellow -Y; older BSRC80xx on white or black dish wheels). AMain lists them under 1/8 GT on-road; BSR also pitches them for speed runs.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-bxrc8223-b-p/p1824916",
+    "product_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-35-shore-bxrc8235-b/p1824916?v=1814213",
+    "notes": "1/8 GT foam; SKUs BXRC8235-B / BXRC8235-Y; older BSRC8035-B (dish). Pre-mounted pair on 17mm-hex wheels (black -B or yellow -Y; older BSRC80xx on white or black dish wheels). AMain lists them under 1/8 GT on-road; BSR also pitches them for speed runs.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "Gold",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-bxrc8223-b-p/p1824916",
+    "product_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-gold-bxrc8222-b/p1824916?v=1814197",
+    "notes": "1/8 GT foam, colour-coded compound; SKUs BXRC8222-B / BXRC8222-Y. Pre-mounted pair on 17mm-hex wheels (black -B or yellow -Y; older BSRC80xx on white or black dish wheels). AMain lists them under 1/8 GT on-road; BSR also pitches them for speed runs.",
+    "compound_note": "Colour-coded foam compound; BSR does not publish a shore number for it.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "Orange",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-bxrc8223-b-p/p1824916",
+    "product_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-orange-bxrc8223-b/p1824916?v=1814198",
+    "notes": "1/8 GT foam, colour-coded compound; SKUs BXRC8223-B / BXRC8223-Y. Pre-mounted pair on 17mm-hex wheels (black -B or yellow -Y; older BSRC80xx on white or black dish wheels). AMain lists them under 1/8 GT on-road; BSR also pitches them for speed runs.",
+    "compound_note": "Colour-coded foam compound; BSR does not publish a shore number for it.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "Red",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-bxrc8223-b-p/p1824916",
+    "product_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-red-bxrc8227-b/p1824916?v=1814211",
+    "notes": "1/8 GT foam, colour-coded compound; SKUs BXRC8227-B / BXRC8227-Y; older BSRC8027 / BSRC8027-B (dish). Pre-mounted pair on 17mm-hex wheels (black -B or yellow -Y; older BSRC80xx on white or black dish wheels). AMain lists them under 1/8 GT on-road; BSR also pitches them for speed runs.",
+    "compound_note": "Colour-coded foam compound; BSR does not publish a shore number for it.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "Team Purple",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-bxrc8223-b-p/p1824916",
+    "product_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-team-purple-bxrc8234-b/p1824916?v=1814199",
+    "notes": "1/8 GT foam, colour-coded compound; SKUs BXRC8234-B / BXRC8234-Y. Pre-mounted pair on 17mm-hex wheels (black -B or yellow -Y; older BSRC80xx on white or black dish wheels). AMain lists them under 1/8 GT on-road; BSR also pitches them for speed runs.",
+    "compound_note": "Colour-coded foam compound; BSR does not publish a shore number for it.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "BSR Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "XX Pink",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-bxrc8223-b-p/p1824916",
+    "product_url": "https://www.amainhobbies.com/bsr-racing-1-8-premounted-gt-foam-tires-black-2-xx-pink-bxrc8218-b/p1824916?v=1814196",
+    "notes": "1/8 GT foam, colour-coded compound; SKUs BXRC8218-B / BXRC8218-Y; older BSRC8018 (white dish). Pre-mounted pair on 17mm-hex wheels (black -B or yellow -Y; older BSRC80xx on white or black dish wheels). AMain lists them under 1/8 GT on-road; BSR also pitches them for speed runs.",
+    "compound_note": "Colour-coded foam compound; BSR does not publish a shore number for it.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "GT8/Rally",
+    "compound": "25 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-gt8-rally-preglued-foam-tires-black-2-103mm-conjbb-p/p1304044",
+    "product_url": "https://www.amainhobbies.com/contact-gt8-rally-preglued-foam-tires-black-2-103mm-25-shore-conjb25b/p1304044?v=1303055",
+    "notes": "1/8 GT / Rally foam, pair pre-glued on Schumacher black 17mm-hex wheels, 103mm OD. SKU CONJB25B. Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT, 103mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "GT8/Rally",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-gt8-rally-preglued-foam-tires-black-2-103mm-conjbb-p/p1304044",
+    "product_url": "https://www.amainhobbies.com/contact-gt8-rally-preglued-foam-tires-black-2-103mm-35-shore-conjb35b/p1304044?v=1303056",
+    "notes": "1/8 GT / Rally foam, pair pre-glued on Schumacher black 17mm-hex wheels, 103mm OD. SKU CONJB35B. Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT, 103mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "GT8/Rally",
+    "compound": "38 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-gt8-rally-preglued-foam-tires-black-2-103mm-conjbb-p/p1304044",
+    "product_url": "https://www.amainhobbies.com/contact-gt8-rally-preglued-foam-tires-black-2-103mm-38-shore-conjb38b/p1304044?v=1303057",
+    "notes": "1/8 GT / Rally foam, pair pre-glued on Schumacher black 17mm-hex wheels, 103mm OD. SKU CONJB38B. Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT, 103mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "GT8/Rally",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-gt8-rally-preglued-foam-tires-black-2-103mm-conjbb-p/p1304044",
+    "product_url": "https://www.amainhobbies.com/contact-gt8-rally-preglued-foam-tires-black-2-103mm-40-shore-conjb40b/p1304044?v=1303058",
+    "notes": "1/8 GT / Rally foam, pair pre-glued on Schumacher black 17mm-hex wheels, 103mm OD. SKU CONJB40B. Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT, 103mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "GT8/Rally",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.hobbyheroes.com/collections/contact-tyres-1",
+    "product_url": "https://www.hobbyheroes.com/products/conjb45b-contact-gt8-rally-1-8-on-road-foam-gt-tires-45-shore-black-rims-grp",
+    "notes": "1/8 GT / Rally foam, pair pre-glued on Schumacher black 17mm-hex wheels, 103mm OD. SKU CONJB45B (HobbyHeroes). Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT, 103mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "Nitro Front",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-conj83006-p/p762158",
+    "product_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-30-shore-conj83006/p762158?v=758411",
+    "notes": "1/8 nitro on-road front, pair pre-mounted on black 5-spoke wheels, 38mm wide. SKU CONJ83006. Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 38mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "Nitro Front",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-conj83006-p/p762158",
+    "product_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-32-shore-conj83206/p762158?v=758412",
+    "notes": "1/8 nitro on-road front, pair pre-mounted on black 5-spoke wheels, 38mm wide. SKU CONJ83206 (also CONJ8CT06 69mm OD; light grey rim CONJ83286). Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 38mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "Nitro Front",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-conj83006-p/p762158",
+    "product_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-35-shore-conj83506/p762158?v=758414",
+    "notes": "1/8 nitro on-road front, pair pre-mounted on black 5-spoke wheels, 38mm wide. SKU CONJ83506 (light grey rim CONJ83586). Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 38mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "Nitro Front",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.speedworldhobbies.com/RC_Car_On_Road_1_8th_Scale_Foam_Tires.cfm",
+    "product_url": "https://www.speedworldhobbies.com/RC_Car_On_Road_1_8th_Scale_Foam_Tires.cfm",
+    "notes": "1/8 nitro on-road front, pair pre-mounted on black 5-spoke wheels, 38mm wide. SKU J83701 (older white \"Jap\" wheel, Speed World Hobbies). Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 38mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "Nitro Front",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-conj83006-p/p762158",
+    "product_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-40-shore-conj84006/p762158?v=758418",
+    "notes": "1/8 nitro on-road front, pair pre-mounted on black 5-spoke wheels, 38mm wide. SKU CONJ84006. Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 38mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "Nitro Front",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-conj83006-p/p762158",
+    "product_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-45-shore-conj84506/p762158?v=758420",
+    "notes": "1/8 nitro on-road front, pair pre-mounted on black 5-spoke wheels, 38mm wide. SKU CONJ84506 (also CONJ84506P 66mm OD). Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 38mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "Nitro Front",
+    "compound": "50 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-conj83006-p/p762158",
+    "product_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-front-tires-w-5-spoke-rim-2-black-50-shore-conj85006/p762158?v=758422",
+    "notes": "1/8 nitro on-road front, pair pre-mounted on black 5-spoke wheels, 38mm wide. SKU CONJ85006. Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 38mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "Nitro Rear",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-rear-tires-w-5-spoke-rim-2-black-conj83207-p/p762159",
+    "product_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-rear-tires-w-5-spoke-rim-2-black-32-shore-conj83207/p762159?v=758413",
+    "notes": "1/8 nitro on-road rear, pair pre-mounted on black 5-spoke wheels, 60.5mm wide. SKU CONJ83207. Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60.5mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "Nitro Rear",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-rear-tires-w-5-spoke-rim-2-black-conj83207-p/p762159",
+    "product_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-rear-tires-w-5-spoke-rim-2-black-35-shore-conj83507/p762159?v=758415",
+    "notes": "1/8 nitro on-road rear, pair pre-mounted on black 5-spoke wheels, 60.5mm wide. SKU CONJ83507 (also CONJ8CT07 76mm OD; light grey rim CONJ83587). Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60.5mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "Nitro Rear",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-rear-tires-w-5-spoke-rim-2-black-conj83207-p/p762159",
+    "product_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-rear-tires-w-5-spoke-rim-2-black-37-shore-conj83707/p762159?v=758417",
+    "notes": "1/8 nitro on-road rear, pair pre-mounted on black 5-spoke wheels, 60.5mm wide. SKU CONJ83707. Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60.5mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Contact RC",
+    "discipline": "onroad-8th",
+    "model": "Nitro Rear",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-rear-tires-w-5-spoke-rim-2-black-conj83207-p/p762159",
+    "product_url": "https://www.amainhobbies.com/contact-1-8-nitro-foam-rear-tires-w-5-spoke-rim-2-black-40-shore-conj84007/p762159?v=758419",
+    "notes": "1/8 nitro on-road rear, pair pre-mounted on black 5-spoke wheels, 60.5mm wide. SKU CONJ84007. Made in the UK by Schumacher.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60.5mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "onroad-8th",
+    "model": "Attack Circuit Front",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/18-on-road-foam",
+    "product_url": "https://corally.com/en/product/C-14712-30/team-corally-attack-foam-tires-18-circuit-30-shore-front-69mm-carbon-rims-2-pcs",
+    "notes": "Pair pre-mounted, 1/8 on-road front, 69mm OD, carbon rims. SKU C-14712-30. Tyres and rims made in Italy.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 69mm OD",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "onroad-8th",
+    "model": "Attack Circuit Front",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/18-on-road-foam",
+    "product_url": "https://corally.com/en/product/C-14712-32/team-corally-attack-foam-tires-18-circuit-32-shore-front-69mm-carbon-rims-2-pcs",
+    "notes": "Pair pre-mounted, 1/8 on-road front, 69mm OD, carbon rims. SKU C-14712-32. Tyres and rims made in Italy.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 69mm OD",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "onroad-8th",
+    "model": "Attack Circuit Front",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/18-on-road-foam",
+    "product_url": "https://corally.com/en/product/C-14712-35/team-corally-attack-foam-tires-18-circuit-35-shore-front-69mm-carbon-rims-2-pcs",
+    "notes": "Pair pre-mounted, 1/8 on-road front, 69mm OD, carbon rims. SKU C-14712-35. Tyres and rims made in Italy.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 69mm OD",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "onroad-8th",
+    "model": "Attack Circuit Rear",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/18-on-road-foam",
+    "product_url": "https://corally.com/en/product/C-14719-32/team-corally-attack-foam-tires-18-circuit-32-shore-rear-76mm-carbon-rims-2-pcs",
+    "notes": "Pair pre-mounted, 1/8 on-road rear, 76mm OD, carbon rims. SKU C-14719-32. Tyres and rims made in Italy.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 76mm OD",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "onroad-8th",
+    "model": "Attack Circuit Rear",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/18-on-road-foam",
+    "product_url": "https://corally.com/en/product/C-14719-35/team-corally-attack-foam-tires-18-circuit-35-shore-rear-76mm-carbon-rims-2-pcs",
+    "notes": "Pair pre-mounted, 1/8 on-road rear, 76mm OD, carbon rims. SKU C-14719-35. Tyres and rims made in Italy.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 76mm OD",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "onroad-8th",
+    "model": "Attack Circuit Rear",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/18-on-road-foam",
+    "product_url": "https://corally.com/en/product/C-14719-37/team-corally-attack-foam-tires-18-circuit-37-shore-rear-76mm-carbon-rims-2-pcs",
+    "notes": "Pair pre-mounted, 1/8 on-road rear, 76mm OD, carbon rims. SKU C-14719-37. Tyres and rims made in Italy.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 76mm OD",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "onroad-8th",
+    "model": "Attack SSX-8 Front",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/18-pan-car-foam",
+    "product_url": "https://corally.com/en/product/C-14713-30/team-corally-attack-foam-tires-18-ssx-8-30-shore-front-65mm-carbon-flex-rims-2-pcs",
+    "notes": "Pair pre-mounted, 1/8 on-road front, 65mm OD, 37mm wide, carbon flex rims; made for the Corally SSX-8 1/8 pan car. SKU C-14713-30. Tyres and rims made in Italy.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 65mm OD",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "onroad-8th",
+    "model": "Attack SSX-8 Front",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/18-pan-car-foam",
+    "product_url": "https://corally.com/en/product/C-14713-32/team-corally-attack-foam-tires-18-ssx-8-32-shore-front-65mm-carbon-flex-rims-2-pcs",
+    "notes": "Pair pre-mounted, 1/8 on-road front, 65mm OD, 37mm wide, carbon flex rims; made for the Corally SSX-8 1/8 pan car. SKU C-14713-32. Tyres and rims made in Italy.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 65mm OD",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "onroad-8th",
+    "model": "Attack SSX-8 Front",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/18-pan-car-foam",
+    "product_url": "https://corally.com/en/product/C-14713-35/team-corally-attack-foam-tires-18-ssx-8-35-shore-front-65mm-carbon-flex-rims-2-pcs",
+    "notes": "Pair pre-mounted, 1/8 on-road front, 65mm OD, 37mm wide, carbon flex rims; made for the Corally SSX-8 1/8 pan car. SKU C-14713-35. Tyres and rims made in Italy.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 65mm OD",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "onroad-8th",
+    "model": "Attack SSX-8 Rear",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/18-pan-car-foam",
+    "product_url": "https://corally.com/en/product/C-14718-32/team-corally-attack-foam-tires-18-ssx-8-32-shore-rear-72mm-carbon-flex-rims-2-pcs",
+    "notes": "Pair pre-mounted, 1/8 on-road rear, 72mm OD, carbon flex rims; made for the Corally SSX-8 1/8 pan car. SKU C-14718-32. Tyres and rims made in Italy.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 72mm OD",
+    "discontinued": false
+  },
+  {
+    "brand": "Corally",
+    "discipline": "onroad-8th",
+    "model": "Attack SSX-8 Rear",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://corally.com/en/catalog/products/tires/18-pan-car-foam",
+    "product_url": "https://corally.com/en/product/C-14718-35/team-corally-attack-foam-tires-18-ssx-8-35-shore-rear-72mm-carbon-flex-rims-2-pcs",
+    "notes": "Pair pre-mounted, 1/8 on-road rear, 72mm OD, carbon flex rims; made for the Corally SSX-8 1/8 pan car. SKU C-14718-35. Tyres and rims made in Italy.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 72mm OD",
+    "discontinued": false
+  },
+  {
+    "brand": "Enneti",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.absolutehobbyz.com/enneti-18-on-road-front-30-shore-enneti-carbon-1pr.html",
+    "product_url": "https://www.absolutehobbyz.com/enneti-18-on-road-front-30-shore-enneti-carbon-1pr.html",
+    "notes": "1/8 on-road front; ENN8ETFC30 (Absolute Hobbyz: coming soon). Italian foam, pair pre-mounted; rim versions \"Enneti Carbon\" (ENN8ETxC..) and \"Enneti Light comp\" (ENN8ETxLN..). Enneti also made the Xceed \"Enneti\" tyres.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Enneti",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.absolutehobbyz.com/enneti-18-on-road-front-32-shore-enneti-carbon-1pr.html",
+    "product_url": "https://www.absolutehobbyz.com/enneti-18-on-road-front-32-shore-enneti-carbon-1pr.html",
+    "notes": "1/8 on-road front; ENN8ETFC32 / ENN8ETFLN32. Italian foam, pair pre-mounted; rim versions \"Enneti Carbon\" (ENN8ETxC..) and \"Enneti Light comp\" (ENN8ETxLN..). Enneti also made the Xceed \"Enneti\" tyres.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Enneti",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.absolutehobbyz.com/enneti-18-on-road-front-35-shore-enneti-carbon-1pr.html",
+    "product_url": "https://www.absolutehobbyz.com/enneti-18-on-road-front-35-shore-enneti-carbon-1pr.html",
+    "notes": "1/8 on-road front; ENN8ETFC35 / ENN8ETFLN35. Italian foam, pair pre-mounted; rim versions \"Enneti Carbon\" (ENN8ETxC..) and \"Enneti Light comp\" (ENN8ETxLN..). Enneti also made the Xceed \"Enneti\" tyres.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Enneti",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.absolutehobbyz.com/enneti-18-on-road-front-37-shore-enneti-carbon-1pr.html",
+    "product_url": "https://www.absolutehobbyz.com/enneti-18-on-road-front-37-shore-enneti-carbon-1pr.html",
+    "notes": "1/8 on-road front; ENN8ETFC37 / ENN8ETFLN37. Italian foam, pair pre-mounted; rim versions \"Enneti Carbon\" (ENN8ETxC..) and \"Enneti Light comp\" (ENN8ETxLN..). Enneti also made the Xceed \"Enneti\" tyres.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Enneti",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.modelsamu.it/it/brand/44-enneti",
+    "product_url": "https://www.modelsamu.it/it/enneti/2638-gomme-anteriori-18-sh42.html",
+    "notes": "1/8 on-road front; sold by Modelsamu as \"Gomme Competition 1/8 Anteriori SH42\". Italian foam, pair pre-mounted; rim versions \"Enneti Carbon\" (ENN8ETxC..) and \"Enneti Light comp\" (ENN8ETxLN..). Enneti also made the Xceed \"Enneti\" tyres.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Enneti",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.modelsamu.it/it/brand/44-enneti",
+    "product_url": "https://www.modelsamu.it/it/enneti/2160-gomme-anteriori-1-8-sh45.html",
+    "notes": "1/8 on-road front; Modelsamu (title says SH45; its description text says SH32, so worth a check). Italian foam, pair pre-mounted; rim versions \"Enneti Carbon\" (ENN8ETxC..) and \"Enneti Light comp\" (ENN8ETxLN..). Enneti also made the Xceed \"Enneti\" tyres.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Enneti",
+    "discipline": "onroad-8th",
+    "model": "Rear",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.absolutehobbyz.com/enneti-18-on-road-rear-30-shore-enneti-carbon-1pr.html",
+    "product_url": "https://www.absolutehobbyz.com/enneti-18-on-road-rear-30-shore-enneti-carbon-1pr.html",
+    "notes": "1/8 on-road rear; ENN8ETRC30 (Absolute Hobbyz: coming soon). Italian foam, pair pre-mounted; rim versions \"Enneti Carbon\" (ENN8ETxC..) and \"Enneti Light comp\" (ENN8ETxLN..). Enneti also made the Xceed \"Enneti\" tyres.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Enneti",
+    "discipline": "onroad-8th",
+    "model": "Rear",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.absolutehobbyz.com/enneti-18-on-road-rear-32-shore-enneti-carbon-1pr.html",
+    "product_url": "https://www.absolutehobbyz.com/enneti-18-on-road-rear-32-shore-enneti-carbon-1pr.html",
+    "notes": "1/8 on-road rear; ENN8ETRC32 / ENN8ETRLN32. Italian foam, pair pre-mounted; rim versions \"Enneti Carbon\" (ENN8ETxC..) and \"Enneti Light comp\" (ENN8ETxLN..). Enneti also made the Xceed \"Enneti\" tyres.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Enneti",
+    "discipline": "onroad-8th",
+    "model": "Rear",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.absolutehobbyz.com/enneti-18-on-road-rear-35-shore-enneti-carbon-1pr.html",
+    "product_url": "https://www.absolutehobbyz.com/enneti-18-on-road-rear-35-shore-enneti-carbon-1pr.html",
+    "notes": "1/8 on-road rear; ENN8ETRC35 / ENN8ETRLN35. Italian foam, pair pre-mounted; rim versions \"Enneti Carbon\" (ENN8ETxC..) and \"Enneti Light comp\" (ENN8ETxLN..). Enneti also made the Xceed \"Enneti\" tyres.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Enneti",
+    "discipline": "onroad-8th",
+    "model": "Rear",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.absolutehobbyz.com/enneti-18-on-road-rear-37-shore-enneti-carbon-1pr.html",
+    "product_url": "https://www.absolutehobbyz.com/enneti-18-on-road-rear-37-shore-enneti-carbon-1pr.html",
+    "notes": "1/8 on-road rear; ENN8ETRC37 / ENN8ETRLN37. Italian foam, pair pre-mounted; rim versions \"Enneti Carbon\" (ENN8ETxC..) and \"Enneti Light comp\" (ENN8ETxLN..). Enneti also made the Xceed \"Enneti\" tyres.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T01 Revo",
+    "compound": "R1 Rain",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth01-r1/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, treaded); front or rear. SKUs by wheel: GTH01-R1 white, GTJ01-R1 hard competition white, GTK01-R1 silver, GTX01-R1 black, GTY01-R1 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": "Rain compound: wet track, low grip, very low temperatures (GRP).",
+    "softness": null,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T01 Revo",
+    "compound": "S1 XXSoft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth01-s1/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, treaded); front or rear. SKUs by wheel: GTH01-S1 white, GTJ01-S1 hard competition white, GTK01-S1 silver, GTX01-S1 black, GTY01-S1 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": "Very low grip / very low temperatures (GRP).",
+    "softness": 1,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T01 Revo",
+    "compound": "S2 XSoft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth01-s2/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, treaded); front or rear. SKUs by wheel: GTH01-S2 white, GTJ01-S2 hard competition white, GTK01-S2 silver, GTX01-S2 black, GTY01-S2 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T01 Revo",
+    "compound": "S3 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth01-s3/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, treaded); front or rear. SKUs by wheel: GTH01-S3 white, GTJ01-S3 hard competition white, GTK01-S3 silver, GTX01-S3 black, GTY01-S3 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": "Medium grip, medium temperatures (GRP).",
+    "softness": 2,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T01 Revo",
+    "compound": "S4 SoftMedium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth01-s4/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, treaded); front or rear. SKUs by wheel: GTH01-S4 white, GTJ01-S4 hard competition white, GTK01-S4 silver, GTX01-S4 black, GTY01-S4 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T01 Revo",
+    "compound": "S5 Medium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth01-s5/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, treaded); front or rear. SKUs by wheel: GTH01-S5 white, GTJ01-S5 hard competition white, GTK01-S5 silver, GTX01-S5 black, GTY01-S5 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T01 Revo",
+    "compound": "S7 Medium Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth01-s7/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, treaded); front or rear. SKUs by wheel: GTH01-S7 white, GTJ01-S7 hard competition white, GTK01-S7 silver, GTX01-S7 black, GTY01-S7 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T02 Slick",
+    "compound": "R1 Rain",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth02-r1/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, slick); front or rear. SKUs by wheel: GTH02-R1 white, GTJ02-R1 hard competition white, GTK02-R1 silver, GTX02-R1 black, GTY02-R1 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": "Rain compound: wet track, low grip, very low temperatures (GRP).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T02 Slick",
+    "compound": "S1 XXSoft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth02-s1/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, slick); front or rear. SKUs by wheel: GTH02-S1 white, GTJ02-S1 hard competition white, GTK02-S1 silver, GTX02-S1 black, GTY02-S1 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": "Very low grip / very low temperatures (GRP).",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T02 Slick",
+    "compound": "S2 XSoft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth02-s2/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, slick); front or rear. SKUs by wheel: GTH02-S2 white, GTJ02-S2 hard competition white, GTK02-S2 silver, GTX02-S2 black, GTY02-S2 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": null,
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T02 Slick",
+    "compound": "S3 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth02-s3/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, slick); front or rear. SKUs by wheel: GTH02-S3 white, GTJ02-S3 hard competition white, GTK02-S3 silver, GTX02-S3 black, GTY02-S3 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": "Medium grip, medium temperatures (GRP).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T02 Slick",
+    "compound": "S4 SoftMedium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth02-s4/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, slick); front or rear. SKUs by wheel: GTH02-S4 white, GTJ02-S4 hard competition white, GTK02-S4 silver, GTX02-S4 black, GTY02-S4 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T02 Slick",
+    "compound": "S5 Medium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth02-s5/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, slick); front or rear. SKUs by wheel: GTH02-S5 white, GTJ02-S5 hard competition white, GTK02-S5 silver, GTX02-S5 black, GTY02-S5 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T02 Slick",
+    "compound": "S7 Medium Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/18-gt/",
+    "product_url": "https://www.grpgandini.it/en/gth02-s7/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (98mm OD, 41mm wide, slick); front or rear. SKUs by wheel: GTH02-S7 white, GTJ02-S7 hard competition white, GTK02-S7 silver, GTX02-S7 black, GTY02-S7 yellow. Previous generation, still listed on grpgandini.it.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T03 Revo",
+    "compound": "XB1 UltraSoft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t03-revo-en/",
+    "product_url": "https://www.grpgandini.it/en/gth03-xb1/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, treaded); front or rear. SKUs by wheel: GTH03-XB1 FLEX white, GTJ03-XB1 RIGID white, GTK03-XB1 FLEX silver, GTX03-XB1 FLEX black, GTY03-XB1 FLEX yellow.",
+    "compound_note": "XB line (new 2022): very low grip, very low temperatures; best at 0-20 C track temp (GRP use chart).",
+    "softness": 1,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T03 Revo",
+    "compound": "XB2 ExtraSoft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t03-revo-en/",
+    "product_url": "https://www.grpgandini.it/en/gth03-xb2/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, treaded); front or rear. SKUs by wheel: GTH03-XB2 FLEX white, GTJ03-XB2 RIGID white, GTK03-XB2 FLEX silver, GTX03-XB2 FLEX black, GTY03-XB2 FLEX yellow.",
+    "compound_note": "XB line (new 2022): very low grip, very low temperatures; best at 0-20 C track temp (GRP use chart).",
+    "softness": 1,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T03 Revo",
+    "compound": "XB3 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t03-revo-en/",
+    "product_url": "https://www.grpgandini.it/en/gth03-xb3/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, treaded); front or rear. SKUs by wheel: GTH03-XB3 FLEX white, GTJ03-XB3 RIGID white, GTK03-XB3 FLEX silver, GTX03-XB3 FLEX black, GTY03-XB3 FLEX yellow.",
+    "compound_note": "XB line (new 2022): rated equally good from 0 to 60 C track temp (GRP use chart).",
+    "softness": 2,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T03 Revo",
+    "compound": "XM2 SuperSoft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t03-revo-en/",
+    "product_url": "https://www.grpgandini.it/en/gth03-xm2/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, treaded); front or rear. SKUs by wheel: GTH03-XM2 FLEX white, GTJ03-XM2 RIGID white, GTK03-XM2 FLEX silver, GTX03-XM2 FLEX black, GTY03-XM2 FLEX yellow.",
+    "compound_note": "XM line, replaces S2; best at 15-40 C track temp (GRP use chart).",
+    "softness": 2,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T03 Revo",
+    "compound": "XM3 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t03-revo-en/",
+    "product_url": "https://www.grpgandini.it/en/gth03-xm3/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, treaded); front or rear. SKUs by wheel: GTH03-XM3 FLEX white, GTJ03-XM3 RIGID white, GTK03-XM3 FLEX silver, GTX03-XM3 FLEX black, GTY03-XM3 FLEX yellow.",
+    "compound_note": "XM line, replaces S3; best at 15-40 C track temp (GRP use chart).",
+    "softness": 2,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T03 Revo",
+    "compound": "XM4 SoftMedium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t03-revo-en/",
+    "product_url": "https://www.grpgandini.it/en/gth03-xm4/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, treaded); front or rear. SKUs by wheel: GTH03-XM4 FLEX white, GTJ03-XM4 RIGID white, GTK03-XM4 FLEX silver, GTX03-XM4 FLEX black, GTY03-XM4 FLEX yellow.",
+    "compound_note": "XM line, replaces S4; best at 35-60 C track temp (GRP use chart).",
+    "softness": 3,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T03 Revo",
+    "compound": "XM5 Medium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t03-revo-en/",
+    "product_url": "https://www.grpgandini.it/en/gth03-xm5/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, treaded); front or rear. SKUs by wheel: GTH03-XM5 FLEX white, GTJ03-XM5 RIGID white, GTK03-XM5 FLEX silver, GTX03-XM5 FLEX black, GTY03-XM5 FLEX yellow.",
+    "compound_note": "XM line, replaces S5; best at 35-60 C track temp (GRP use chart).",
+    "softness": 4,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T03 Revo",
+    "compound": "XM7 Medium Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t03-revo-en/",
+    "product_url": "https://www.grpgandini.it/en/gth03-xm7/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, treaded); front or rear. SKUs by wheel: GTH03-XM7 FLEX white, GTJ03-XM7 RIGID white, GTK03-XM7 FLEX silver, GTX03-XM7 FLEX black, GTY03-XM7 FLEX yellow.",
+    "compound_note": "XM line, replaces S7; best at 35-60 C track temp (GRP use chart).",
+    "softness": 5,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T04 Slick",
+    "compound": "XB1 UltraSoft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t04-slick-en/",
+    "product_url": "https://www.grpgandini.it/en/gth04-xb1/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, slick); front or rear. SKUs by wheel: GTH04-XB1 FLEX white, GTJ04-XB1 RIGID white, GTK04-XB1 FLEX silver, GTX04-XB1 FLEX black, GTY04-XB1 FLEX yellow.",
+    "compound_note": "XB line (new 2022): very low grip, very low temperatures; best at 0-20 C track temp (GRP use chart).",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T04 Slick",
+    "compound": "XB2 ExtraSoft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t04-slick-en/",
+    "product_url": "https://www.grpgandini.it/en/gth04-xb2/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, slick); front or rear. SKUs by wheel: GTH04-XB2 FLEX white, GTJ04-XB2 RIGID white, GTK04-XB2 FLEX silver, GTX04-XB2 FLEX black, GTY04-XB2 FLEX yellow.",
+    "compound_note": "XB line (new 2022): very low grip, very low temperatures; best at 0-20 C track temp (GRP use chart).",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T04 Slick",
+    "compound": "XB3 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t04-slick-en/",
+    "product_url": "https://www.grpgandini.it/en/gth04-xb3/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, slick); front or rear. SKUs by wheel: GTH04-XB3 FLEX white, GTJ04-XB3 RIGID white, GTK04-XB3 FLEX silver, GTX04-XB3 FLEX black, GTY04-XB3 FLEX yellow.",
+    "compound_note": "XB line (new 2022): rated equally good from 0 to 60 C track temp (GRP use chart).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T04 Slick",
+    "compound": "XM2 SuperSoft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t04-slick-en/",
+    "product_url": "https://www.grpgandini.it/en/gth04-xm2/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, slick); front or rear. SKUs by wheel: GTH04-XM2 FLEX white, GTJ04-XM2 RIGID white, GTK04-XM2 FLEX silver, GTX04-XM2 FLEX black, GTY04-XM2 FLEX yellow.",
+    "compound_note": "XM line, replaces S2; best at 15-40 C track temp (GRP use chart).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T04 Slick",
+    "compound": "XM3 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t04-slick-en/",
+    "product_url": "https://www.grpgandini.it/en/gth04-xm3/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, slick); front or rear. SKUs by wheel: GTH04-XM3 FLEX white, GTJ04-XM3 RIGID white, GTK04-XM3 FLEX silver, GTX04-XM3 FLEX black, GTY04-XM3 FLEX yellow.",
+    "compound_note": "XM line, replaces S3; best at 15-40 C track temp (GRP use chart).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T04 Slick",
+    "compound": "XM4 SoftMedium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t04-slick-en/",
+    "product_url": "https://www.grpgandini.it/en/gth04-xm4/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, slick); front or rear. SKUs by wheel: GTH04-XM4 FLEX white, GTJ04-XM4 RIGID white, GTK04-XM4 FLEX silver, GTX04-XM4 FLEX black, GTY04-XM4 FLEX yellow.",
+    "compound_note": "XM line, replaces S4; best at 35-60 C track temp (GRP use chart).",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T04 Slick",
+    "compound": "XM5 Medium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t04-slick-en/",
+    "product_url": "https://www.grpgandini.it/en/gth04-xm5/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, slick); front or rear. SKUs by wheel: GTH04-XM5 FLEX white, GTJ04-XM5 RIGID white, GTK04-XM5 FLEX silver, GTX04-XM5 FLEX black, GTY04-XM5 FLEX yellow.",
+    "compound_note": "XM line, replaces S5; best at 35-60 C track temp (GRP use chart).",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "GRP",
+    "discipline": "onroad-8th",
+    "model": "T04 Slick",
+    "compound": "XM7 Medium Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.grpgandini.it/en/t04-slick-en/",
+    "product_url": "https://www.grpgandini.it/en/gth04-xm7/",
+    "notes": "Belted rubber 1:8 GT tyre, pair pre-glued on 17mm-hex wheels (X-TECH line, 99mm OD, 42mm wide, slick); front or rear. SKUs by wheel: GTH04-XM7 FLEX white, GTJ04-XM7 RIGID white, GTK04-XM7 FLEX silver, GTX04-XM7 FLEX black, GTY04-XM7 FLEX yellow.",
+    "compound_note": "XM line, replaces S7; best at 35-60 C track temp (GRP use chart).",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-front-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road front; SKUs 004-0021 (Light) / 004-0121 (Carbon). Standard 70.5mm diameter, some shores also 69/66/65mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race).",
+    "compound_note": "Shore hardness; lower is softer (more grip, less life).",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-front-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road front; SKUs 004-0031 (Light) / 004-0131 (Carbon). Standard 70.5mm diameter, some shores also 69/66/65mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race).",
+    "compound_note": "Shore hardness; lower is softer (more grip, less life).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-front-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road front; SKUs 004-0041 (Light) / 004-0141 (Carbon). Standard 70.5mm diameter, some shores also 69/66/65mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race).",
+    "compound_note": "Shore hardness; lower is softer (more grip, less life).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-front-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road front; SKUs 004-0051 (Light) / 004-0151 (Carbon). Standard 70.5mm diameter, some shores also 69/66/65mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race).",
+    "compound_note": "Shore hardness; lower is softer (more grip, less life).",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-front-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road front; SKUs 004-0081 (Light) / 004-0181 (Carbon). Standard 70.5mm diameter, some shores also 69/66/65mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race).",
+    "compound_note": "Shore hardness; lower is softer (more grip, less life).",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-front-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road front; SKUs 004-0061 (Light) / 004-0161 (Carbon). Standard 70.5mm diameter, some shores also 69/66/65mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race).",
+    "compound_note": "Shore hardness; lower is softer (more grip, less life).",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "Bi-Compound",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-front-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road front; SKUs 004-0001 (Light) / 004-0101 (Carbon). Standard 70.5mm diameter, some shores also 69/66/65mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race). Sold as \"Double C.\" on hotracetyres.eu.",
+    "compound_note": "Two-compound foam (shores not stated).",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Front",
+    "compound": "Humid",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-front-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road front; SKUs 004-0171 (Carbon only). Standard 70.5mm diameter, some shores also 69/66/65mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race).",
+    "compound_note": "For damp / humid conditions.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "GT",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.hotracetyres.eu/285-18-carbon-rims",
+    "product_url": "https://www.hotracetyres.eu/18-carbon-rims/9036-pair-of-gt-foam-tyres-shore-40-hot-race.html",
+    "notes": "Pair of GT foam tyres, SKU 004-3000, listed in the 1/8 carbon-rims range of the official Hot Race EU store. Only 40 shore listed.",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Lens",
+    "compound": "Medium (Light Blue)",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product/lens/",
+    "product_url": "https://hotrace.shop/product/lens/",
+    "notes": "Premium 1/8 on-road foam on a new rim material, sold as a numbered front+rear set (front and rear compound chosen separately; SKUs 004-1010 to 004-1190). Optional Lexan lens discs. Does not replace the standard Hot Race 1/8 tyres.",
+    "compound_note": "Lens foam shore is given by colour, not number: SuperSoft red, Soft green, Medium light blue.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "all"
+      },
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 on-road front + rear set",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Lens",
+    "compound": "Medium High Grip (Light Blue, white dot)",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product/lens/",
+    "product_url": "https://hotrace.shop/product/lens/",
+    "notes": "Premium 1/8 on-road foam on a new rim material, sold as a numbered front+rear set (front and rear compound chosen separately; SKUs 004-1010 to 004-1190). Optional Lexan lens discs. Does not replace the standard Hot Race 1/8 tyres.",
+    "compound_note": "High-grip version of the colour-coded Lens foam (white dot).",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "all"
+      },
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 on-road front + rear set",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Lens",
+    "compound": "Soft (Green)",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product/lens/",
+    "product_url": "https://hotrace.shop/product/lens/",
+    "notes": "Premium 1/8 on-road foam on a new rim material, sold as a numbered front+rear set (front and rear compound chosen separately; SKUs 004-1010 to 004-1190). Optional Lexan lens discs. Does not replace the standard Hot Race 1/8 tyres.",
+    "compound_note": "Lens foam shore is given by colour, not number: SuperSoft red, Soft green, Medium light blue.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "all"
+      },
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 on-road front + rear set",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Lens",
+    "compound": "Soft High Grip (Green, white dot)",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product/lens/",
+    "product_url": "https://hotrace.shop/product/lens/",
+    "notes": "Premium 1/8 on-road foam on a new rim material, sold as a numbered front+rear set (front and rear compound chosen separately; SKUs 004-1010 to 004-1190). Optional Lexan lens discs. Does not replace the standard Hot Race 1/8 tyres.",
+    "compound_note": "High-grip version of the colour-coded Lens foam (white dot).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "all"
+      },
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 on-road front + rear set",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Lens",
+    "compound": "SuperSoft (Red)",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product/lens/",
+    "product_url": "https://hotrace.shop/product/lens/",
+    "notes": "Premium 1/8 on-road foam on a new rim material, sold as a numbered front+rear set (front and rear compound chosen separately; SKUs 004-1010 to 004-1190). Optional Lexan lens discs. Does not replace the standard Hot Race 1/8 tyres.",
+    "compound_note": "Lens foam shore is given by colour, not number: SuperSoft red, Soft green, Medium light blue.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "all"
+      },
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 on-road front + rear set",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Lens",
+    "compound": "SuperSoft High Grip (Red, white dot)",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product/lens/",
+    "product_url": "https://hotrace.shop/product/lens/",
+    "notes": "Premium 1/8 on-road foam on a new rim material, sold as a numbered front+rear set (front and rear compound chosen separately; SKUs 004-1010 to 004-1190). Optional Lexan lens discs. Does not replace the standard Hot Race 1/8 tyres.",
+    "compound_note": "High-grip version of the colour-coded Lens foam (white dot).",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "all"
+      },
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 on-road front + rear set",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Rear",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-rear-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear; SKUs 004-0032 (Light) / 004-0132 (Carbon). Standard 78mm diameter, some shores also 76/68mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race).",
+    "compound_note": "Shore hardness; lower is softer (more grip, less life).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Rear",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-rear-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear; SKUs 004-0042 (Light) / 004-0142 (Carbon). Standard 78mm diameter, some shores also 76/68mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race).",
+    "compound_note": "Shore hardness; lower is softer (more grip, less life).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Rear",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-rear-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear; SKUs 004-0052 (Light) / 004-0152 (Carbon). Standard 78mm diameter, some shores also 76/68mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race).",
+    "compound_note": "Shore hardness; lower is softer (more grip, less life).",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Hot Race",
+    "discipline": "onroad-8th",
+    "model": "Rear",
+    "compound": "Humid",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://hotrace.shop/product-category/onroad/1-8/",
+    "product_url": "https://hotrace.shop/product/pair-of-1-8-rear-tires/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear; SKUs 004-0172 (Carbon only). Standard 78mm diameter, some shores also 76/68mm (hotracetyres.eu). Carbon rims for low/medium grip, Light rims for high grip and hot weather (Hot Race).",
+    "compound_note": "For damp / humid conditions.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "J-Tech",
+    "discipline": "onroad-8th",
+    "model": "Gold Front",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.marchettimodelservice.com/categoria-prodotto/jtech/gomme-1-8-1-10-on-road/",
+    "product_url": "https://www.marchettimodelservice.com/shop/jtech/gomme-1-8-1-10-on-road/gomme-18-on-road-anteriori-sh-32-gold/",
+    "notes": "1/8 on-road front; SKU JTA01832G (Modelsamu lists it as JT101832G). J-Tech Gold series 1/8 on-road foam, pair pre-mounted (black carbon wheel). Made/distributed by Marchetti Model Service (Viterbo, Italy).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "J-Tech",
+    "discipline": "onroad-8th",
+    "model": "Gold Front",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.marchettimodelservice.com/categoria-prodotto/jtech/gomme-1-8-1-10-on-road/",
+    "product_url": "https://www.marchettimodelservice.com/shop/jtech/gomme-1-8-1-10-on-road/gomme-18-on-road-anteriori-sh-35-gold/",
+    "notes": "1/8 on-road front; SKU JTA01835G. J-Tech Gold series 1/8 on-road foam, pair pre-mounted (black carbon wheel). Made/distributed by Marchetti Model Service (Viterbo, Italy).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "J-Tech",
+    "discipline": "onroad-8th",
+    "model": "Gold Front",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.modelsamu.it/it/137-j-tech",
+    "product_url": "https://www.modelsamu.it/it/j-tech/3199-gomme-anteriori-18-sh45-gold-carbon.html",
+    "notes": "1/8 on-road front; SKU JTP01845G (\"Gomme Anteriori 1/8 SH45 Gold Carbon\" at Modelsamu; not on the J-Tech B2B list). J-Tech Gold series 1/8 on-road foam, pair pre-mounted (black carbon wheel). Made/distributed by Marchetti Model Service (Viterbo, Italy).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "J-Tech",
+    "discipline": "onroad-8th",
+    "model": "Gold Rear",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.marchettimodelservice.com/categoria-prodotto/jtech/gomme-1-8-1-10-on-road/",
+    "product_url": "https://www.marchettimodelservice.com/shop/jtech/gomme-1-8-1-10-on-road/gomme-18-on-road-posteriori-sh-32-gold/",
+    "notes": "1/8 on-road rear; SKU JTP01832G. J-Tech Gold series 1/8 on-road foam, pair pre-mounted (black carbon wheel). Made/distributed by Marchetti Model Service (Viterbo, Italy).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "J-Tech",
+    "discipline": "onroad-8th",
+    "model": "Gold Rear",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.marchettimodelservice.com/categoria-prodotto/jtech/gomme-1-8-1-10-on-road/",
+    "product_url": "https://www.marchettimodelservice.com/shop/jtech/gomme-1-8-1-10-on-road/gomme-18-on-road-posteriori-sh-35-gold/",
+    "notes": "1/8 on-road rear; SKU JTP01835G. J-Tech Gold series 1/8 on-road foam, pair pre-mounted (black carbon wheel). Made/distributed by Marchetti Model Service (Viterbo, Italy).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "J-Tech",
+    "discipline": "onroad-8th",
+    "model": "Gold Rear",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.marchettimodelservice.com/categoria-prodotto/jtech/gomme-1-8-1-10-on-road/",
+    "product_url": "https://www.marchettimodelservice.com/shop/jtech/gomme-1-8-1-10-on-road/gomme-18-on-road-posteriori-sh-37-gold/",
+    "notes": "1/8 on-road rear; SKU JTP01837G. J-Tech Gold series 1/8 on-road foam, pair pre-mounted (black carbon wheel). Made/distributed by Marchetti Model Service (Viterbo, Italy).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "J-Tech",
+    "discipline": "onroad-8th",
+    "model": "Wet Special Gold",
+    "compound": "Wet",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.marchettimodelservice.com/categoria-prodotto/jtech/gomme-1-8-1-10-on-road/",
+    "product_url": "https://www.marchettimodelservice.com/shop/jtech/gomme-1-8-1-10-on-road/wet-special-gold-1-8-set-22-treno-completo/",
+    "notes": "Complete 1/8 on-road wet set (2 front + 2 rear), SKU JT018WG. J-Tech Gold series 1/8 on-road foam, pair pre-mounted (black carbon wheel). Made/distributed by Marchetti Model Service (Viterbo, Italy).",
+    "compound_note": "Wet-weather foam.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "all"
+      },
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 on-road front + rear set",
+    "discontinued": false
+  },
+  {
+    "brand": "Kyosho",
+    "discipline": "onroad-8th",
+    "model": "KC-Slicks GT",
+    "compound": "#45",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://rc.kyosho.com/en/catalogsearch/result/?q=KC-Slicks",
+    "product_url": "https://rc.kyosho.com/en/igt005-45.html",
+    "notes": "KC-Slicks Tire V2 (#45/With Inner/GT/2pcs), IGT005-45; rubber slick with foam insert for Inferno GT / 1/8 GT racing. The standard compound fitted to the Inferno GT2 Type-R.",
+    "compound_note": "Kyosho: #45 is the standard (high-grip) compound; #55 is long life.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Kyosho",
+    "discipline": "onroad-8th",
+    "model": "KC-Slicks GT",
+    "compound": "#55",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://rc.kyosho.com/en/catalogsearch/result/?q=KC-Slicks",
+    "product_url": "https://rc.kyosho.com/en/igt003-55.html",
+    "notes": "KC-Slicks Tire (#55/With Inner/GT/2Pcs), IGT003-55 (old part IGT002-55); rubber slick with foam insert. Out of stock on kyosho.com in Sept 2026.",
+    "compound_note": "Kyosho: #55 is the long-life compound.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Front Five",
+    "compound": "25 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm wide. Rim versions: Five Carbon MX-8A25NFC, Five Light MX-8A25NFL, Precision MX-8A25NFP (retailers); \"JP\" SKUs (e.g. MX-8A25NFCJP) are the 69mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Front Five",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm wide. Rim versions: Five Carbon MX-8A30NFC, Five Light MX-8A30NFL, Precision MX-8A30NFP (retailers); \"JP\" SKUs (e.g. MX-8A30NFCJP) are the 69mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Front Five",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm wide. Rim versions: Five Carbon MX-8A32NFC, Five Light MX-8A32NFL, Precision MX-8A32NFP (retailers); \"JP\" SKUs (e.g. MX-8A32NFCJP) are the 69mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Front Five",
+    "compound": "32/40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm wide. Rim versions: Five Carbon MX-8A32/40NFC, Five Light MX-8A32/40NFL, Precision MX-8A32/40NFP (retailers); \"JP\" SKUs (e.g. MX-8A32/40NFCJP) are the 69mm diameter option (sold as factory selected).",
+    "compound_note": "Variable (dual) compound: softer outer edges for cornering grip, stiffer centre for straight-line speed (retailer copy of Matrix text).",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Front Five",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm wide. Rim versions: Five Carbon MX-8A35NFC, Five Light MX-8A35NFL, Precision MX-8A35NFP (retailers); \"JP\" SKUs (e.g. MX-8A35NFCJP) are the 69mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Front Five",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm wide. Rim versions: Five Carbon MX-8A37NFC, Five Light MX-8A37NFL, Precision MX-8A37NFP (retailers); \"JP\" SKUs (e.g. MX-8A37NFCJP) are the 69mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Front Five",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm wide. Rim versions: Five Carbon MX-8A40NFC, Five Light MX-8A40NFL, Precision MX-8A40NFP (retailers); \"JP\" SKUs (e.g. MX-8A40NFCJP) are the 69mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Front Five",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm wide. Rim versions: Five Carbon MX-8A42NFC, Five Light MX-8A42NFL, Precision MX-8A42NFP (retailers); \"JP\" SKUs (e.g. MX-8A42NFCJP) are the 69mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Front Five",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm wide. Rim versions: Five Carbon MX-8A45NFC, Five Light MX-8A45NFL, Precision MX-8A45NFP (retailers); \"JP\" SKUs (e.g. MX-8A45NFCJP) are the 69mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Front Five",
+    "compound": "50 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm wide. Rim versions: Five Carbon MX-8A50NFC, Five Light MX-8A50NFL, Precision MX-8A50NFP (retailers); \"JP\" SKUs (e.g. MX-8A50NFCJP) are the 69mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Front Five",
+    "compound": "Wet",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm wide. Rim versions: Five Carbon MX-8AWETNFC, Five Light MX-8AWETNFL, Precision MX-8AWETNFP (retailers).",
+    "compound_note": "Wet-weather foam.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "GT",
+    "compound": "25 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/gt/foam-gt/",
+    "product_url": "https://matrixtires.net/prodotto/gt/",
+    "notes": "1/8 GT foam, pair on carbon ten-spoke 17mm hex wheels. SKU GT-25 (MTX-GT-25 at US retailers).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "GT",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/gt/foam-gt/",
+    "product_url": "https://matrixtires.net/prodotto/gt/",
+    "notes": "1/8 GT foam, pair on carbon ten-spoke 17mm hex wheels. SKU GT-30 (MTX-GT-30 at US retailers).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "GT",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/gt/foam-gt/",
+    "product_url": "https://matrixtires.net/prodotto/gt/",
+    "notes": "1/8 GT foam, pair on carbon ten-spoke 17mm hex wheels. SKU GT-35 (MTX-GT-35 at US retailers).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "GT",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.absolutehobbyz.com/matrix-18-foam-gt-on-road-tires-2-37-shore.html",
+    "product_url": "https://www.absolutehobbyz.com/matrix-18-foam-gt-on-road-tires-2-37-shore.html",
+    "notes": "1/8 GT foam, pair on carbon ten-spoke 17mm hex wheels. SKU GT-37 (MTX-GT-37 at US retailers). 37 shore is not on matrixtires.net; seen only at Absolute Hobbyz.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "GT",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/gt/foam-gt/",
+    "product_url": "https://matrixtires.net/prodotto/gt/",
+    "notes": "1/8 GT foam, pair on carbon ten-spoke 17mm hex wheels. SKU GT-40 (MTX-GT-40 at US retailers).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "GT",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/gt/foam-gt/",
+    "product_url": "https://matrixtires.net/prodotto/gt/",
+    "notes": "1/8 GT foam, pair on carbon ten-spoke 17mm hex wheels. SKU GT-45 (MTX-GT-45 at US retailers).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Rear Five",
+    "compound": "25 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/rear-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear, 60mm wide. Rim versions: Five Carbon MX-8P25NFC, Five Light MX-8P25NFL, Precision MX-8P25NFP (retailers); \"JP\" SKUs (e.g. MX-8P25NFCJP) are the 76mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Rear Five",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/rear-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear, 60mm wide. Rim versions: Five Carbon MX-8P30NFC, Five Light MX-8P30NFL, Precision MX-8P30NFP (retailers); \"JP\" SKUs (e.g. MX-8P30NFCJP) are the 76mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Rear Five",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/rear-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear, 60mm wide. Rim versions: Five Carbon MX-8P32NFC, Five Light MX-8P32NFL, Precision MX-8P32NFP (retailers); \"JP\" SKUs (e.g. MX-8P32NFCJP) are the 76mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Rear Five",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/rear-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear, 60mm wide. Rim versions: Five Carbon MX-8P35NFC, Five Light MX-8P35NFL, Precision MX-8P35NFP (retailers); \"JP\" SKUs (e.g. MX-8P35NFCJP) are the 76mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Rear Five",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/rear-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear, 60mm wide. Rim versions: Five Carbon MX-8P37NFC, Five Light MX-8P37NFL, Precision MX-8P37NFP (retailers); \"JP\" SKUs (e.g. MX-8P37NFCJP) are the 76mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Rear Five",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/rear-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear, 60mm wide. Rim versions: Five Carbon MX-8P40NFC, Five Light MX-8P40NFL, Precision MX-8P40NFP (retailers); \"JP\" SKUs (e.g. MX-8P40NFCJP) are the 76mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Rear Five",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/rear-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear, 60mm wide. Rim versions: Five Carbon MX-8P42NFC, Five Light MX-8P42NFL, Precision MX-8P42NFP (retailers); \"JP\" SKUs (e.g. MX-8P42NFCJP) are the 76mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Rear Five",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/rear-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear, 60mm wide. Rim versions: Five Carbon MX-8P45NFC, Five Light MX-8P45NFL, Precision MX-8P45NFP (retailers); \"JP\" SKUs (e.g. MX-8P45NFCJP) are the 76mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Rear Five",
+    "compound": "50 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/rear-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear, 60mm wide. Rim versions: Five Carbon MX-8P50NFC, Five Light MX-8P50NFL, Precision MX-8P50NFP (retailers); \"JP\" SKUs (e.g. MX-8P50NFCJP) are the 76mm diameter option (sold as factory selected).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Rear Five",
+    "compound": "Wet",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/rear-five-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear, 60mm wide. Rim versions: Five Carbon MX-8PWETNFC, Five Light MX-8PWETNFL, Precision MX-8PWETNFP (retailers).",
+    "compound_note": "Wet-weather foam.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "UGrip Front",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://speedyrc.com.au/products/matrix-racing-tires-1-8-ugrip-series-front",
+    "product_url": "https://speedyrc.com.au/products/matrix-racing-tires-1-8-ugrip-series-front",
+    "notes": "Pre-mounted pair, 1/8 on-road front. Rim versions MX-8A32UGL (Light), MX-8A32UGC (Carbon), MX-8A32UGP (Precision), MX-8A32UGF (Flex). Not listed on matrixtires.net in Sept 2026; Xtreme looks like its successor.",
+    "compound_note": "ULTRA GRIP compound made with a Japanese foam producer: more grip, better balance, lower wear; stiffer on the outside for cornering.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "UGrip Rear",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://speedyrc.com.au/products/matrix-racing-tires-1-8-ugrip-series-rear",
+    "product_url": "https://speedyrc.com.au/products/matrix-racing-tires-1-8-ugrip-series-rear",
+    "notes": "Pre-mounted pair, 1/8 on-road rear. Rim versions MX-8P35UGL (Light), MX-8P35UGC (Carbon), MX-8P35UGP (Precision), MX-8P35UGF (Flex). Not listed on matrixtires.net in Sept 2026; Xtreme looks like its successor.",
+    "compound_note": "ULTRA GRIP compound made with a Japanese foam producer: more grip, better balance, lower wear; stiffer on the outside for cornering.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Xtreme Front",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/front-five-xtreme-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road front, 37mm. Five Xtreme Carbon MX-8A32XTC or Five Xtreme Light MX-8A32XTL. Only sold in 32 shore.",
+    "compound_note": "Special high-performance compound for maximum grip and consistency; same look as the standard range, different core (Matrix Xtreme copy via Speedy RC).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front, 37mm",
+    "discontinued": false
+  },
+  {
+    "brand": "Matrix",
+    "discipline": "onroad-8th",
+    "model": "Xtreme Rear",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://matrixtires.net/categoria-prodotto/1-8-on-road/",
+    "product_url": "https://matrixtires.net/prodotto/rear-five-xtreme-carbon/",
+    "notes": "Pre-mounted pair, 1/8 on-road rear, 60mm. Five Xtreme Carbon MX-8P35XTC or Five Xtreme Light MX-8P35XTL. Only sold in 35 shore.",
+    "compound_note": "Special high-performance compound for maximum grip and consistency; same look as the standard range, different core (Matrix Xtreme copy via Speedy RC).",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear, 60mm",
+    "discontinued": false
+  },
+  {
+    "brand": "PMT",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "Q00 Ultra Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.pmt-tyres.it/shop/category/modelli-r-c-racing-tyres-1-8-gt-rally-games-6",
+    "product_url": "https://www.pmt-tyres.it/shop/rallys0-q00-w1-1-8-gt-slick-ultra-soft-q00-reinforced-1965",
+    "notes": "Reinforced 1:8 GT / Rally Game slick, pair on white spoked wheels, 98mm OD, 40mm wide; SKU RALLYS0-Q00/W1.",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "PMT",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "Q01 Super Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.pmt-tyres.it/shop/category/modelli-r-c-racing-tyres-1-8-gt-rally-games-6",
+    "product_url": "https://www.pmt-tyres.it/shop/rallys0-q01-w1-1-8-gt-slick-super-soft-q01-reinforced-1964",
+    "notes": "Reinforced 1:8 GT / Rally Game slick, pair on white spoked wheels, 98mm OD, 40mm wide; SKU RALLYS0-Q01/W1.",
+    "compound_note": "32 Shore A; for cold tracks (PMT data via Speedy RC).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "PMT",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "Q03 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.pmt-tyres.it/shop/category/modelli-r-c-racing-tyres-1-8-gt-rally-games-6",
+    "product_url": "https://www.pmt-tyres.it/shop/rallys0-q03-w1-1-8-gt-slick-soft-q03-reinforced-1963",
+    "notes": "Reinforced 1:8 GT / Rally Game slick, pair on white spoked wheels, 98mm OD, 40mm wide; SKU RALLYS0-Q03/W1.",
+    "compound_note": "35 Shore A; for cold tracks (PMT data via Speedy RC).",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "PMT",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "Q05 Medium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.pmt-tyres.it/shop/category/modelli-r-c-racing-tyres-1-8-gt-rally-games-6",
+    "product_url": "https://www.pmt-tyres.it/shop/rallys0-q05-w1-1-8-gt-slick-medium-q05-reinforced-1962",
+    "notes": "Reinforced 1:8 GT / Rally Game slick, pair on white spoked wheels, 98mm OD, 40mm wide; SKU RALLYS0-Q05/W1.",
+    "compound_note": "40 Shore A; for a clean track (PMT data via Speedy RC).",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "PMT",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "Q07 Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.pmt-tyres.it/shop/category/modelli-r-c-racing-tyres-1-8-gt-rally-games-6",
+    "product_url": "https://www.pmt-tyres.it/shop/rallys0-q07-w1-1-8-gt-slick-hard-q07-reinforced-1961",
+    "notes": "Reinforced 1:8 GT / Rally Game slick, pair on white spoked wheels, 98mm OD, 40mm wide; SKU RALLYS0-Q07/W1.",
+    "compound_note": "45 Shore A; for hot tracks (PMT data via Speedy RC).",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "PMT",
+    "discipline": "onroad-8th",
+    "model": "Rally18",
+    "compound": "Q00 Ultra Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.pmt-tyres.it/shop/category/modelli-r-c-racing-tyres-1-8-gt-rally-games-6",
+    "product_url": "https://www.pmt-tyres.it/shop/rally18-q00-w1-carved-rally18-ultra-soft-q00-reinforced-2698",
+    "notes": "Carved (treaded) reinforced 1:8 GT / Rally Game rubber tyre, pair on spoked wheels, 98mm OD, 40mm wide; SKUs RALLY18-Q00/W1 (white), RALLY18-Q00/B1 (black).",
+    "compound_note": null,
+    "softness": 1,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "PMT",
+    "discipline": "onroad-8th",
+    "model": "Rally18",
+    "compound": "Q01 Super Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.pmt-tyres.it/shop/category/modelli-r-c-racing-tyres-1-8-gt-rally-games-6",
+    "product_url": "https://www.pmt-tyres.it/shop/rally18-q01-w1-carved-rally18-super-soft-q01-reinforced-2696",
+    "notes": "Carved (treaded) reinforced 1:8 GT / Rally Game rubber tyre, pair on spoked wheels, 98mm OD, 40mm wide; SKUs RALLY18-Q01/W1, RALLY18-Q01/B1.",
+    "compound_note": "32 Shore A; for cold tracks (PMT data via Speedy RC).",
+    "softness": 2,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "PMT",
+    "discipline": "onroad-8th",
+    "model": "Rally18",
+    "compound": "Q03 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.pmt-tyres.it/shop/category/modelli-r-c-racing-tyres-1-8-gt-rally-games-6",
+    "product_url": "https://www.pmt-tyres.it/shop/rally18-q03-w1-carved-rally18-soft-q03-reinforced-2694",
+    "notes": "Carved (treaded) reinforced 1:8 GT / Rally Game rubber tyre, pair on spoked wheels, 98mm OD, 40mm wide; SKUs RALLY18-Q03/W1, RALLY18-Q03/B1.",
+    "compound_note": "35 Shore A; for cold tracks (PMT data via Speedy RC).",
+    "softness": 3,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "PMT",
+    "discipline": "onroad-8th",
+    "model": "Rally18",
+    "compound": "Q05 Medium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.pmt-tyres.it/shop/category/modelli-r-c-racing-tyres-1-8-gt-rally-games-6",
+    "product_url": "https://www.pmt-tyres.it/shop/rally18-q05-w1-carved-rally18-medium-q05-reinforced-2690",
+    "notes": "Carved (treaded) reinforced 1:8 GT / Rally Game rubber tyre, pair on spoked wheels, 98mm OD, 40mm wide; SKUs RALLY18-Q05/W1, RALLY18-Q05/B1.",
+    "compound_note": "40 Shore A; for a clean track (PMT data via Speedy RC).",
+    "softness": 4,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "PMT",
+    "discipline": "onroad-8th",
+    "model": "Rally18",
+    "compound": "Q07 Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.pmt-tyres.it/shop/category/modelli-r-c-racing-tyres-1-8-gt-rally-games-6",
+    "product_url": "https://www.pmt-tyres.it/shop/rally18-q07-w1-carved-rally18-hard-q07-reinforced-2688",
+    "notes": "Carved (treaded) reinforced 1:8 GT / Rally Game rubber tyre, pair on spoked wheels, 98mm OD, 40mm wide; SKUs RALLY18-Q07/W1, RALLY18-Q07/B1.",
+    "compound_note": "45 Shore A; for hot tracks (PMT data via Speedy RC).",
+    "softness": 5,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "PMT",
+    "discipline": "onroad-8th",
+    "model": "Rally18",
+    "compound": "Rain",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.pmt-tyres.it/shop/category/modelli-r-c-racing-tyres-1-8-gt-rally-games-6",
+    "product_url": "https://www.pmt-tyres.it/shop/rally18-400-w1-carved-rally18-rain-reinforced-2692",
+    "notes": "Carved (treaded) reinforced 1:8 GT / Rally Game rubber tyre, pair on spoked wheels, 98mm OD, 40mm wide; SKUs RALLY18-400/W1, RALLY18-400/B1.",
+    "compound_note": "Rain (wet) compound.",
+    "softness": null,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Extreme",
+    "compound": "Ice",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_winter.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Extreme-conditions range, code SP00180.",
+    "compound_note": "For slightly damp surfaces and temperatures near zero.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Extreme",
+    "compound": "Rain",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_winter.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Extreme-conditions range, code SP01025/7.",
+    "compound_note": "For very wet surfaces.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Extreme",
+    "compound": "Wet",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_winter.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Extreme-conditions range, code SP01025.",
+    "compound_note": "For damp or slightly wet surfaces.",
+    "softness": null,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_SPUGNA.html",
+    "notes": "SP Racing foam GT tyre on black multi-spoke wheel, 99mm OD, 42mm wide, 17mm hex; code SP-GT-35.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_SPUGNA.html",
+    "notes": "SP Racing foam GT tyre on black multi-spoke wheel, 99mm OD, 42mm wide, 17mm hex; code SP-GT-37.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_SPUGNA.html",
+    "notes": "SP Racing foam GT tyre on black multi-spoke wheel, 99mm OD, 42mm wide, 17mm hex; code SP-GT-40.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "42 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_SPUGNA.html",
+    "notes": "SP Racing foam GT tyre on black multi-spoke wheel, 99mm OD, 42mm wide, 17mm hex; code SP-GT-42.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_SPUGNA.html",
+    "notes": "SP Racing foam GT tyre on black multi-spoke wheel, 99mm OD, 42mm wide, 17mm hex; code SP-GT-45.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Foam",
+    "compound": "50 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_SPUGNA.html",
+    "notes": "SP Racing foam GT tyre on black multi-spoke wheel, 99mm OD, 42mm wide, 17mm hex; code SP-GT-50.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Long Life Radial",
+    "compound": "R1 Extra Super Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/Radiali_R.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Longer-lasting radial, e.g. for 30-minute-plus finals; sold as \"SP R1 Radial\".",
+    "compound_note": "SP: long-life compounds with low wear.",
+    "softness": 1,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Long Life Radial",
+    "compound": "R2 Super Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/Radiali_R.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Longer-lasting radial, e.g. for 30-minute-plus finals; sold as \"SP R2 Radial\".",
+    "compound_note": "SP: long-life compounds with low wear.",
+    "softness": 2,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Long Life Radial",
+    "compound": "R3 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/Radiali_R.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Longer-lasting radial, e.g. for 30-minute-plus finals; sold as \"SP R3 Radial\".",
+    "compound_note": "SP: long-life compounds with low wear.",
+    "softness": 3,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Long Life Radial",
+    "compound": "R4 Medium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/Radiali_R.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Longer-lasting radial, e.g. for 30-minute-plus finals; sold as \"SP R4 Radial\".",
+    "compound_note": "SP: long-life compounds with low wear.",
+    "softness": 4,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Long Life Radial",
+    "compound": "R5 Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/Radiali_R.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Longer-lasting radial, e.g. for 30-minute-plus finals; sold as \"SP R5 Radial\".",
+    "compound_note": "SP: long-life compounds with low wear.",
+    "softness": 5,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Radiale",
+    "compound": "F0 Super Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Radiali_F.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Radial tread, sold as \"F0 Radiale\" (4 pcs in the SP shop).",
+    "compound_note": "SP: built for driving confidence and very low wear.",
+    "softness": 2,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Radiale",
+    "compound": "F00 Extra Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Radiali_F.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Radial tread, sold as \"F00 Radiale\" (4 pcs in the SP shop). F00 is in the SP online shop but not yet on the info page.",
+    "compound_note": "SP: built for driving confidence and very low wear.",
+    "softness": 1,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Radiale",
+    "compound": "F1 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Radiali_F.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Radial tread, sold as \"F1 Radiale\" (4 pcs in the SP shop).",
+    "compound_note": "SP: built for driving confidence and very low wear.",
+    "softness": 3,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Radiale",
+    "compound": "F3 Medium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Radiali_F.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Radial tread, sold as \"F3 Radiale\" (4 pcs in the SP shop).",
+    "compound_note": "SP: built for driving confidence and very low wear.",
+    "softness": 4,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Radiale",
+    "compound": "F5 Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Radiali_F.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Radial tread, sold as \"F5 Radiale\" (4 pcs in the SP shop).",
+    "compound_note": "SP: built for driving confidence and very low wear.",
+    "softness": 5,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "SL100 Medium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Slick.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Slick, \"synthetic\" compound for top-level racing; code SPSL100.",
+    "compound_note": "Synthetic compound; SP temperature range -5 to 25 C as printed.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "SL150 Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Slick.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Slick, \"synthetic\" compound for top-level racing; code SPSL150.",
+    "compound_note": "Synthetic compound; SP temperature range 15 to 40 C.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "SL160 Extra Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Slick.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Slick, \"thermal\" compound; code SPSL160.",
+    "compound_note": "Thermal compound for dirty, low-grip tracks at any temperature; SP range -5 to 10 C.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "SL180 Super Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Slick.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Slick, \"thermal\" compound; code SPSL180.",
+    "compound_note": "Thermal compound for dirty, low-grip tracks at any temperature; SP range 0 to 15 C.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "SL200 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Slick.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Slick, \"thermal\" compound; code SPSL200.",
+    "compound_note": "Thermal compound for dirty, low-grip tracks at any temperature; SP range 10 to 25 C.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "SL220 Medium",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Slick.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Slick, \"thermal\" compound; code SPSL220.",
+    "compound_note": "Thermal compound for dirty, low-grip tracks at any temperature; SP range 15 to 35 C.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "SL240 Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Slick.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Slick, \"thermal\" compound; code SPSL240.",
+    "compound_note": "Thermal compound for dirty, low-grip tracks at any temperature; SP range 20 to 45 C.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "SL50 Super Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Slick.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Slick, \"synthetic\" compound for top-level racing; code SPSL050.",
+    "compound_note": "Synthetic compound; SP temperature range -10 to 5 C.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Slick",
+    "compound": "SL75 Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/1_8_GT.html",
+    "product_url": "https://www.spracing.it/GT_Slick.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Slick, \"synthetic\" compound for top-level racing; code SPSL075.",
+    "compound_note": "Synthetic compound; SP temperature range 0 to 15 C.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Sport",
+    "compound": "Hard",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_29",
+    "product_url": "https://www.spracing.it/GT_Sport.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Budget \"Sport\" version, code SP00015; the SP shop sells the hard pair as the front to balance the car.",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "GT Sport",
+    "compound": "Soft",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_29",
+    "product_url": "https://www.spracing.it/GT_Sport.html",
+    "notes": "SP Racing 1/8 GT / Rally Game rubber tyre, 98mm OD, 42mm wide, 17mm hex wheel. Made in Italy. Budget \"Sport\" version, code SP00010; the SP shop sells the soft pair as the rear to balance the car.",
+    "compound_note": null,
+    "softness": 3,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "On Road Front",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_76",
+    "product_url": "https://www.spracing.it/catalog/product_info.php?cPath=24_146_76&products_id=7153",
+    "notes": "\"Gomme Spugne 1/8 On Road SP 32 shore anteriori\" (SP online shop); 1/8 track foam, pair. SP also trues to a requested diameter.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "On Road Front",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_76",
+    "product_url": "https://www.spracing.it/catalog/product_info.php?cPath=24_146_76&products_id=7154",
+    "notes": "\"Gomme Spugne 1/8 On Road SP 35 shore anteriori\" (SP online shop); 1/8 track foam, pair. SP also trues to a requested diameter.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "On Road Front",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_76",
+    "product_url": "https://www.spracing.it/catalog/product_info.php?cPath=24_146_76&products_id=7183",
+    "notes": "\"Gomme Spugne 1/8 On Road SP 40 shore anteriori\" (SP online shop); 1/8 track foam, pair. SP also trues to a requested diameter.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "On Road Front",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_76",
+    "product_url": "https://www.spracing.it/catalog/product_info.php?cPath=24_146_76&products_id=7155",
+    "notes": "\"Gomme Spugne 1/8 On Road SP 45 shore anteriori\" (SP online shop); 1/8 track foam, pair. SP also trues to a requested diameter.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "On Road Front",
+    "compound": "48 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_76",
+    "product_url": "https://www.spracing.it/catalog/product_info.php?cPath=24_146_76&products_id=7160",
+    "notes": "\"Gomme Spugne 1/8 On Road SP 48 shore anteriori\" (SP online shop); 1/8 track foam, pair. SP also trues to a requested diameter.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "On Road Front",
+    "compound": "50 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_76",
+    "product_url": "https://www.spracing.it/catalog/product_info.php?cPath=24_146_76&products_id=7156",
+    "notes": "\"Gomme Spugne 1/8 On Road SP 50 shore anteriori\" (SP online shop); 1/8 track foam, pair. SP also trues to a requested diameter.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "On Road Rear",
+    "compound": "32 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_76",
+    "product_url": "https://www.spracing.it/catalog/product_info.php?cPath=24_146_76&products_id=7157",
+    "notes": "\"Gomme Spugne 1/8 On Road SP 32 shore posteriori\" (SP online shop); 1/8 track foam, pair. SP also trues to a requested diameter.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "On Road Rear",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_76",
+    "product_url": "https://www.spracing.it/catalog/product_info.php?cPath=24_146_76&products_id=7158",
+    "notes": "\"Gomme Spugne 1/8 On Road SP 35 shore posteriori\" (SP online shop); 1/8 track foam, pair. SP also trues to a requested diameter.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "On Road Rear",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_76",
+    "product_url": "https://www.spracing.it/catalog/product_info.php?cPath=24_146_76&products_id=7184",
+    "notes": "\"Gomme Spugne 1/8 On Road SP 40 shore posteriori\" (SP online shop); 1/8 track foam, pair. SP also trues to a requested diameter.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "SP Racing",
+    "discipline": "onroad-8th",
+    "model": "On Road Rear",
+    "compound": "45 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.spracing.it/catalog/index.php?cPath=24_146_76",
+    "product_url": "https://www.spracing.it/catalog/product_info.php?cPath=24_146_76&products_id=7159",
+    "notes": "\"Gomme Spugne 1/8 On Road SP 45 shore posteriori\" (SP online shop); 1/8 track foam, pair. SP also trues to a requested diameter.",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 D-Spec Slick",
+    "compound": "D32 (Soft)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/f1",
+    "product_url": "https://www.sweepracing.com/product-page/gt2-d32wp-gt8-d-compound-slick-tires-2pcs",
+    "notes": "Belted 1/8 GT slick, pair pre-glued. GT2-D32WP (white) / GT2-D32BP (black); US SKU 4332.",
+    "compound_note": "D-SPEC rubber (from the D-Spec TC tyres) made for heavier GT8 cars: strong, long-lasting, easy to drive.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 D-Spec Slick",
+    "compound": "D36 (Medium)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/f1",
+    "product_url": "https://www.sweepracing.com/product-page/gt2-d36wp-gt8-d-compound-slick-tires-2pcs",
+    "notes": "Belted 1/8 GT slick, pair pre-glued. GT2-D36WP (white) / GT2-D36BP (black); US SKU 4336; yellow dot.",
+    "compound_note": "D-SPEC rubber (from the D-Spec TC tyres) made for heavier GT8 cars: strong, long-lasting, easy to drive.",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 D-Spec Slick",
+    "compound": "D40 (Hard)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/f1",
+    "product_url": "https://www.sweepracing.com/product-page/gt2-d40wp-8th-gt-d-compound-slick-tires-white-wheels-2pcs",
+    "notes": "Belted 1/8 GT slick, pair pre-glued. GT2-D40WP (white) / GT2-D40BP (black); red dot. 2025 IFMAR GT Worlds spec and 2026 EFRA GT8 Euros control tyre.",
+    "compound_note": "D-SPEC rubber (from the D-Spec TC tyres) made for heavier GT8 cars: strong, long-lasting, easy to drive.",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 D-Spec Slick",
+    "compound": "D44 (X-Hard)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/f1",
+    "product_url": "https://www.sweepracing.com/product-page/gt2-d32wp-gt8-d-compound-slick-tires-2pcs",
+    "notes": "Belted 1/8 GT slick, pair pre-glued. Listed as available in the D-Spec text on both Sweep sites; no own product page seen.",
+    "compound_note": "D-SPEC rubber (from the D-Spec TC tyres) made for heavier GT8 cars: strong, long-lasting, easy to drive.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Slick",
+    "compound": "EXP 40 (Ultra Soft)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Slick-40deg-Belted-EXP-GT-Super-Soft-2pc-tire-set-with-Pre-Glued-options_p_422.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40140E; sweepracing.com S40140EK16P (black) / S40140EW16P (white) pre-glued. Slick: for purpose-built or smooth tracks.",
+    "compound_note": "40 deg, green dot, cold weather. EXP = synthetic rubber, most traction, longer lasting (two colour dots).",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Slick",
+    "compound": "EXP 45 (Soft)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Slick-45deg-Belted-EXP-GT-Soft-2pc-tire-set-with-Pre-Glued-options_p_262.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40145E; sweepracing.com S40145EK16P (black) / S40145EW16P (white) pre-glued. Slick: for purpose-built or smooth tracks.",
+    "compound_note": "45 deg, blue dot, cool weather. EXP = synthetic rubber, most traction, longer lasting (two colour dots).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Slick",
+    "compound": "EXP 50 (Medium)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Slick-50deg-Belted-EXP-GT-Medium-2pc-tire-set-with-Pre-Glued-options_p_263.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40150E. Slick: for purpose-built or smooth tracks.",
+    "compound_note": "50 deg, red dot, hot weather. EXP = synthetic rubber, most traction, longer lasting (two colour dots).",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Slick",
+    "compound": "EXP 55 (Hard)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Slick-55deg-Belted-EXP-GT-Hard-2pc-tire-set-with-Pre-Glued-options_p_264.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40155E. Slick: for purpose-built or smooth tracks.",
+    "compound_note": "55 deg, gold dot, sizzling weather. EXP = synthetic rubber, most traction, longer lasting (two colour dots).",
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Slick",
+    "compound": "GT 45 (Soft)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Slick-45deg-Belted-GT-Soft-2pc-tire-set-with-Pre-Glued-options_p_148.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40145. Slick: for purpose-built or smooth tracks.",
+    "compound_note": "45 deg, blue dot, cool weather. GT = natural virgin rubber, for VHT / sugar-coated prepped tracks (one colour dot).",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Slick",
+    "compound": "GT 50 (Medium)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Slick-50deg-Belted-GT-Medium-2pc-tire-set-with-Pre-Glued-options_p_259.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40150. Slick: for purpose-built or smooth tracks.",
+    "compound_note": "50 deg, red dot, hot weather. GT = natural virgin rubber, for VHT / sugar-coated prepped tracks (one colour dot).",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Treaded",
+    "compound": "EXP 40 (Ultra Soft)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Treaded-40deg-Belted-EXP-GT-Super-Soft-2pc-tire-set-with-Pre-Glued-options_p_423.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40240E. Treaded: for uneven surfaces such as parking lots.",
+    "compound_note": "40 deg, green dot, cold weather. EXP = synthetic rubber, most traction, longer lasting (two colour dots).",
+    "softness": 1,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Treaded",
+    "compound": "EXP 45 (Soft)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Treaded-45deg-Belted-EXP-GT-Soft-2pc-tire-set-with-Pre-Glued-options_p_265.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40245E; sweepracing.com S40245EK16P (black) / S40245EW16P (white) pre-glued. Treaded: for uneven surfaces such as parking lots.",
+    "compound_note": "45 deg, blue dot, cool weather. EXP = synthetic rubber, most traction, longer lasting (two colour dots).",
+    "softness": 2,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Treaded",
+    "compound": "EXP 50 (Medium)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Treaded-50deg-Belted-EXP-GT-Medium-2pc-tire-set-with-Pre-Glued-options_p_266.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40250E. Treaded: for uneven surfaces such as parking lots.",
+    "compound_note": "50 deg, red dot, hot weather. EXP = synthetic rubber, most traction, longer lasting (two colour dots).",
+    "softness": 3,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Treaded",
+    "compound": "EXP 55 (Hard)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Treaded-55deg-Belted-EXP-GT-Hard-2pc-tire-set-with-Pre-Glued-options_p_267.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40255E; sweepracing.com S40255EW16P (white) pre-glued. Treaded: for uneven surfaces such as parking lots.",
+    "compound_note": "55 deg, gold dot, sizzling weather. EXP = synthetic rubber, most traction, longer lasting (two colour dots).",
+    "softness": 4,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Treaded",
+    "compound": "GT 45 (Soft)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Treaded-45deg-Belted-GT-Soft-2pc-tire-set-with-Pre-Glued-options_p_261.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40245. Treaded: for uneven surfaces such as parking lots.",
+    "compound_note": "45 deg, blue dot, cool weather. GT = natural virgin rubber, for VHT / sugar-coated prepped tracks (one colour dot).",
+    "softness": 2,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GT8 Treaded",
+    "compound": "GT 50 (Medium)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Treaded-50deg-Belted-GT-Medium-2pc-tire-set-with-Pre-Glued-options_p_260.html",
+    "notes": "Belted 1/8 GT rubber, 102mm OD, sold as a pair loose or pre-glued on EVO16 wheels; SKU 40250. Treaded: for uneven surfaces such as parking lots.",
+    "compound_note": "50 deg, red dot, hot weather. GT = natural virgin rubber, for VHT / sugar-coated prepped tracks (one colour dot).",
+    "softness": 3,
+    "tread_style": "other",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GTR2 Slick",
+    "compound": "50 (Medium)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracing.com/f1",
+    "product_url": "https://www.sweepracing.com/product-page/gtr2-50ek16p-1-8-gt-slick-tires",
+    "notes": "GTR2-50EK16P: \"all new GT8 tires 50deg\", pair pre-glued on black wheels (sweepracing.com). Rubber family (EXP or GT) not stated.",
+    "compound_note": "50 deg (Sweep chart: medium, hot weather).",
+    "softness": 3,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT, low profile",
+    "discontinued": false
+  },
+  {
+    "brand": "Sweep Racing",
+    "discipline": "onroad-8th",
+    "model": "GTR2 Slick",
+    "compound": "EXP 45 (Soft)",
+    "surface": "asphalt",
+    "tire_type": "rubber",
+    "source_url": "https://www.sweepracingusa.com/8th-GT8_c_25.html",
+    "product_url": "https://www.sweepracingusa.com/Slick-45deg-Low-profile-GTR2-Belted-Blue-dot-2pc-Pre-Glued-Options_p_760.html",
+    "notes": "Low-profile (smaller diameter) belted 1/8 GT slick, debuted at the 2019 Pan Am GT race; SKU 42145E, blue dot.",
+    "compound_note": "45 deg, blue dot, cool weather.",
+    "softness": 2,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "gt-8th",
+        "position": "all"
+      }
+    ],
+    "size": "1/8 GT, low profile",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "onroad-8th",
+    "model": "2013 Front",
+    "compound": "30 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.speedworldhobbies.com/RC_Car_On_Road_1_8th_Scale_Foam_Tires.cfm",
+    "product_url": "https://www.speedworldhobbies.com/ULTI_Tire_Products.cfm",
+    "notes": "SKU 08F302013WC. Ulti (Nuclear RC, USA) 1/8 nitro on-road foam, pair on carbon rims. ultitires.com is behind a Cloudflare block, so only the two items Speed World Hobbies lists are here; Ulti also sells \"Invincible\" RS170H/R177H lines (not confirmed).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 1,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "ULTI",
+    "discipline": "onroad-8th",
+    "model": "2013 Rear",
+    "compound": "35 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.speedworldhobbies.com/RC_Car_On_Road_1_8th_Scale_Foam_Tires.cfm",
+    "product_url": "https://www.speedworldhobbies.com/ULTI_Tire_Products.cfm",
+    "notes": "SKU 08R352013WC. Ulti (Nuclear RC, USA) 1/8 nitro on-road foam, pair on carbon rims. ultitires.com is behind a Cloudflare block, so only the two items Speed World Hobbies lists are here; Ulti also sells \"Invincible\" RS170H/R177H lines (not confirmed).",
+    "compound_note": "Shore hardness; lower is softer.",
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "onroad-8th",
+    "model": "Enneti Front",
+    "compound": "37 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/xceed-rc-enneti-1-8-on-road-front-tires-2-white-37-shore-xcd101602/p385455",
+    "product_url": "https://www.amainhobbies.com/xceed-rc-enneti-1-8-on-road-front-tires-2-white-37-shore-xcd101602/p385455?v=171287",
+    "notes": "Made for Xceed by Enneti (Italy); pair pre-mounted on twin six-spoke wheels (white nylon or carbon black), on-road quick-release axle fit, not hex. SKU XCD101602 (white).",
+    "compound_note": null,
+    "softness": 4,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "onroad-8th",
+    "model": "Enneti Front",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/xceed-rc-enneti-1-8-on-road-front-tires-2-white-37-shore-xcd101602/p385455",
+    "product_url": "https://www.amainhobbies.com/xceed-rc-enneti-1-8-on-road-front-tires-2-white-40-shore-xcd101603/p385455?v=171288",
+    "notes": "Made for Xceed by Enneti (Italy); pair pre-mounted on twin six-spoke wheels (white nylon or carbon black), on-road quick-release axle fit, not hex. SKUs XCD101603 (white), XCD101645 (carbon).",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "front"
+      },
+      {
+        "class": "gt-8th",
+        "position": "front"
+      }
+    ],
+    "size": "1/8 on-road front",
+    "discontinued": false
+  },
+  {
+    "brand": "Xceed",
+    "discipline": "onroad-8th",
+    "model": "Enneti Rear",
+    "compound": "40 Shore",
+    "surface": "asphalt",
+    "tire_type": "foam",
+    "source_url": "https://www.amainhobbies.com/xceed-rc-enneti-1-8-on-road-rear-tires-2-white-40-shore-xcd101608/p385458",
+    "product_url": "https://www.amainhobbies.com/xceed-rc-enneti-1-8-on-road-rear-tires-2-white-40-shore-xcd101608/p385458?v=171293",
+    "notes": "Made for Xceed by Enneti (Italy); pair pre-mounted on twin six-spoke wheels (white nylon or carbon black), on-road quick-release axle fit, not hex. SKU XCD101608 (white).",
+    "compound_note": null,
+    "softness": 5,
+    "tread_style": "slick",
+    "surfaces": [
+      "asphalt"
+    ],
+    "fits": [
+      {
+        "class": "pan-8th",
+        "position": "rear"
+      },
+      {
+        "class": "gt-8th",
+        "position": "rear"
+      }
+    ],
+    "size": "1/8 on-road rear",
+    "discontinued": false
+  }
+]

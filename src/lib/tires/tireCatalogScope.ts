@@ -8,8 +8,10 @@ import { tireCatalogWhere } from "@/lib/tires/tireCatalogFilter";
 /**
  * Ceiling on a catalog read. The pickers download the list once and search it in the browser, so
  * a row past this is not merely last — it cannot be found at all. Headroom, not a page size.
+ * 5000 since the per-class lists of 2026-09-26 took the whole catalog to about 2,000: a car
+ * nothing can place still gets all of it, and every placed car only its own list.
  */
-export const TIRE_CATALOG_MAX = 2000;
+export const TIRE_CATALOG_MAX = 5000;
 
 /**
  * The slice of the catalog a car's picker may see. Fails OPEN: a bucket nobody has imported
