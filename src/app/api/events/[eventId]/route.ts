@@ -13,7 +13,7 @@ import {
   mapEventForUser,
   userCanAccessEvent,
 } from "@/lib/events/eventParticipation";
-import { canEditSharedEventFields } from "@/lib/events/eventAccess";
+import { canEditSharedEventFields, isLiveRcMeeting } from "@/lib/events/eventAccess";
 import { mergeEventIntoExistingByResultsUrl } from "@/lib/events/mergeEvents";
 import { eventTrackFieldsForLink } from "@/lib/tracks/legacyTrackSnapshot";
 import { revalidateAfterEventMutation } from "@/lib/revalidateUser";
@@ -83,9 +83,14 @@ export async function PATCH(
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
+  // Your own notes are always yours to save; only the meeting's shared fields are guarded.
   if (hasShared && !canEditSharedEventFields(user, existing)) {
     return NextResponse.json(
-      { error: "Only the user who created this event or an admin can edit shared event fields." },
+      {
+        error: isLiveRcMeeting(existing)
+          ? "A LiveRC meeting's name, dates and links come from LiveRC."
+          : "Only the driver who made this meeting can change its name, dates or links.",
+      },
       { status: 403 }
     );
   }
@@ -235,10 +240,18 @@ export async function PATCH(
       if (merge.merged) {
         survivingEventId = merge.eventId;
         await ensureEventParticipation({ userId: user.id, eventId: survivingEventId });
-        await prisma.event.update({
+        // The meeting this one joined already carries the link, so it is LiveRC's: what was typed
+        // into the one that joined it must not rename or re-date it for everyone on it (W1-01).
+        const survivor = await prisma.event.findUnique({
           where: { id: survivingEventId },
-          data: eventData,
+          select: { userId: true, resultsSourceUrl: true },
         });
+        if (survivor && canEditSharedEventFields(user, survivor)) {
+          await prisma.event.update({
+            where: { id: survivingEventId },
+            data: eventData,
+          });
+        }
       } else {
         await prisma.event.update({
           where: { id: survivingEventId },

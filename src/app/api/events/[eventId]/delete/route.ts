@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Delete a meeting you made, while nobody else is on it (founder ruling 2026-09-26). Your runs on
- * it stay, as days at its track. Rules and the transaction: src/lib/events/deleteOwnEvent.ts.
+ * it stay, as days at its track. A LiveRC meeting is never deleted here: it has no racer maker.
+ * Rules and the transaction: src/lib/events/deleteOwnEvent.ts.
  *
  * A POST beside `join/`, not a DELETE on the event, so it can't be mistaken for an admin removal.
  */
@@ -29,6 +30,9 @@ export async function POST(_request: Request, context: { params: Promise<{ event
   if (!result.ok) {
     if (result.reason === "not-found") {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    if (result.reason === "liverc-meeting") {
+      return NextResponse.json({ error: "A LiveRC meeting can't be deleted." }, { status: 403 });
     }
     if (result.reason === "not-maker") {
       return NextResponse.json(

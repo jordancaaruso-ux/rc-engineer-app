@@ -8,6 +8,7 @@ import { PageBackLink } from "@/components/ui/PageBackLink";
 import { EventMetaEditor } from "@/components/events/EventMetaEditor";
 import { EventDeleteClient } from "@/components/events/EventDeleteClient";
 import { loadEventDeleteView } from "@/lib/events/deleteOwnEvent";
+import { canEditSharedEventFields } from "@/lib/events/eventAccess";
 import {
   EVENT_LIST_INCLUDE,
   mapEventForUser,
@@ -104,6 +105,7 @@ export default async function EventDetailPage(props: {
             initialMyRcmUrl={event.myRcmUrl}
             initialRaceClass={event.raceClass}
             runCount={runCount}
+            canEditShared={canEditSharedEventFields(user, raw)}
           />
 
           {deleteView && deleteView.block === null ? (

@@ -22,13 +22,20 @@ export type EventDeleteView = {
 
 /** What the meeting's page needs to decide whether to offer Delete. Null when there is no such meeting. */
 export async function loadEventDeleteView(eventId: string, userId: string): Promise<EventDeleteView | null> {
-  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { userId: true } });
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { userId: true, resultsSourceUrl: true },
+  });
   if (!event) return null;
   const [othersOnIt, myRunCount] = await Promise.all([
     countOthersOnEvent(prisma, eventId, userId),
     prisma.run.count({ where: { eventId, userId } }),
   ]);
-  const facts: EventDeleteFacts = { creatorUserId: event.userId, othersOnIt };
+  const facts: EventDeleteFacts = {
+    creatorUserId: event.userId,
+    resultsSourceUrl: event.resultsSourceUrl,
+    othersOnIt,
+  };
   return { facts, block: eventDeleteBlock(userId, facts), myRunCount };
 }
 
@@ -37,7 +44,8 @@ export type DeleteOwnEventResult =
   | { ok: false; reason: "not-found" | EventDeleteBlock };
 
 /**
- * Delete a meeting its maker made, while nobody else is on it (founder ruling 2026-09-26).
+ * Delete a meeting its maker made, while nobody else is on it (founder ruling 2026-09-26). Never a
+ * LiveRC meeting: it has no racer maker (`eventDeleteBlock`).
  *
  * The maker's runs stay, as days at the meeting's track: the event link goes, the date and track
  * stay, so Sessions shows each day on its own (buildRunHistoryGroups groups by track name and day).
@@ -51,12 +59,23 @@ export async function deleteOwnEvent(eventId: string, userId: string): Promise<D
   return prisma.$transaction(async (tx) => {
     const event = await tx.event.findUnique({
       where: { id: eventId },
-      select: { id: true, userId: true, trackId: true, track: { select: { name: true } }, trackNameSnapshot: true },
+      select: {
+        id: true,
+        userId: true,
+        resultsSourceUrl: true,
+        trackId: true,
+        track: { select: { name: true } },
+        trackNameSnapshot: true,
+      },
     });
     if (!event) return { ok: false, reason: "not-found" } as const;
 
     const othersOnIt = await countOthersOnEvent(tx, eventId, userId);
-    const block = eventDeleteBlock(userId, { creatorUserId: event.userId, othersOnIt });
+    const block = eventDeleteBlock(userId, {
+      creatorUserId: event.userId,
+      resultsSourceUrl: event.resultsSourceUrl,
+      othersOnIt,
+    });
     if (block) return { ok: false, reason: block } as const;
 
     if (event.trackId) {
