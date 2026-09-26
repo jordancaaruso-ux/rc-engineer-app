@@ -14,6 +14,11 @@
  * tier `pro` (so the seat resolves to Race Engineer); with the plain app stamp it would be
  * mistaken for Race Engineer's own product. It is also never added to the portal's plan-switch
  * list: a founder has nothing to switch to.
+ *
+ * A US$ or € amount already on a price can never be edited (Stripe: immutable). When the code's
+ * amounts change, `--new-founding-prices` makes a new batch price and moves the lookup key to it;
+ * the old price keeps working for whatever still points at it. Then put the new id in
+ * STRIPE_PRICE_FOUNDING_<batch>, redeploy, and only then archive the old price.
  */
 import type Stripe from "stripe";
 // Relative, not `@/`: this runs under tsx outside the Next build. Both modules are pure.
@@ -31,7 +36,8 @@ type FoundingPriceDef = {
   /**
    * The price's own US$ and € amounts (Stripe `currency_options`), shown and charged to visitors
    * whose plans are priced in those currencies. Added once, never changed: Stripe refuses an edit to
-   * an amount already on a price, so a different amount means a new price and new env vars.
+   * an amount already on a price, so a different amount means a new price and new env vars
+   * (`--new-founding-prices`).
    */
   currencyOptions: { usd: number; eur: number };
 };
@@ -75,6 +81,7 @@ async function ensureFoundingPrice(
   stripe: Stripe,
   productId: string,
   def: FoundingPriceDef,
+  replaceChanged: boolean,
 ): Promise<string> {
   const existing = await stripe.prices.list({
     lookup_keys: [def.lookupKey],
@@ -87,14 +94,19 @@ async function ensureFoundingPrice(
     current.unit_amount === def.unitAmount &&
     (current.recurring?.interval ?? undefined) === def.interval;
   const options = Object.entries(def.currencyOptions) as Array<["usd" | "eur", number]>;
-  if (current && sameShape) {
+  // US$/€ amounts the price already carries that differ from the code's: only a new price fixes them.
+  const changed = options.filter(([c, amount]) => {
+    const has = current?.currency_options?.[c]?.unit_amount;
+    return has != null && has !== amount;
+  });
+  if (current && sameShape && !(replaceChanged && changed.length > 0)) {
     // Add any currency the price doesn't carry yet; one it already carries is never touched.
     const missing = options.filter(([c]) => current.currency_options?.[c]?.unit_amount == null);
-    for (const [c, amount] of options) {
+    for (const [c, amount] of changed) {
       const has = current.currency_options?.[c]?.unit_amount;
-      if (has != null && has !== amount) {
-        console.warn(`  ${def.lookupKey}: ${c} is ${has}, wanted ${amount}; Stripe can't change it (needs a new price)`);
-      }
+      console.warn(
+        `  ${def.lookupKey}: ${c} is ${has}, wanted ${amount}; Stripe can't change it (re-run with --new-founding-prices)`,
+      );
     }
     if (missing.length > 0) {
       await stripe.prices.update(current.id, {
@@ -114,15 +126,23 @@ async function ensureFoundingPrice(
     ...(current ? { transfer_lookup_key: true } : {}),
     metadata: { app: FOUNDING_APP },
   });
+  if (current) {
+    console.log(
+      `  ${def.lookupKey}: ${price.id} replaces ${current.id}; archive the old one once nothing points at it`,
+    );
+  }
   return price.id;
 }
 
 /** Make (or find) the founding product and its prices; returns the env lines to paste. */
-export async function ensureFoundingSeats(stripe: Stripe): Promise<string[]> {
+export async function ensureFoundingSeats(
+  stripe: Stripe,
+  opts: { replaceChanged?: boolean } = {},
+): Promise<string[]> {
   const productId = await ensureFoundingProduct(stripe);
   const lines: string[] = [];
   for (const def of PRICES) {
-    const priceId = await ensureFoundingPrice(stripe, productId, def);
+    const priceId = await ensureFoundingPrice(stripe, productId, def, opts.replaceChanged ?? false);
     const what = def.interval
       ? `$0 AUD/${def.interval} (the seat)`
       : `$${(def.unitAmount / 100).toFixed(2)} AUD once (US$${(def.currencyOptions.usd / 100).toFixed(2)}, €${(def.currencyOptions.eur / 100).toFixed(2)})`;

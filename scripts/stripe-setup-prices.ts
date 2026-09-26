@@ -163,8 +163,11 @@ async function ensurePortalPlanSwitching(
 
 async function main() {
   // Founding seats (docs/MONETISATION_NORTH_STAR.md): their own product and prices, never in the
-  // portal's plan-switch list. `--founding-only` makes just those and touches nothing else.
-  const foundingLines = await ensureFoundingSeats(stripe);
+  // portal's plan-switch list. `--founding-only` makes just those and touches nothing else;
+  // `--new-founding-prices` replaces a batch price whose US$/€ amounts changed in the code.
+  const foundingLines = await ensureFoundingSeats(stripe, {
+    replaceChanged: process.argv.includes("--new-founding-prices"),
+  });
   if (process.argv.includes("--founding-only")) {
     console.log("\n--- paste into .env.local ---");
     console.log(foundingLines.map((l) => l.replace("=", '="') + '"').join("\n"));

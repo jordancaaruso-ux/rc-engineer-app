@@ -111,14 +111,14 @@ test("the seats line, in every state the band can be in", () => {
 test("amounts read like the price cards, in any of the three currencies", () => {
   assert.equal(formatFoundingAmount(39_900), "$399");
   assert.equal(formatFoundingAmount(99_950), "$999.50");
-  assert.equal(formatFoundingAmount(25_900, "usd"), "$259");
-  assert.equal(formatFoundingAmount(64_950, "usd"), "$649.50");
-  assert.equal(formatFoundingAmount(23_900, "eur"), "€239");
-  assert.equal(formatFoundingAmount(59_950, "eur"), "€599.50");
+  assert.equal(formatFoundingAmount(29_900, "usd"), "$299");
+  assert.equal(formatFoundingAmount(74_950, "usd"), "$749.50");
+  assert.equal(formatFoundingAmount(25_900, "eur"), "€259");
+  assert.equal(formatFoundingAmount(64_950, "eur"), "€649.50");
 });
 
 test("US$ and € seats follow the A$ rule: just under 2 and 2.5 years of the yearly price, ending in 9", () => {
-  const yearly = { aud: 19_990, usd: 12_990, eur: 11_990 };
+  const yearly = { aud: 19_990, usd: 14_990, eur: 12_990 };
   const years = [2, 2.5];
   FOUNDING_BATCHES.forEach((b, i) => {
     const amounts = { aud: b.amountCents, usd: b.currencyAmounts.usd, eur: b.currencyAmounts.eur };

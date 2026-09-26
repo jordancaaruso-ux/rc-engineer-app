@@ -29,7 +29,7 @@ import {
  *
  * Three Stripe prices, all on one "Founding member" product whose `metadata.tier` is `pro`:
  *   - STRIPE_PRICE_FOUNDING_1 / _2: the one-off payments, A$399 and A$499, each carrying its own
- *     US$ and € amounts as `currency_options` (US$259/US$319, €239/€299).
+ *     US$ and € amounts as `currency_options` (US$299/US$369, €259/€319).
  *   - STRIPE_PRICE_FOUNDING_SEAT: a $0 yearly price (also $0 in US$ and €). The webhook puts each
  *     founder on a subscription to it once their payment clears, and that subscription IS the seat.
  * Until all three are set (and Stripe is), the offer shows nowhere and the checkout refuses, so

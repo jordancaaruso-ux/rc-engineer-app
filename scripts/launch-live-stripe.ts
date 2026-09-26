@@ -16,7 +16,8 @@
  *   - webhook endpoint at <origin>/api/stripe/webhook with exactly the events the route handles
  *     (an existing endpoint gains any event it is missing)
  *   - founding member seats: their own product, the two batch prices and the $0 seat price
- *     (scripts/stripeFoundingSetup.ts); `--founding-only` does just that plus the webhook events
+ *     (scripts/stripeFoundingSetup.ts); `--founding-only` does just that plus the webhook events;
+ *     `--new-founding-prices` replaces a batch price whose US$/€ amounts changed in the code
  *   - prints the complete Vercel env block to paste (price ids + whsec)
  */
 import { randomBytes } from "node:crypto";
@@ -219,7 +220,9 @@ async function main() {
   // Founding seats (docs/MONETISATION_NORTH_STAR.md, 2026-09-25). `--founding-only` makes the
   // founding product and prices and brings the webhook's events up to date, and nothing else:
   // no plan prices, no portal, no coupons.
-  const foundingLines = await ensureFoundingSeats(stripe);
+  const foundingLines = await ensureFoundingSeats(stripe, {
+    replaceChanged: args.includes("--new-founding-prices"),
+  });
   if (args.includes("--founding-only")) {
     await ensureWebhook({ create: false });
     console.log(`\n--- Vercel env (Production) — add these three ---`);

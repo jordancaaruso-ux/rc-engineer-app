@@ -17,9 +17,11 @@
  *     else bought. Add them later if the offer is popular.
  *
  *   - In US dollars and euros too (2026-09-26, founder: "fix before launch day the rough edge"):
- *     a US visitor whose plan cards say US$12.99 saw the seat in A$ and, at checkout, Stripe's
+ *     a US visitor whose plan cards were in US$ saw the seat in A$ and, at checkout, Stripe's
  *     own conversion of it. The seat now has its own round US$ and € amounts, shown and charged
- *     exactly when the plans on the same page are (`pickFoundingCurrency`).
+ *     exactly when the plans on the same page are (`pickFoundingCurrency`). Matched the same day
+ *     to the plans' approved overseas table (founder: "the table is a yes"): US$299 / €259, then
+ *     US$369 / €319.
  *
  * The seat itself is a $0 yearly Stripe subscription on its own product (`metadata.tier` = pro),
  * so every surface that reads the Subscription row (sign-in, entitlement, the run window, teams)
@@ -51,15 +53,15 @@ export type FoundingBatch = {
    * The same seat's own round US$ and € amounts, carried by the batch price as Stripe
    * `currency_options`. Set the way the A$ ones were: the largest whole amount ending in 9 that is
    * below two years (batch 1) or two and a half years (batch 2) of Race Engineer's yearly price in
-   * that currency (A$199.90, US$129.90, €119.90). Once added to a live price an amount can never
+   * that currency (A$199.90, US$149.90, €129.90). Once added to a live price an amount can never
    * be changed or removed; a different amount means a new price and new STRIPE_PRICE_FOUNDING_*.
    */
   currencyAmounts: { usd: number; eur: number };
 };
 
 export const FOUNDING_BATCHES: readonly FoundingBatch[] = [
-  { batch: 1, seats: 25, amountCents: 39_900, currencyAmounts: { usd: 25_900, eur: 23_900 } },
-  { batch: 2, seats: 25, amountCents: 49_900, currencyAmounts: { usd: 31_900, eur: 29_900 } },
+  { batch: 1, seats: 25, amountCents: 39_900, currencyAmounts: { usd: 29_900, eur: 25_900 } },
+  { batch: 2, seats: 25, amountCents: 49_900, currencyAmounts: { usd: 36_900, eur: 31_900 } },
 ];
 
 /** The count appears once FEWER than this many seats remain in the batch on sale. */
@@ -168,7 +170,7 @@ export function foundingSeatsLine(o: {
 }
 
 /**
- * Cents to "$399", "€239" or "$649.50": whole amounts drop the cents. The short symbol only, as on
+ * Cents to "$399", "€259" or "$749.50": whole amounts drop the cents. The short symbol only, as on
  * the plan cards; the currency is named once beside it ("USD, once").
  */
 export function formatFoundingAmount(cents: number, currency: string = DEFAULT_PRICE_CURRENCY): string {
