@@ -33,8 +33,14 @@ function trackRow(t: TrackOption) {
     value: t.id,
     label: t.name,
     detail: t.location ?? null,
+    // "grip"/"layout" ride along with each tag: the search wants every typed word, so "high grip"
+    // needs the word "grip" somewhere, and a bare "HIGH" doesn't say it.
     keywords:
-      [...(t.gripTags ?? []), ...(t.layoutTags ?? []), liveRcShortName(t.liveRcUrl)]
+      [
+        ...(t.gripTags ?? []).map((g) => `${g} grip`),
+        ...(t.layoutTags ?? []).map((l) => `${l} layout`),
+        liveRcShortName(t.liveRcUrl),
+      ]
         .filter(Boolean)
         .join(" ") || null,
   };

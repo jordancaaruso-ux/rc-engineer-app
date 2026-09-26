@@ -8,6 +8,12 @@
  * work, not `String.includes`, and it should behave identically whether the
  * driver is picking a tire, a track, an additive or a past run. One
  * implementation is the only way that stays true.
+ *
+ * What a picker lists and how it orders it are two jobs. `matchesEveryWord` decides what is
+ * listed: every typed word has to be in the option, and a number has to be a whole number there.
+ * `scoreSearchMatch` only orders what passed. Until 2026-09-26 the score did both, and one shared
+ * word was enough: "TT-02" offered a Formula car ending "F1-02", "RC Madness" listed 410 clubs,
+ * "1/12" found only 1/10 pan tires (founder call after the launch test drive).
  */
 
 /**
@@ -41,9 +47,10 @@ export function normalizeSearchText(input: string): string {
  *
  * The tiers matter more than the numbers: exact beats punctuation-insensitive
  * exact, which beats substring — so typing a full name never ranks below a
- * coincidental prefix — and anything with no shared token at all scores by
- * overlap ratio, which is what keeps siblings ("Sweep 32" under "sweep 36")
- * on screen instead of dropping the near-miss you probably meant.
+ * coincidental prefix — and anything else scores by the share of typed words
+ * it holds. That last tier lets a sibling ("Sweep 32" for "sweep 36") score,
+ * which the tire matcher's "Did you mean" still wants; a picker never lists one,
+ * because `matchesEveryWord` decides what a picker lists.
  */
 export function tokenOverlapScore(a: string, b: string): number {
   if (!a || !b) return 0;
@@ -81,6 +88,116 @@ export function scoreSearchMatch(query: string, fields: Array<string | null | un
   return best;
 }
 
+function isDigit(c: string | undefined): boolean {
+  return c != null && c >= "0" && c <= "9";
+}
+
+/**
+ * One normalized field, laid out for finding typed words in it: its words run together
+ * (`compact`), where each word began, and every place a typed word may start — the start of a
+ * word, or a switch between letters and digits inside one ("TC|10", "D|32", "4|WD"). `shown`
+ * marks the name and detail line the driver reads, as against hidden codes and hosts.
+ */
+type WordField = {
+  words: string[];
+  compact: string;
+  wordStarts: Set<number>;
+  runStarts: number[];
+  shown: boolean;
+};
+
+function toWordField(normalized: string, shown: boolean): WordField {
+  const words = normalized.split(" ").filter(Boolean);
+  const wordStarts = new Set<number>();
+  const runStarts: number[] = [];
+  let compact = "";
+  for (const word of words) {
+    wordStarts.add(compact.length);
+    for (let i = 0; i < word.length; i++) {
+      if (i === 0 || isDigit(word[i]) !== isDigit(word[i - 1])) runStarts.push(compact.length + i);
+    }
+    compact += word;
+  }
+  return { words, compact, wordStarts, runStarts, shown };
+}
+
+/**
+ * Letters it takes before a typed word may match inside a longer word of a shown name. Glued
+ * names are common ("Apexraceway", "GRP … SuperSoft") and "soft" has to find the second; below
+ * four letters the hits are noise ("rc" in "Circuit", "hot" in "Hole Shot").
+ */
+const INSIDE_WORD_MIN = 4;
+
+/**
+ * Whether one typed word is in a field. It has to start where a word (or a letters/digits
+ * switch) starts, so "mad" finds "Madness" but "rc" does not find "Circuit" — unless it is four
+ * letters or more and the field is one the driver can see (`INSIDE_WORD_MIN`). A number in it
+ * has to be a whole number there: "3" is not in "36", "12" is not in "1/10", and "64" is not
+ * "6.4", two numbers that only sit side by side. Words may run on across the field's own
+ * spaces, which is how "proline" finds "Pro-Line".
+ */
+function fieldHasWord(field: WordField, word: string): boolean {
+  const { compact, wordStarts, runStarts } = field;
+  // Letters only, so no number can be cut or joined, and inside ONE word: across two it is chance
+  // ("ride" in "Hybrid Evo"). Hidden fields are glued codes and hosts, where a word inside a word
+  // is chance too ("madness" in a "minizmadness" host).
+  if (field.shown && word.length >= INSIDE_WORD_MIN && !/\d/.test(word)) {
+    if (field.words.some((w) => w.includes(word))) return true;
+  }
+  const endsInDigit = isDigit(word[word.length - 1]);
+  next: for (const start of runStarts) {
+    if (!compact.startsWith(word, start)) continue;
+    const end = start + word.length;
+    // Stopped partway through a number: "d3" in "D32".
+    if (endsInDigit && isDigit(compact[end]) && !wordStarts.has(end)) continue;
+    // Ran two of the field's numbers together: "64" across "6.4".
+    for (let i = start + 1; i < end; i++) {
+      if (wordStarts.has(i) && isDigit(compact[i - 1]) && isDigit(compact[i])) continue next;
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Whether every typed word is in the option, in any order, each in any of its fields — the
+ * picker's rule for what it lists (founder call 2026-09-26). No typo tolerance: the old
+ * leniency was letting one shared word or number through, which this replaces.
+ *
+ * `fields` are what the driver sees (name, detail line); `hiddenFields` are searched but never
+ * shown (a model code, a LiveRC host), and only match where a word starts.
+ *
+ * Words typed apart may also be found run together ("off road" in "Offroad", "j concepts" in
+ * "JConcepts"), but two typed numbers never join into one: "6 4" is not 64.
+ */
+export function matchesEveryWord(
+  query: string,
+  fields: Array<string | null | undefined>,
+  hiddenFields: Array<string | null | undefined> = []
+): boolean {
+  const words = normalizeSearchText(query).split(" ").filter(Boolean);
+  if (words.length === 0) return false;
+  const prepare = (list: Array<string | null | undefined>, shown: boolean) =>
+    list
+      .filter((f): f is string => Boolean(f))
+      .map((f) => toWordField(normalizeSearchText(f), shown));
+  const prepared = [...prepare(fields, true), ...prepare(hiddenFields, false)];
+  const found = (word: string) => prepared.some((f) => fieldHasWord(f, word));
+  // covered[i]: typed words i… are all found, some perhaps run together.
+  const covered: boolean[] = new Array(words.length + 1).fill(false);
+  covered[words.length] = true;
+  for (let i = words.length - 1; i >= 0; i--) {
+    let joined = "";
+    for (let j = i; j < words.length && !covered[i]; j++) {
+      const word = words[j]!;
+      if (j > i && isDigit(words[j - 1]!.slice(-1)) && isDigit(word[0])) break;
+      joined += word;
+      covered[i] = covered[j + 1]! && found(joined);
+    }
+  }
+  return covered[0]!;
+}
+
 export type SearchableOption = {
   value: string;
   label: string;
@@ -115,8 +232,9 @@ export type OptionSection<T extends SearchableOption = SearchableOption> = {
  *   the good stuff first ("Recently used", "Favourites"). Later sections drop
  *   anything an earlier one already showed, so nothing appears twice.
  * - **Something typed** — the find view. Grouping is dead weight once you know
- *   what you're after, so it collapses to one ranked list. Section order still
- *   breaks ties: two options that match equally, and the one you ran last
+ *   what you're after, so it collapses to one ranked list of the options that
+ *   hold every typed word (`matchesEveryWord`), best match first. Section order
+ *   still breaks ties: two options that match equally, and the one you ran last
  *   weekend comes first.
  *
  * Equal scores keep the order the CALLER gave them. That used to be alphabetical
@@ -155,11 +273,17 @@ export function filterOptionSections<T extends SearchableOption>(
   let position = 0;
   const scored = deduped
     .flatMap((section) =>
-      section.options.map((option) => ({
-        option,
-        position: position++,
-        score: scoreSearchMatch(q, [option.label, option.detail, option.keywords]),
-      }))
+      section.options.map((option) => {
+        const fields = [option.label, option.detail, option.keywords];
+        const listed = matchesEveryWord(q, [option.label, option.detail], [option.keywords]);
+        return {
+          option,
+          position: position++,
+          // Listed only with every word found; the score just orders them. At least 1, because a
+          // match made of word starts alone ("jcon refl") has no whole word for the score to count.
+          score: listed ? Math.max(1, scoreSearchMatch(q, fields)) : 0,
+        };
+      })
     )
     .filter((m) => m.score > 0)
     .sort((a, b) => b.score - a.score || a.position - b.position);
