@@ -132,8 +132,17 @@ export function parseInviteAction(raw: unknown): TeamInviteAction | null {
 }
 
 /**
+ * `/teams` that shows its list even to a one-team driver, instead of jumping to their team.
+ *
+ * The team page's New team goes here, because the New team form lives on the list: a Race
+ * Engineer driver on one team could never reach it to start a second.
+ */
+export const TEAMS_LIST_HREF = "/teams?list=1";
+
+/**
  * The team `/teams` jumps straight to, or null when it shows its list. With one team there is
  * nothing to choose; an unanswered invite keeps the list, because the list is where it is answered.
+ * `showList` is `TEAMS_LIST_HREF` asking for the list.
  *
  * Shared with the team page, whose back arrow must not point at a list that only bounces the
  * driver straight back to the team (founder, 2026-09-26: a one-team driver who opened the team
@@ -141,7 +150,22 @@ export function parseInviteAction(raw: unknown): TeamInviteAction | null {
  */
 export function teamsIndexSkipsTo(
   teams: readonly { id: string }[],
-  pendingInviteCount: number
+  pendingInviteCount: number,
+  showList = false
 ): string | null {
+  if (showList) return null;
   return teams.length === 1 && pendingInviteCount === 0 ? (teams[0]?.id ?? null) : null;
+}
+
+/**
+ * Whether the team page offers New team (`TEAMS_LIST_HREF`). Only on the driver's sole team,
+ * where `/teams` would jump straight back instead of showing its New team form. And only when
+ * their plan has room for another team (Race Engineer); a Notebook driver is at its limit.
+ */
+export function teamPageOffersNewTeam(input: {
+  teamId: string;
+  soleTeamId: string | null;
+  canStartAnother: boolean;
+}): boolean {
+  return input.canStartAnother && input.soleTeamId === input.teamId;
 }

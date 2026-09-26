@@ -15,6 +15,7 @@ import {
   isInviteTerminal,
   normalizeInviteStatus,
   parseInviteAction,
+  teamPageOffersNewTeam,
   teamsIndexSkipsTo,
 } from "@/lib/teams/teamInviteRules";
 
@@ -142,4 +143,17 @@ test("the Teams list skips to a sole team, unless an invite is waiting on it", (
   assert.equal(teamsIndexSkipsTo([{ id: "t1" }], 1), null);
   assert.equal(teamsIndexSkipsTo([{ id: "t1" }, { id: "t2" }], 0), null);
   assert.equal(teamsIndexSkipsTo([], 0), null);
+});
+
+test("asked for the list, a one-team driver stays on it", () => {
+  assert.equal(teamsIndexSkipsTo([{ id: "t1" }], 0, true), null);
+  assert.equal(teamsIndexSkipsTo([{ id: "t1" }], 0, false), "t1");
+});
+
+test("the team page offers New team only on a sole team, and only with room for another", () => {
+  assert.equal(teamPageOffersNewTeam({ teamId: "t1", soleTeamId: "t1", canStartAnother: true }), true);
+  // Notebook: one team is its limit.
+  assert.equal(teamPageOffersNewTeam({ teamId: "t1", soleTeamId: "t1", canStartAnother: false }), false);
+  // Two teams: back already leads to the list, where the form is.
+  assert.equal(teamPageOffersNewTeam({ teamId: "t1", soleTeamId: null, canStartAnother: true }), false);
 });

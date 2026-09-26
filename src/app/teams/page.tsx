@@ -27,8 +27,15 @@ export const dynamic = "force-dynamic";
  * The plan's team limit (`teamLimitFor`, founder call 2026-09-24) is drawn here, where it bites:
  * Starter joins no team and Notebook one, so at the limit the New team card becomes a lock and an
  * invite's Accept becomes the door to the plan that holds one more. The two routes refuse too.
+ *
+ * `?list=1` (`TEAMS_LIST_HREF`) skips the jump: the team page's New team comes here for the form
+ * below.
  */
-export default async function TeamsPage(): Promise<ReactNode> {
+export default async function TeamsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ list?: string }>;
+}): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
     return (
       <header className="page-header is-echo">
@@ -41,12 +48,13 @@ export default async function TeamsPage(): Promise<ReactNode> {
   }
 
   const user = await requireCurrentUser();
-  const [teams, invites] = await Promise.all([
+  const [teams, invites, { list }] = await Promise.all([
     listTeamsWithActivity(user.id),
     listPendingInvitesForUser(user.id),
+    searchParams,
   ]);
 
-  const soleTeamId = teamsIndexSkipsTo(teams, invites.length);
+  const soleTeamId = teamsIndexSkipsTo(teams, invites.length, list === "1");
   if (soleTeamId) redirect(`/teams/${soleTeamId}`);
 
   const joinLock = await teamJoinLock({ id: user.id, email: user.email ?? null }, teams.length);
