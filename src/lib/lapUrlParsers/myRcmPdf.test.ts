@@ -26,6 +26,15 @@
  *                                    1). 10 drivers, and a **real lap 0** — the start segment,
  *                                    ~10s, which MyRCM counts in TOTAL but not in L. Discarding it
  *                                    left every driver in the field ten seconds short.
+ *  - myrcm-pdf-names-header-en.pdf → Race Car Series #5, MCK Dormagen (event 89794, RCS Formel 1,
+ *                                    Group 4), downloaded 2026-09-26 with MyRCM's default boxes.
+ *                                    **MyRCM's current layout**: the lap header prints every
+ *                                    driver's name beside `LAP`, and the reader that wanted `LAP`
+ *                                    alone on its line found no laps at all.
+ *  - myrcm-pdf-names-header-de.pdf → the same run downloaded in German, every box ticked:
+ *                                    `LAUFRESULTAT`, `FAHRER`/`R`/`GESAMT`/`BESTE`, `RUNDE`.
+ *  - myrcm-pdf-ranking-de.pdf      → the same class's German qualifying ranking (ENDRANGLISTEN): a
+ *                                    summary, not a run, and still refused as one.
  *
  * The assertions below are the values printed in the documents themselves, so this file fails if a
  * future MyRCM layout change moves a lap into the wrong driver's column — which is the whole point
@@ -64,6 +73,9 @@ const QUALY = "myrcm-pdf-qualy-4drivers.pdf";
 const SUMMARY = "myrcm-pdf-summary-nolaps.pdf";
 const BARE = "myrcm-pdf-final-baretimes.pdf";
 const STARTROW = "myrcm-pdf-final-startrow.pdf";
+const NAMES_EN = "myrcm-pdf-names-header-en.pdf";
+const NAMES_DE = "myrcm-pdf-names-header-de.pdf";
+const RANKING_DE = "myrcm-pdf-ranking-de.pdf";
 
 test("parseMyRcmPdfTime reads both lap-time shapes and refuses the staging zeros", () => {
   assert.equal(parseMyRcmPdfTime("22.013"), 22.013);
@@ -307,6 +319,67 @@ test("an event summary is refused with something the driver can act on", async (
       assert.match(error.message, /run/i, "the message must say to download a single run");
       return true;
     }
+  );
+});
+
+test("MyRCM's current layout reads: driver names printed beside LAP", async () => {
+  // Refused as "This file has no lap times in it" (test drive 2026-09-26): the lap header used to
+  // be the word LAP alone, and now it runs on with every driver's name.
+  const report = await read(NAMES_EN);
+
+  assert.equal(report.sessionName, "Group 4");
+  assert.equal(report.eventName, "Race Car Series #5 Season 2025 MCK Dormagen/ 2. SK-Lauf West");
+  assert.equal(report.className, "RCS Formel 1");
+  assert.equal(report.sessionCompletedAtIso, "2025-09-07T09:37:13.000Z");
+  assert.equal(report.reconciled, true);
+  assert.deepEqual(report.issues, []);
+
+  assert.deepEqual(
+    report.drivers.map((d) => [d.position, d.driverName, d.laps.length]),
+    [
+      [1, "Silvio Boehmichen", 19],
+      [2, "Thomas Dammer", 21],
+      [3, "Oliver Osygus", 21],
+      [4, "Axel Linden", 21],
+      [5, "Sander Visser", 19],
+      [6, "Holger Stannek", 20],
+    ]
+  );
+  // The values printed in the file: first laps, best laps, and P1's start segment (lap 0).
+  const silvio = report.drivers[0];
+  assert.deepEqual(silvio?.laps.slice(0, 4), [20.662, 20.242, 19.809, 19.63]);
+  assert.equal(silvio?.startSegmentSeconds, 11.284);
+  assert.deepEqual(
+    report.drivers.map((d) => Math.min(...d.laps).toFixed(3)),
+    ["19.630", "19.592", "20.023", "20.232", "20.146", "20.534"]
+  );
+});
+
+test("a German download reads the same run as the English one", async () => {
+  // Refused as "a summary report" (test drive 2026-09-26): every column word was English-only.
+  const german = await read(NAMES_DE);
+  const english = await read(NAMES_EN);
+
+  assert.equal(german.sessionName, "Gruppe 4");
+  assert.equal(german.className, "RCS Formel 1");
+  assert.equal(german.sessionCompletedAtIso, english.sessionCompletedAtIso);
+  assert.equal(german.reconciled, true);
+  assert.deepEqual(german.issues, []);
+  assert.deepEqual(
+    german.drivers.map((d) => [d.position, d.driverName, d.statedLapCount, d.laps]),
+    english.drivers.map((d) => [d.position, d.driverName, d.statedLapCount, d.laps]),
+    "the lap heat map further down re-prints every lap under RUNDE; it must not be read twice"
+  );
+  // "!!BESTZEITEN!!" over "[3]" wraps around the German header row; "[3]" is not P1's total.
+  assert.equal(german.drivers[0]?.statedTotalTime, "6:52.185");
+  assert.equal(german.drivers[0]?.statedTotalSeconds, 412.185);
+});
+
+test("a German ranking is still refused as a summary, not read as a run", async () => {
+  await assert.rejects(
+    () => read(RANKING_DE),
+    (error: unknown) =>
+      error instanceof MyRcmPdfParseError && error.code === "no_classification"
   );
 });
 

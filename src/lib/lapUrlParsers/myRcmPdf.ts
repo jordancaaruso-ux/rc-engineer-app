@@ -14,10 +14,12 @@
  *
  * ## What the layout actually is, and the six ways it bites
  *
- * The lap matrix has **no driver names in it**. Its only header is the word `LAP`. Every cell
- * reads like `(2) 24.321` — or like `16.505`, because there are **two printed formats** and which
- * one you get is a property of the event. See `BARE_LAP_CELL_RE`; supporting only the bracketed
- * form silently kills the feature for most of European racing.
+ * The lap matrix's header is the word `LAP` (`RUNDE` in a German download). Older files print it
+ * alone; current ones print the drivers' names beside it, which are not read — the column order
+ * is what maps a column to a driver (see 1). Every cell reads like `(2) 24.321` — or like
+ * `16.505`, because there are **two printed formats** and which one you get is a property of the
+ * event. See `BARE_LAP_CELL_RE`; supporting only the bracketed form silently kills the feature for
+ * most of European racing.
  *
  *  1. **The bracket is not the driver.** It is that driver's running position *after that lap*, so
  *     it changes down a column. Keying on it scrambles every driver's laps into plausible-looking
@@ -184,9 +186,25 @@ function lapCellSeconds(text: string): number | null {
   return null;
 }
 
-/** The lap matrix's only header. Used as the gate on reading bare numbers as lap times. */
-const isLapTableHeader = (band: MyRcmPdfBand): boolean =>
-  band.cells.length === 1 && (band.cells[0] as MyRcmPdfCell).text.toUpperCase() === "LAP";
+/** The word over the lap matrix's lap-number column: English `LAP`, German `RUNDE`. */
+const LAP_HEADER_WORDS = new Set(["LAP", "RUNDE"]);
+
+/**
+ * The lap matrix's header. Used as the gate on reading bare numbers as lap times.
+ *
+ * It used to be the lone word `LAP`. MyRCM now prints the drivers' names beside it ("LAP SILVIO
+ * BOEHMICHEN THOMAS DAMMER …"), and a German download says `RUNDE`. Requiring the word alone on
+ * its line read no lap at all from either (Race Car Series #5, MCK Dormagen, 2026-09-26). So the
+ * leftmost cell is the word, and nothing else on the line is a time.
+ */
+const isLapTableHeader = (band: MyRcmPdfBand): boolean => {
+  const [first, ...rest] = band.cells;
+  if (!first || !LAP_HEADER_WORDS.has(first.text.toUpperCase())) return false;
+  return rest.every((cell) => lapCellSeconds(cell.text) === null);
+};
+
+/** The line above the session name: "RUN RESULT", or "LAUFRESULTAT" in a German download. */
+const RUN_RESULT_HEADING_RE = /^(?:RUN RESULT|LAUFRESULTAT)$/i;
 
 /** "23.08.2026 14:49:21" */
 const PRINTED_DATETIME_RE = /^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/;
@@ -260,25 +278,47 @@ type ClassificationAnchors = {
   note: number | null;
 };
 
+/**
+ * The classification's column words, in each language a driver downloads the report in. A German
+ * download prints `FAHRER`, `R` (Runden), `GESAMT`, `BESTE` and `HINWEIS` where the English one
+ * prints `DRIVER`, `L`, `TOTAL`, `BEST` and `NOTE`; `P` and `#` are the same in both.
+ */
+const CLASSIFICATION_WORDS = {
+  position: ["P"],
+  carNumber: ["#"],
+  driver: ["DRIVER", "FAHRER"],
+  lapCount: ["L", "R"],
+  total: ["TOTAL", "GESAMT"],
+  best: ["BEST", "BESTE"],
+  note: ["NOTE", "HINWEIS"],
+} as const;
+
 function findClassificationAnchors(bands: MyRcmPdfBand[]): ClassificationAnchors | null {
   for (let i = 0; i < bands.length; i += 1) {
     const band = bands[i] as MyRcmPdfBand;
     const byText = new Map<string, number>();
     for (const cell of band.cells) byText.set(cell.text.toUpperCase(), cell.x);
+    const at = (words: readonly string[]): number | null => {
+      for (const word of words) {
+        const x = byText.get(word);
+        if (x !== undefined) return x;
+      }
+      return null;
+    };
 
-    const position = byText.get("P");
-    const driver = byText.get("DRIVER");
-    if (position === undefined || driver === undefined) continue;
+    const position = at(CLASSIFICATION_WORDS.position);
+    const driver = at(CLASSIFICATION_WORDS.driver);
+    if (position === null || driver === null) continue;
 
     return {
       bandIndex: i,
       position,
-      carNumber: byText.get("#") ?? null,
+      carNumber: at(CLASSIFICATION_WORDS.carNumber),
       driver,
-      lapCount: byText.get("L") ?? null,
-      total: byText.get("TOTAL") ?? null,
-      best: byText.get("BEST") ?? null,
-      note: byText.get("NOTE") ?? null,
+      lapCount: at(CLASSIFICATION_WORDS.lapCount),
+      total: at(CLASSIFICATION_WORDS.total),
+      best: at(CLASSIFICATION_WORDS.best),
+      note: at(CLASSIFICATION_WORDS.note),
     };
   }
   return null;
@@ -356,7 +396,14 @@ function parseClassification(bands: MyRcmPdfBand[]): ParsedClassification {
     const prev = k > 0 ? (spine[k - 1] as (typeof spine)[number]) : null;
     const next = k + 1 < spine.length ? (spine[k + 1] as (typeof spine)[number]) : null;
 
-    const ceiling = prev ? (prev.y + here.y) / 2 : Number.POSITIVE_INFINITY;
+    // The first driver has nobody above to share a boundary with, so its record reaches as far up
+    // as it reaches down. Unbounded, it took in the header's second line: a German download prints
+    // "!!BESTZEITEN!!" over "[3]" around the header row, and "[3]" was read as P1's total.
+    const ceiling = prev
+      ? (prev.y + here.y) / 2
+      : next
+        ? here.y + (here.y - next.y) / 2
+        : Number.POSITIVE_INFINITY;
     const floor = next ? (here.y + next.y) / 2 : Number.NEGATIVE_INFINITY;
 
     const owned: MyRcmPdfCell[] = [];
@@ -569,7 +616,7 @@ export function parseMyRcmPdfReport(cells: Array<MyRcmPdfCell & { page: number }
   let className: string | null = null;
   let sessionCompletedAtIso: string | null = null;
 
-  const headerIndex = bands.findIndex((b) => /^RUN RESULT$/i.test(bandText(b).trim()));
+  const headerIndex = bands.findIndex((b) => RUN_RESULT_HEADING_RE.test(bandText(b).trim()));
   if (headerIndex >= 0) {
     const titleBand = bands[headerIndex + 1];
     if (titleBand) sessionName = bandText(titleBand).trim() || null;
