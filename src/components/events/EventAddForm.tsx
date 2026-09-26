@@ -351,8 +351,11 @@ export function EventAddForm({
         <div className="inset-panel-deep space-y-2 px-3 py-2.5">
           {liveRcOffer.map((meeting) => (
             <div key={meeting.hubUrl} className="space-y-1.5">
+              {/* Untouched dates make the meeting for today, so today is the day this asked about
+                  (test drive 2026-09-26: "on these days" beside a Dates box still reading "Pick
+                  the dates"). */}
               <p className="text-sm text-foreground">
-                LiveRC already has “{meeting.name}” on these days.
+                LiveRC already has “{meeting.name}” {startDate ? "on these days" : "today"}.
               </p>
               <button
                 type="button"
