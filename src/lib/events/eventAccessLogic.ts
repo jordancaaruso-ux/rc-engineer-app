@@ -30,6 +30,30 @@ export function mayJoinEvent(userId: string, facts: EventJoinFacts): boolean {
   return facts.creatorIsTeammate;
 }
 
+/** Everything the delete rule needs, counted by `loadEventDeleteFacts`. */
+export type EventDeleteFacts = {
+  /** Null for legacy events whose creator row was deleted. */
+  creatorUserId: string | null;
+  /** Other drivers on the meeting: a participation row, a run or an imported session of theirs. */
+  othersOnIt: number;
+};
+
+export type EventDeleteBlock = "not-maker" | "others-on-it";
+
+/**
+ * Why this driver may NOT delete this meeting, or null when they may (founder ruling 2026-09-26:
+ * "They must be able to delete it, if nobody else is on it").
+ *
+ * Only the driver who made it, and only while nobody else is on it. No admin override: an admin
+ * cleans up with merge, which keeps everyone's runs together. A legacy meeting with no creator is
+ * nobody's to delete.
+ */
+export function eventDeleteBlock(userId: string, facts: EventDeleteFacts): EventDeleteBlock | null {
+  if (!facts.creatorUserId || facts.creatorUserId !== userId) return "not-maker";
+  if (facts.othersOnIt > 0) return "others-on-it";
+  return null;
+}
+
 /** Creator or app admin may edit shared Event fields (name, dates, URLs, track link). */
 export function canEditSharedEventFields(
   user: EventAccessUser,

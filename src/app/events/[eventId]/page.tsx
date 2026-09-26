@@ -6,6 +6,8 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { EventMetaEditor } from "@/components/events/EventMetaEditor";
+import { EventDeleteClient } from "@/components/events/EventDeleteClient";
+import { loadEventDeleteView } from "@/lib/events/deleteOwnEvent";
 import {
   EVENT_LIST_INCLUDE,
   mapEventForUser,
@@ -62,9 +64,10 @@ export default async function EventDetailPage(props: {
 
   const event = mapEventForUser(raw, user.id);
 
-  const runCount = await prisma.run.count({
-    where: { eventId: event.id, userId: user.id },
-  });
+  const [runCount, deleteView] = await Promise.all([
+    prisma.run.count({ where: { eventId: event.id, userId: user.id } }),
+    loadEventDeleteView(event.id, user.id),
+  ]);
 
   return (
     <>
@@ -102,6 +105,10 @@ export default async function EventDetailPage(props: {
             initialRaceClass={event.raceClass}
             runCount={runCount}
           />
+
+          {deleteView && deleteView.block === null ? (
+            <EventDeleteClient eventId={event.id} myRunCount={deleteView.myRunCount} />
+          ) : null}
         </div>
       </section>
     </>

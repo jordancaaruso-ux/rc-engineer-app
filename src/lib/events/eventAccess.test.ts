@@ -3,7 +3,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canEditSharedEventFields, mayJoinEvent } from "@/lib/events/eventAccessLogic";
+import { canEditSharedEventFields, eventDeleteBlock, mayJoinEvent } from "@/lib/events/eventAccessLogic";
 
 const creator = { id: "user-a", email: "a@example.com" };
 const other = { id: "user-b", email: "b@example.com" };
@@ -74,4 +74,30 @@ test("mayJoinEvent leaves anyone already on the event alone", () => {
 
 test("mayJoinEvent denies a stranger when the creator row is gone", () => {
   assert.equal(mayJoinEvent("user-b", { ...FACTS, creatorUserId: null }), false);
+});
+
+// Delete your own meeting (founder ruling 2026-09-26: "if nobody else is on it").
+
+test("eventDeleteBlock lets the maker delete a meeting nobody else is on", () => {
+  assert.equal(eventDeleteBlock("user-a", { creatorUserId: "user-a", othersOnIt: 0 }), null);
+});
+
+test("eventDeleteBlock stops the maker once another driver is on it", () => {
+  assert.equal(eventDeleteBlock("user-a", { creatorUserId: "user-a", othersOnIt: 1 }), "others-on-it");
+});
+
+test("eventDeleteBlock stops anyone who didn't make it, admins included", () => {
+  const prev = process.env.AUTH_ADMIN_EMAILS;
+  process.env.AUTH_ADMIN_EMAILS = "admin@example.com";
+  try {
+    assert.equal(eventDeleteBlock("user-b", { creatorUserId: "user-a", othersOnIt: 0 }), "not-maker");
+    assert.equal(eventDeleteBlock("user-admin", { creatorUserId: "user-a", othersOnIt: 0 }), "not-maker");
+  } finally {
+    if (prev === undefined) delete process.env.AUTH_ADMIN_EMAILS;
+    else process.env.AUTH_ADMIN_EMAILS = prev;
+  }
+});
+
+test("eventDeleteBlock leaves a legacy meeting with no maker alone", () => {
+  assert.equal(eventDeleteBlock("user-a", { creatorUserId: null, othersOnIt: 0 }), "not-maker");
 });
