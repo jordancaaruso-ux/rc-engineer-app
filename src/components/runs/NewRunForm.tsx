@@ -64,7 +64,8 @@ import {
   formatTirePrepLine,
   type TirePrepStep,
 } from "@/lib/runs/tirePrep";
-import { formatEventDate, formatEventRelativeLabel, formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { eventDateToYmd } from "@/lib/eventDateParse";
 import { type MeetingSessionType } from "@/lib/runSession";
 import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupContext";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
@@ -143,7 +144,7 @@ import {
   type LapIngestFormValue,
 } from "@/components/runs/LapTimesIngestPanel";
 import { TrackTimingSourceNotice } from "@/components/runs/TrackTimingSourceNotice";
-import { EventDateRangeField } from "@/components/events/EventDateRangeField";
+import { EventDateRangeField, formatEventDateRange } from "@/components/events/EventDateRangeField";
 import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSessionCard";
 import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
@@ -152,6 +153,7 @@ import { TrackNearbySuggestions } from "@/components/runs/TrackNearbySuggestions
 import {
   buildTrackEventGroups,
   hubUrlFromOptionValue,
+  relativeDayLabel,
   type JoinableTeamEvent,
   type TrackListLiveRcMeeting,
   type TrackLiveRcStatus,
@@ -2156,26 +2158,24 @@ export function NewRunForm(props: {
       liveRc: read ? { status: read.status, meetings: read.meetings } : { status: "none", meetings: [] },
     });
   }, [trackId, trackEvents, eventListTodayYmd, events, joinableEvents]);
-  const allEventGroups = useMemo(
-    () =>
-      [
-        {
-          label: "Upcoming",
-          options: eventSelectGroups.upcoming.map((ev) => ({
-            value: ev.id,
-            label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
-          })),
-        },
-        {
-          label: "Past",
-          options: eventSelectGroups.past.map((ev) => ({
-            value: ev.id,
-            label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
-          })),
-        },
-      ].filter((g) => g.options.length > 0),
-    [eventSelectGroups]
-  );
+  const allEventGroups = useMemo(() => {
+    // Calendar days, as the track's list and the meeting's own page print them. The stored dates
+    // are days at UTC noon, which the phone's zone read a day late in New Zealand.
+    const label = (ev: EventOption) => {
+      const [startYmd, endYmd] = [eventDateToYmd(ev.startDate), eventDateToYmd(ev.endDate)];
+      return `${ev.name} · ${formatEventDateRange(startYmd, startYmd)} · ${relativeDayLabel(startYmd, endYmd, eventListTodayYmd)}`;
+    };
+    return [
+      {
+        label: "Upcoming",
+        options: eventSelectGroups.upcoming.map((ev) => ({ value: ev.id, label: label(ev) })),
+      },
+      {
+        label: "Past",
+        options: eventSelectGroups.past.map((ev) => ({ value: ev.id, label: label(ev) })),
+      },
+    ].filter((g) => g.options.length > 0);
+  }, [eventSelectGroups, eventListTodayYmd]);
   /**
    * Log Run with no track yet: the Event box reads "Select the track first" and doesn't open, and
    * "+ New event" waits too (founder 2026-09-26). Without a track the list could only be every
