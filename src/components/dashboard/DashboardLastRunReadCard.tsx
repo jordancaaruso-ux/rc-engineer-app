@@ -1,4 +1,5 @@
 import type { DashboardHomeModel } from "@/lib/dashboardServer";
+import { meetingNameLessTrack } from "@/lib/events/meetingNameLessTrack";
 import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
@@ -49,7 +50,12 @@ export function DashboardLastRunReadCard({
   // (src/lib/runSession.ts), which reads as a broken field. Treat it as absent.
   const label = run.sessionLabel.trim();
   const hasLabel = label.length > 0 && label !== "—";
-  const meta = [hasLabel ? label : null, run.carName, run.trackName, run.eventName]
+  const meta = [
+    hasLabel ? label : null,
+    run.carName,
+    run.trackName,
+    meetingNameLessTrack(run.eventName, run.trackName),
+  ]
     .filter(Boolean)
     .join(" · ");
 

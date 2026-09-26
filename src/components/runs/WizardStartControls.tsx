@@ -7,6 +7,7 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
+import { meetingNameLessTrack } from "@/lib/events/meetingNameLessTrack";
 import type { WizardStepId } from "@/lib/runs/wizardWalk";
 
 /**
@@ -238,7 +239,9 @@ export function WizardDraftsCard({ drafts }: { drafts: WizardDraftRow[] }) {
             {d.sessionLabel || "Run"} — {d.carName}
           </span>
           <span className="tabular-nums text-[10px] text-muted-foreground">
-            {[d.trackName, d.eventName, relativeWhen(d.createdAt)].filter(Boolean).join(" · ")}
+            {[d.trackName, meetingNameLessTrack(d.eventName, d.trackName), relativeWhen(d.createdAt)]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
           <span className="mt-1 text-[11px] text-warning">
             finish logging — laps &amp; rating
