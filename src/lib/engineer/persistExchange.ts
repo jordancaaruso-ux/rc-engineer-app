@@ -38,6 +38,8 @@ export async function persistEngineerChatExchange(params: {
   nextQuestions?: string[];
   /** The setup-change links the answer used (sheetLinks.ts). */
   sheetLinks?: EngineerMessageContextSnapshot["sheetLinks"];
+  /** The driver's message was a free reply: saved so the next one isn't (aiUsage/ledger.ts `engineerReplyIsFree`). */
+  freeReply?: boolean;
 }): Promise<PersistedChatExchange> {
   const threadId = await getOrCreateThread({
     userId: params.userId,
@@ -57,6 +59,8 @@ export async function persistEngineerChatExchange(params: {
     ...(params.nextQuestions && params.nextQuestions.length > 0 ? { nextQuestions: params.nextQuestions } : {}),
     // Same reason: a link in an answer reopened from History still opens the runs it was about.
     ...(params.sheetLinks && Object.keys(params.sheetLinks).length > 0 ? { sheetLinks: params.sheetLinks } : {}),
+    // One free reply per paid question: this mark is what makes the next message use one again.
+    ...(params.freeReply ? { freeReply: true } : {}),
   };
 
   await prisma.engineerChatMessage.create({

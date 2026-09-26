@@ -89,7 +89,8 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
           mirror key for the `lg:`-prefixed width, same role as `.dash-wide`. */}
       <section className="page-body engineer-wide flex min-h-0 max-w-4xl flex-1 flex-col pb-2 lg:max-w-6xl md:pb-0">
         {/* Quota meter (MONETISATION_NORTH_STAR.md Phase 2). In the body, not the subtitle —
-            `.page-header .page-subtitle` is display:none globally. */}
+            `.page-header .page-subtitle` is display:none globally. Worked out on the server; the
+            chat refreshes the page after every answer and refusal, so it never goes stale. */}
         {quotaNote ? (
           <p className="mb-2 w-full text-center text-xs text-muted-foreground">
             {quotaNote}
@@ -109,7 +110,7 @@ export default async function EngineerChatPage(): Promise<ReactNode> {
           </CardPanel>
         )}
         <Suspense fallback={<EngineerClientSkeleton />}>
-          <EngineerPageClient ratingsEnabled={ratingsEnabled} hasRuns={hasAnyRun} />
+          <EngineerPageClient ratingsEnabled={ratingsEnabled} hasRuns={hasAnyRun} metered={quotaNote != null} />
         </Suspense>
       </section>
     </>

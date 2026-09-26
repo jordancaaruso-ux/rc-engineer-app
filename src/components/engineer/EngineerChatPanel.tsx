@@ -44,6 +44,7 @@ import {
 } from "@/lib/engineerStarterQuestions";
 import { useUnits } from "@/components/providers/UnitsProvider";
 import { hideUnfinishedLink, readSheetLinks, type SheetLinkTarget, type SheetLinks } from "@/lib/engineer/sheetLinks";
+import { isFreeEngineerReply } from "@/lib/aiUsage/budgets";
 
 /**
  * The Engineer chat: the conversation card and the history card, the subject bar, the starter
@@ -68,7 +69,12 @@ type RatingContext = {
   compareRunId?: string | null;
   nextQuestions?: string[];
   sheetLinks?: SheetLinks;
+  /** The message this answers was a free reply, so the next one uses a question (aiUsage budgets.ts). */
+  freeReply?: boolean;
 };
+
+/** The plan speaking — a question allowance used up, a plan without the Engineer — never a failure. */
+class EngineerRefusal extends Error {}
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -167,7 +173,8 @@ async function readSseStream(
           }
         }
       } else if (event === "error") {
-        throw new Error(typeof data.message === "string" ? data.message : "Engineer chat failed");
+        const message = typeof data.message === "string" ? data.message : "Engineer chat failed";
+        throw data.refused === true ? new EngineerRefusal(message) : new Error(message);
       }
     }
   }
@@ -226,6 +233,7 @@ export function EngineerChatPanel({
   onQueuedPromptConsumed,
   ratingsEnabled = false,
   hasRuns = false,
+  metered = false,
 }: {
   queuedPrompt?: EngineerQueuedChatPrompt | null;
   onQueuedPromptConsumed?: () => void;
@@ -235,6 +243,12 @@ export function EngineerChatPanel({
    * starter questions make sense; in General they don't, because no run is attached.
    */
   hasRuns?: boolean;
+  /**
+   * The driver's plan counts questions (the page shows a questions-left line). The page is
+   * refreshed after every answer and refusal so that line is current, and the composer says when
+   * a reply to the Engineer's own question is free.
+   */
+  metered?: boolean;
 } = {}) {
   const router = useRouter();
   const pathname = usePathname();
@@ -258,6 +272,8 @@ export function EngineerChatPanel({
   const [sending, setSending] = useState(false);
   const [statusPhase, setStatusPhase] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A refusal from the plan (EngineerRefusal): shown as a plain line, never as an error.
+  const [notice, setNotice] = useState<string | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [candidates, setCandidates] = useState<RunCandidate[]>([]);
   const [candidatesLoading, setCandidatesLoading] = useState(true);
@@ -487,6 +503,7 @@ export function EngineerChatPanel({
   const openThread = useCallback(async (id: string) => {
     setLoadingThread(true);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch(`/api/engineer/threads/${encodeURIComponent(id)}/messages`);
       if (!res.ok) throw new Error("Could not load that conversation");
@@ -534,6 +551,7 @@ export function EngineerChatPanel({
     stickToBottom.current = true;
     setMessages([]);
     setError(null);
+    setNotice(null);
     setInput("");
     setHistoryOpen(null);
   }, []);
@@ -543,6 +561,7 @@ export function EngineerChatPanel({
       const question = text.trim();
       if (!question || sending) return;
       setError(null);
+      setNotice(null);
       setSending(true);
       setStatusPhase(null);
       stickToBottom.current = true;
@@ -589,8 +608,9 @@ export function EngineerChatPanel({
           }),
         });
         if (!res.ok || !res.body) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(body.error ?? `HTTP ${res.status}`);
+          const body = (await res.json().catch(() => ({}))) as { error?: string; refused?: boolean };
+          const message = body.error ?? `HTTP ${res.status}`;
+          throw body.refused === true ? new EngineerRefusal(message) : new Error(message);
         }
         const { reply, nextQuestions, sheetLinks, feedback } = await readSseStream(res, {
           onStatus: (phase) => setStatusPhase(phase),
@@ -616,14 +636,18 @@ export function EngineerChatPanel({
             : prev
         );
         setInput(question);
-        setError(e instanceof Error ? e.message : "Engineer chat failed");
+        if (e instanceof EngineerRefusal) setNotice(e.message);
+        else setError(e instanceof Error ? e.message : "Engineer chat failed");
       } finally {
         setSending(false);
         setStatusPhase(null);
+        // The questions-left line is drawn by the page on the server: read it again after every
+        // answer and refusal, or it sits on the count from when the page loaded (test drive 2026-09-26).
+        if (metered) router.refresh();
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rangeScope is re-parsed each render; rangeQuery is its identity
-    [generalMode, messages, pinnedRunId, rangeQuery, refreshThreads, scopeNamedIn, sending, threadId, writeSubject]
+    [generalMode, messages, metered, pinnedRunId, rangeQuery, refreshThreads, router, scopeNamedIn, sending, threadId, writeSubject]
   );
 
   // A `?prompt=` handoff (dashboard cards) lands in the composer and sends itself once.
@@ -658,6 +682,15 @@ export function EngineerChatPanel({
     const end = text.length;
     el.setSelectionRange(end, end);
   };
+
+  // A reply to the Engineer's own question uses no question, once per paid question (aiUsage
+  // budgets.ts `isFreeEngineerReply`, the server's rule): said in the box where the reply is typed.
+  const latest = messages[messages.length - 1];
+  const replyIsFree =
+    metered &&
+    !sending &&
+    latest?.role === "assistant" &&
+    isFreeEngineerReply({ content: latest.content, freeReply: latest.ratingContext?.freeReply === true });
 
   const historyShown = historyOpen ?? messages.length === 0;
   const canCollapseHistory = threads.length > HISTORY_COLLAPSED_COUNT;
@@ -769,6 +802,11 @@ export function EngineerChatPanel({
             </pre>
           </div>
         ) : null}
+        {notice ? (
+          <p role="status" className="px-3 pt-2 text-[13px] leading-snug text-muted-foreground lg:px-5">
+            {notice}
+          </p>
+        ) : null}
 
         {/*
          * Desktop-only empty state. On a phone the composer is the first thing in the card, so an
@@ -869,7 +907,7 @@ export function EngineerChatPanel({
               }}
               rows={1}
               className="flex-1 min-h-9 max-h-28 resize-none rounded-lg border border-border bg-background px-2.5 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-              placeholder="Ask the Engineer…"
+              placeholder={replyIsFree ? "Your reply is free…" : "Ask the Engineer…"}
               disabled={panelBusy}
               aria-label="Message to engineer"
             />

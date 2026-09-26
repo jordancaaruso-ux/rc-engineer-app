@@ -21,6 +21,11 @@ export type EngineerMessageContextSnapshot = {
   nextQuestions?: string[];
   /** What each setup-change link in the answer opens (sheetLinks.ts): only the ones it used. */
   sheetLinks?: Record<string, { runId: string; sinceRunId: string }>;
+  /**
+   * The message this answers was a free reply (aiUsage/budgets.ts `isFreeEngineerReply`), so the
+   * driver's next one uses a question again. Absent on every answer to a message that used one.
+   */
+  freeReply?: boolean;
 };
 
 export type EngineerRatingInput = {

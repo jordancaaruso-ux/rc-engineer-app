@@ -11,7 +11,7 @@ import { parseRangeScope } from "@/lib/engineer/rangeScope";
 import { engineerTools, loadEngineerToolContext } from "@/lib/engineer/tools";
 import type { EngineerChatMessage } from "@/lib/engineer/payload";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/apiRateLimit";
-import { checkAiBudget, engineerQuotaSnapshot, recordAiUsage } from "@/lib/aiUsage/ledger";
+import { checkAiBudget, engineerQuotaSnapshot, engineerReplyIsFree, recordAiUsage } from "@/lib/aiUsage/ledger";
 import { getEntitlement } from "@/lib/entitlement";
 import {
   isBillingEnforced,
@@ -103,6 +103,7 @@ async function maybePersistEngineerReply(params: {
   model?: string;
   nextQuestions?: string[];
   sheetLinks?: SheetLinks;
+  freeReply?: boolean;
 }): Promise<EngineerChatFeedbackPayload | null> {
   const userQuestion = [...params.messages].reverse().find((m) => m.role === "user")?.content ?? "";
   if (!userQuestion.trim() || !params.reply.trim()) return null;
@@ -120,6 +121,7 @@ async function maybePersistEngineerReply(params: {
       model: params.model,
       nextQuestions: params.nextQuestions,
       sheetLinks: params.sheetLinks,
+      freeReply: params.freeReply,
     });
   } catch (err) {
     console.error("[api/engineer/chat] persist exchange failed", err);
@@ -188,14 +190,15 @@ export async function POST(request: Request) {
     const useStream = body?.stream === true;
 
     // Streaming clients only understand error FRAMES, so refusals ship as a 200 SSE stream
-    // with one error event; plain clients get real status codes.
+    // with one error event; plain clients get real status codes. `refused` tells the page this is
+    // the plan speaking, not a failure: it shows the words plainly, never under a red "Error".
     const refuseAllowance = (message: string, status: number): Response => {
       if (useStream) {
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
           start(controller) {
             controller.enqueue(
-              encoder.encode(`event: error\ndata: ${JSON.stringify({ message })}\n\n`)
+              encoder.encode(`event: error\ndata: ${JSON.stringify({ message, refused: true })}\n\n`)
             );
             controller.close();
           },
@@ -212,7 +215,7 @@ export async function POST(request: Request) {
           },
         });
       }
-      return NextResponse.json({ error: message }, { status });
+      return NextResponse.json({ error: message, refused: true }, { status });
     };
 
     // Demo visitors: 2 live questions a day per IP, plus a DURABLE global ceiling on the
@@ -264,11 +267,17 @@ export async function POST(request: Request) {
       (entitlement.tier === "standard" || entitlement.tier === "pro")
         ? entitlement.tier
         : undefined;
+    // A reply to the Engineer's own question uses no question, once per paid question (aiUsage
+    // budgets.ts `isFreeEngineerReply`). Only a plan with an allowance has anything to spare, and it
+    // is judged on the saved conversation, never on the history this request carries.
+    const threadIdIn = typeof body?.threadId === "string" ? body.threadId.trim() : "";
+    const freeReply = tier != null && threadIdIn !== "" && (await engineerReplyIsFree(user.id, threadIdIn));
     const budget = await checkAiBudget({
       userId: user.id,
       userEmail: user.email,
       feature: "engineer-chat",
       tier,
+      freeReply,
     });
     if (!budget.ok) {
       return refuseAllowance(budget.message, 429);
@@ -351,6 +360,8 @@ export async function POST(request: Request) {
               promptTokens: out.usage?.promptTokens ?? 0,
               completionTokens: out.usage?.completionTokens ?? 0,
               cachedPromptTokens: out.usage?.cachedPromptTokens ?? 0,
+              // A free reply's cost still counts toward the dollar brakes; it just isn't a question.
+              calls: freeReply ? 0 : 1,
             });
             const usedLinks = sheetLinksUsedIn(out.reply, sheetLinks);
             const feedback = isDemo
@@ -367,6 +378,7 @@ export async function POST(request: Request) {
                   model: out.model,
                   nextQuestions: out.nextQuestions,
                   sheetLinks: usedLinks,
+                  freeReply,
                 });
             send("done", {
               reply: out.reply,
@@ -410,6 +422,7 @@ export async function POST(request: Request) {
       promptTokens: out.usage?.promptTokens ?? 0,
       completionTokens: out.usage?.completionTokens ?? 0,
       cachedPromptTokens: out.usage?.cachedPromptTokens ?? 0,
+      calls: freeReply ? 0 : 1,
     });
 
     const usedLinks = sheetLinksUsedIn(out.reply, sheetLinks);
@@ -427,6 +440,7 @@ export async function POST(request: Request) {
           model: out.model,
           nextQuestions: out.nextQuestions,
           sheetLinks: usedLinks,
+          freeReply,
         });
 
     return NextResponse.json({

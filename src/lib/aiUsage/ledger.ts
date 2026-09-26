@@ -8,6 +8,7 @@ import {
   applyEngineerTierBudget,
   estimateCostUsd,
   evaluateAiBudget,
+  isFreeEngineerReply,
   resolveAiBudget,
   type AiBudgetVerdict,
   type AiUsageFeature,
@@ -41,6 +42,8 @@ export async function checkAiBudget(input: {
    * enforcement is dark: they keep the base budget, exactly today's behaviour.
    */
   tier?: "standard" | "pro";
+  /** A reply to the Engineer's own question (`engineerReplyIsFree`): the question allowance doesn't stop it. */
+  freeReply?: boolean;
 }): Promise<AiBudgetVerdict> {
   if (isAuthAdminEmail(input.userEmail)) return { ok: true };
 
@@ -84,10 +87,32 @@ export async function checkAiBudget(input: {
       costTodayUsd: todayRows.reduce((sum, r) => sum + r.costUsd, 0),
       costMonthUsd: monthAgg._sum.costUsd ?? 0,
       featureCallsMonth: monthCallsAgg?._sum.calls ?? 0,
+      freeReply: input.freeReply,
     });
   } catch (error) {
     console.error("[aiUsage] budget check failed; allowing the call", error);
     return { ok: true };
+  }
+}
+
+/**
+ * Is the driver's next message in this conversation a free reply (budgets.ts `isFreeEngineerReply`)?
+ * Judged on the Engineer's latest answer as SAVED — the history the page sends could say anything.
+ * False on any doubt: a conversation that isn't theirs, no answer in it yet, or a DB error.
+ */
+export async function engineerReplyIsFree(userId: string, threadId: string): Promise<boolean> {
+  try {
+    const latest = await prisma.engineerChatMessage.findFirst({
+      where: { threadId, role: "assistant", thread: { userId } },
+      orderBy: { createdAt: "desc" },
+      select: { content: true, metadataJson: true },
+    });
+    if (!latest) return false;
+    const meta = latest.metadataJson as { freeReply?: unknown } | null;
+    return isFreeEngineerReply({ content: latest.content, freeReply: meta?.freeReply === true });
+  } catch (error) {
+    console.error("[aiUsage] free-reply check failed; the message uses a question", error);
+    return false;
   }
 }
 

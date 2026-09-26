@@ -7,10 +7,13 @@ import { EngineerChatPanel, type EngineerQueuedChatPrompt } from "@/components/e
 export function EngineerPageClient({
   ratingsEnabled = false,
   hasRuns = false,
+  metered = false,
 }: {
   ratingsEnabled?: boolean;
   /** The driver has logged at least one run — decides which starter questions are offered. */
   hasRuns?: boolean;
+  /** The page shows a questions-left line: the driver's plan counts questions. */
+  metered?: boolean;
 }) {
   const searchParams = useSearchParams();
   const promptParam = searchParams.get("prompt")?.trim() || "";
@@ -36,6 +39,7 @@ export function EngineerPageClient({
       <EngineerChatPanel
         ratingsEnabled={ratingsEnabled}
         hasRuns={hasRuns}
+        metered={metered}
         queuedPrompt={queuedPrompt}
         onQueuedPromptConsumed={() => setPromptConsumed(true)}
       />

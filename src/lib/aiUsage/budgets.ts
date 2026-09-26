@@ -199,11 +199,17 @@ export function evaluateAiBudget(input: {
   costMonthUsd: number;
   /** Calls already made in the last 30 days, for this feature. Omit when no monthly quota. */
   featureCallsMonth?: number;
+  /**
+   * A reply to the Engineer's own question (`isFreeEngineerReply`). It uses no question, so the two
+   * call counts don't stop it; the dollar brakes still do.
+   */
+  freeReply?: boolean;
 }): AiBudgetVerdict {
   const { budget } = input;
   // Checked FIRST: this is the visible product allowance, so it should be the reason a user is
   // told about, ahead of the dollar/burst brakes they were never shown a number for.
   if (
+    !input.freeReply &&
     budget.monthlyCalls != null &&
     (input.featureCallsMonth ?? 0) >= budget.monthlyCalls
   ) {
@@ -215,7 +221,7 @@ export function evaluateAiBudget(input: {
         "You've used this month's included questions. They reset next month.",
     };
   }
-  if (input.featureCallsToday >= budget.dailyCalls) {
+  if (!input.freeReply && input.featureCallsToday >= budget.dailyCalls) {
     return {
       ok: false,
       reason: "daily-calls",
@@ -269,6 +275,40 @@ export function engineerQuestionCount(n: number): string {
 }
 
 /**
+ * A reply to the Engineer's own question uses no question (owner's call on the 2026-09-26 test
+ * drive). A Notebook racer asked her one question of the day, the answer asked her what the car was
+ * doing, and her answer was refused; a Race Engineer racer's two one-word answers to its questions
+ * ("Nothing", "Loam") each took one of his hundred.
+ *
+ * The rule, exactly: the racer's next message in a conversation is free when the Engineer's latest
+ * answer there asked them a question (`engineerAskedTheDriver`) AND that answer was to a message that
+ * used a question. So a paid question buys at most one free reply: the message after a free reply
+ * uses a question again, however the Engineer answered. It is judged on the conversation as saved
+ * (ledger.ts `engineerReplyIsFree`), never on the history the page sends, and the dollar brakes
+ * still apply to it (`evaluateAiBudget`).
+ */
+export function isFreeEngineerReply(
+  latestAnswer: { content: string; freeReply?: boolean } | null | undefined,
+): boolean {
+  return Boolean(latestAnswer && !latestAnswer.freeReply && engineerAskedTheDriver(latestAnswer.content));
+}
+
+/**
+ * Did this answer ask the driver something: a question mark anywhere outside double quotes and link
+ * addresses. Sol asks in a sentence ending "?" — "Is the snap off power, or as you pick up the
+ * throttle?" — at the end or mid-answer, and in the answers measured, a question mark almost never
+ * meant anything else. The follow-up buttons are not in a saved answer (nextQuestions.ts cuts them
+ * out) and are the driver's questions anyway, so they are taken out here too.
+ */
+export function engineerAskedTheDriver(answer: string): boolean {
+  const own = answer
+    .replace(/\[\[next:[^\]]*\]\]/gi, "")
+    .replace(/\]\([^)\s]*\)/g, "]")
+    .replace(/"[^"\n]*"|“[^”\n]*”/g, "");
+  return own.includes("?");
+}
+
+/**
  * Shape a feature budget for a paying tier. Only Engineer chat has tier allowances; every other
  * feature keeps its base abuse brakes. Callers must NOT pass grandfathered users through here —
  * comps and pre-paywall testers keep the base (untiered) budget.
@@ -288,7 +328,9 @@ export function applyEngineerTierBudget(
       dailyCalls: Math.min(budget.dailyCalls, STANDARD_ENGINEER_DAILY_QUESTIONS),
       messages: {
         ...budget.messages,
-        dailyCalls: `You've used today's ${engineerQuestionCount(STANDARD_ENGINEER_DAILY_QUESTIONS)}. ${TIER_LABELS.pro} includes ${PRO_ENGINEER_MONTHLY_QUESTIONS} a month, to spend whenever you like — upgrade any time on the Subscription page.`,
+        // When the next question comes, then how to get more (test drive 2026-09-26: this line said
+        // only the second, and a racer could not tell when she could ask again).
+        dailyCalls: `You've used today's ${engineerQuestionCount(STANDARD_ENGINEER_DAILY_QUESTIONS)}. You can ask again tomorrow. ${TIER_LABELS.pro} includes ${PRO_ENGINEER_MONTHLY_QUESTIONS} a month, to spend whenever you like — upgrade any time on the Subscription page.`,
       },
     };
   }

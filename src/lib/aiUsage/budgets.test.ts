@@ -6,9 +6,11 @@ import { test } from "node:test";
 import {
   aiUsageTimeZone,
   applyEngineerTierBudget,
+  engineerAskedTheDriver,
   engineerQuestionCount,
   estimateCostUsd,
   evaluateAiBudget,
+  isFreeEngineerReply,
   modelRate,
   remainingMonthlyCalls,
   resolveAiBudget,
@@ -245,6 +247,44 @@ test("Notebook tier: a daily allowance, and the cap-hit line sells the top tier"
   // Must name the tier it is selling, and must never read as a bare limit error.
   if (v.ok === false) assert.match(v.message, new RegExp(TIER_LABELS.pro));
   if (v.ok === false) assert.match(v.message, /upgrade/i);
+  // And says when the next question comes (test drive 2026-09-26: it said only how to buy more).
+  if (v.ok === false) assert.match(v.message, /You can ask again tomorrow\./);
+});
+
+test("an answer asked the driver something when it holds a question of its own", () => {
+  assert.equal(engineerAskedTheDriver("Add a step of rear droop. Is the snap off power, or as you pick up the throttle?"), true);
+  assert.equal(engineerAskedTheDriver("**Where does it lose rotation?** That decides the first change."), true);
+  assert.equal(engineerAskedTheDriver("Add a step of rear droop. It will rotate sooner in the middle."), false);
+  // Not its own question: the driver's words quoted back, a link's address, or the follow-up buttons.
+  assert.equal(engineerAskedTheDriver('You asked "was that faster?" — yes, by 0.12.'), false);
+  assert.equal(engineerAskedTheDriver("You asked “was that faster?” — yes."), false);
+  assert.equal(engineerAskedTheDriver("See [the change](#sheet-abc123?x) before 14:06."), false);
+  assert.equal(engineerAskedTheDriver("Softer front bar.\n[[next: What if it pushes? | Other levers?]]"), false);
+  assert.equal(engineerAskedTheDriver("What were the [two changes before 14:06?](#sheet-abc123)"), true);
+});
+
+test("a reply to the Engineer's own question is free, once per paid question", () => {
+  const asked = "Softer front bar, one step. Is it worst as you turn in, or in the middle?";
+  assert.equal(isFreeEngineerReply({ content: asked }), true, "the answer asked, and was to a paid question");
+  assert.equal(isFreeEngineerReply({ content: asked, freeReply: true }), false, "the reply after a free reply costs again");
+  assert.equal(isFreeEngineerReply({ content: "Softer front bar, one step." }), false, "no question asked");
+  assert.equal(isFreeEngineerReply(null), false, "a new conversation");
+});
+
+test("a free reply passes a spent question allowance, but never the dollar brakes", () => {
+  const notebook = applyEngineerTierBudget(budget, "standard");
+  const spent = { ...clear, budget: notebook, featureCallsToday: STANDARD_ENGINEER_DAILY_QUESTIONS };
+  assert.equal(evaluateAiBudget(spent).ok, false);
+  assert.deepEqual(evaluateAiBudget({ ...spent, freeReply: true }), { ok: true });
+  const brake = evaluateAiBudget({ ...spent, freeReply: true, costTodayUsd: budget.dailyCostUsd });
+  assert.equal(brake.ok === false && brake.reason, "daily-cost");
+
+  const raceEngineer = applyEngineerTierBudget(budget, "pro");
+  const pool = { ...clear, budget: raceEngineer, featureCallsMonth: PRO_ENGINEER_MONTHLY_QUESTIONS };
+  assert.equal(evaluateAiBudget(pool).ok, false);
+  assert.deepEqual(evaluateAiBudget({ ...pool, freeReply: true }), { ok: true });
+  const monthly = evaluateAiBudget({ ...pool, freeReply: true, costMonthUsd: budget.monthlyCostUsd });
+  assert.equal(monthly.ok === false && monthly.reason, "monthly-cost");
 });
 
 test("Race Engineer tier: a monthly pool beside the base daily burst brake", () => {
