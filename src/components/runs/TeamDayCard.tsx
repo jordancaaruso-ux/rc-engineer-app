@@ -12,6 +12,9 @@ import { cn } from "@/lib/utils";
 /**
  * The team day — everyone who ran this session, on one clock.
  *
+ * Only ever opened with two or more drivers in view. A day with one opens straight
+ * onto that driver's session instead (`loneDriver` in `SessionsBrowser`).
+ *
  * The only new chart in the Sessions rework. Everything else on this page is
  * `SessionTrendCard` re-rendered, and that chart plots run *sequence*, which
  * stops meaning anything the moment two people are on it: your run 3 and theirs

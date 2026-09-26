@@ -57,7 +57,8 @@ import { cn } from "@/lib/utils";
  * ## The three levels
  *
  * - **Session** — a day or an event. Always the list.
- * - **Driver** — team scope only, because solo's roster is one. Inserted between.
+ * - **Driver** — team scope only, because solo's roster is one. Inserted between,
+ *   and only when the day has two or more drivers in view.
  * - **Run** — `RunPageClient` in the pane on desktop; on a phone, a real
  *   navigation to `/runs/[id]`, which is the page that already exists.
  *
@@ -254,10 +255,22 @@ export function SessionsBrowser({
   const paneGroup = selection.groupId
     ? groupsById.get(selection.groupId) ?? defaultGroup
     : defaultGroup;
+  /**
+   * One driver in view has no driver level. Whether only one teammate ran that day or
+   * the Driver filter kept only one (the Your team row opens Sessions that way), the
+   * Pace overview had one line and one row to offer, and its only door led to that
+   * driver's session, which is the same chart again. "Pace overview is only [for] when
+   * there's multiple drivers still in the view" (founder, 2026-09-26). So the day opens
+   * straight onto the session, still at depth 1, and back goes to the list.
+   */
+  const loneDriver =
+    teamMode && paneGroup?.drivers?.length === 1 ? paneGroup.drivers[0]! : null;
   const activeDriver: WorkbenchDriver | null =
     (teamMode && selection.driverId
       ? paneGroup?.drivers?.find((d) => d.userId === selection.driverId)
-      : null) ?? null;
+      : null) ??
+    loneDriver ??
+    null;
   const activeRun = selection.runId ? runsById.get(selection.runId) ?? null : null;
 
   /** Depth on the phone. 0 → the list has the screen; anything else → the pane does. */
@@ -505,15 +518,21 @@ export function SessionsBrowser({
             driverLabel={
               activeDriver.userId === viewerUserId ? "Your session" : activeDriver.name
             }
-            summary={`${activeDriver.carName} · ${activeDriver.runs.length} run${
-              activeDriver.runs.length === 1 ? "" : "s"
-            } · ${
+            summary={[
+              activeDriver.carName,
+              `${activeDriver.runs.length} run${activeDriver.runs.length === 1 ? "" : "s"}`,
               activeDriver.delta == null
                 ? "no timed lap"
-                : activeDriver.delta === 0
-                  ? "fastest of the day"
-                  : `P${activeDriver.pos}, +${activeDriver.delta.toFixed(2)}`
-            }`}
+                : // A place needs a field. Alone in view the driver is P1 by default, and
+                  // under the Driver filter "fastest of the day" can be plain wrong.
+                  loneDriver
+                  ? null
+                  : activeDriver.delta === 0
+                    ? "fastest of the day"
+                    : `P${activeDriver.pos}, +${activeDriver.delta.toFixed(2)}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
             trend={activeDriver.trend}
             rows={activeDriver.runs}
             runsById={runsById}
@@ -1142,10 +1161,12 @@ function SessionRail({
 
             {/* Nested levels are the split layout's job. On a phone the rail IS the
                 sessions screen and picking a day pushes to it, so a tree here would
-                be a second way to do the same thing. */}
+                be a second way to do the same thing. A team day with one driver in
+                view has no driver level (see `loneDriver`), so its runs sit straight
+                under it, as a solo day's do. */}
             {open ? (
               <div className="hidden lg:block">
-                {teamMode && group.drivers ? (
+                {teamMode && group.drivers && group.drivers.length > 1 ? (
                   <DriverRail
                     drivers={group.drivers}
                     selection={selection}
