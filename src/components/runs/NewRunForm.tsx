@@ -531,6 +531,8 @@ type NewRunDraftSnapshot = {
    * would POST a twin of a run that already exists on the server.
    */
   savedRunId?: string | null;
+  /** A copied race's own label ("A Main"). Optional: older drafts don't have it. */
+  sessionLabel?: string | null;
 };
 
 /**
@@ -1656,10 +1658,25 @@ export function NewRunForm(props: {
    * Silent draft autosave (issue: leaving `/runs/new` mid-log lost everything).
    * Only the plain new-run flow — edit/draft runs and deep-linked prefills own
    * their own state and must not be clobbered by a stale local snapshot.
+   *
+   * The Log run wizard keeps it too since 2026-09-26: a same-tab link off the form ("Add timing
+   * details" to Settings) threw the whole run away, with no warning (test drive). Leaving on
+   * purpose — a save, Exit › Discard, Undo on the prefill card — closes it (`closeLocalDraft`).
    */
   const draftAutosaveEnabled =
-    !isEditing && !dashboardPrefill && !initialEventId && !labSetupPrefill && !wizardActive;
+    !isEditing && !dashboardPrefill && !initialEventId && !labSetupPrefill;
   const draftHydratedRef = useRef(false);
+  /** Set once the run is saved or thrown away, so no late write brings it back. */
+  const localDraftClosedRef = useRef(false);
+  const closeLocalDraft = () => {
+    localDraftClosedRef.current = true;
+    if (!draftAutosaveEnabled) return;
+    try {
+      window.localStorage.removeItem(NEW_RUN_DRAFT_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
 
   // Restore once on mount. Runs after the default/prefill effects above so the
   // saved snapshot wins over the empty starting form.
@@ -1714,6 +1731,9 @@ export function NewRunForm(props: {
         if (s.conditions) setConditions(s.conditions);
         // A stay-save already banked this content — later saves must update that run.
         if (typeof s.savedRunId === "string" && s.savedRunId) setCreatedRunId(s.savedRunId);
+        if (typeof s.sessionLabel === "string") setSessionLabel(s.sessionLabel);
+        // The wizard's blank entry must not overwrite the restored day (effect further down).
+        wizardSessionAppliedRef.current = true;
       }
     } catch {
       // Corrupt/unavailable storage — start fresh, never block the form.
@@ -1725,7 +1745,7 @@ export function NewRunForm(props: {
   // Debounced persist. Guarded on hydration so the initial empty render can't
   // overwrite a saved snapshot before restore runs.
   useEffect(() => {
-    if (!draftAutosaveEnabled || !draftHydratedRef.current) return;
+    if (!draftAutosaveEnabled || !draftHydratedRef.current || localDraftClosedRef.current) return;
     const snapshot: NewRunDraftSnapshot = {
       sessionType,
       meetingSessionType,
@@ -1755,6 +1775,7 @@ export function NewRunForm(props: {
       shareWithTeam,
       conditions,
       savedRunId: createdRunId,
+      sessionLabel,
     };
     if (!newRunDraftHasContent(snapshot)) {
       try {
@@ -1765,6 +1786,8 @@ export function NewRunForm(props: {
       return;
     }
     const t = setTimeout(() => {
+      // A save or a discard landed while this write waited: the run is no longer a draft here.
+      if (localDraftClosedRef.current) return;
       try {
         window.localStorage.setItem(NEW_RUN_DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
       } catch {
@@ -1802,6 +1825,7 @@ export function NewRunForm(props: {
     shareWithTeam,
     conditions,
     createdRunId,
+    sessionLabel,
   ]);
 
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
@@ -4015,6 +4039,10 @@ export function NewRunForm(props: {
       // Same move for the run itself — see `createdRunId`. Adopted on every create,
       // stay or not: it can only make a later save MORE correct.
       if (!editRun?.id) setCreatedRunId(run.id);
+      // The run is persisted (draft or complete) and the page is leaving — drop the local
+      // autosave so returning to /runs/new starts clean, and before the tyre toast below can
+      // hold the departure: a copy written late would reopen as this run and save over it.
+      if (!opts?.stay) closeLocalDraft();
 
       const cascadedRuns = tireRunNumberCascade?.updatedRuns ?? 0;
       const backfilledRuns = backfilled?.created ?? 0;
@@ -4071,14 +4099,6 @@ export function NewRunForm(props: {
         haptic("success");
         void todayDraftCtx?.refreshDraft();
         return;
-      }
-
-      // The run is persisted (draft or complete) — drop the local autosave so
-      // returning to /runs/new starts clean instead of restoring this run.
-      try {
-        window.localStorage.removeItem(NEW_RUN_DRAFT_STORAGE_KEY);
-      } catch {
-        /* ignore */
       }
 
       // Every OTHER successful save leaves the log-run flow for the dashboard.
@@ -5028,7 +5048,15 @@ export function NewRunForm(props: {
               note={wizardVenueSwapNote}
               subNote={wizardCarSwapNote}
               onPrefill={applyWizardPrefill}
-              onStartBlank={props.onWizardRestart}
+              onStartBlank={
+                props.onWizardRestart
+                  ? () => {
+                      // A clean slate: the local copy would otherwise restore into the remount.
+                      closeLocalDraft();
+                      props.onWizardRestart?.();
+                    }
+                  : undefined
+              }
               onJump={goToWizardStep}
             />
           ) : null}
@@ -6267,6 +6295,7 @@ export function NewRunForm(props: {
           onExitDiscard={() => {
             wizardExitingRef.current = true;
             setWizardExitPromptOpen(false);
+            closeLocalDraft();
             // Throwing the edits away still returns whoever sent them here — leaving is
             // the point of this button, not being relocated.
             router.push(returnHref ?? "/");
