@@ -827,6 +827,62 @@ html[data-native="true"] .web-only {
 }
 
 /*
+ * The install card (`PwaInstallPrompt`, iOS Safari only) never lies over a control
+ * (test drive W1-30, 2026-09-26).
+ *
+ * It sat 1rem off the foot of the screen at z-60, over everything the app draws: the
+ * dock, the Log run step bar (a robot's taps failed with "intercepts pointer events")
+ * and a setup editor's Save, until the driver closed it. Now it sits just above the
+ * dock instead of across it — `--mobile-tab-bar-height` is the dock's published height,
+ * the clearance the setup editor's save bar uses too — and keeps its old 1rem where
+ * there is no dock (md up, and the signed-out pages, `.is-dockless`). Its z-index, under
+ * every bar, sheet and scrim, sits in the component.
+ *
+ * `.pwa-install-room` is the room the page leaves under it, so the last thing on any
+ * page can still be scrolled clear: the card's measured height, plus whatever `<main>`
+ * has not already set aside — over the dock it pads for the dock itself (AppShell).
+ */
+.pwa-install {
+  --pwa-install-bottom: calc(var(--mobile-tab-bar-height) + env(safe-area-inset-bottom, 0px));
+  --pwa-install-under: 0px;
+}
+
+@media (min-width: 768px) {
+  .pwa-install {
+    --pwa-install-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    --pwa-install-under: var(--pwa-install-bottom);
+  }
+}
+
+.pwa-install.is-dockless {
+  --pwa-install-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  --pwa-install-under: var(--pwa-install-bottom);
+}
+
+.pwa-install-card {
+  bottom: var(--pwa-install-bottom);
+}
+
+.pwa-install-room {
+  height: calc(var(--pwa-install-h, 0px) + var(--pwa-install-under));
+}
+
+/*
+ * And it steps aside on the screens whose own bar owns the bottom edge: the Log run
+ * steps (as the dock does, `body[data-logrun-wizard-chrome] .bottom-nav`) and a setup
+ * editor's save bar. Still pending, not dismissed — it is back on the next screen until
+ * the driver closes it. Two rules, not one list, so a browser without `:has()` still
+ * keeps the first.
+ */
+body[data-logrun-wizard-chrome] .pwa-install {
+  display: none;
+}
+
+body:has(.setup-save-panel) .pwa-install {
+  display: none;
+}
+
+/*
  * Elevated panel surface — the shared "lift" that makes cards siblings of the
  * dashboard hero instead of flat near-black rectangles. Warm top sheen + a
  * gradient that lifts the top edge + a soft drop shadow so panels read off the

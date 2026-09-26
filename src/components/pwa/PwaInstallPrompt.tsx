@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 
+import { isHiddenNavRoute } from "@/components/layout/navConfig";
 import { PRODUCT_NAME } from "@/lib/brand/brandNames";
+import { cn } from "@/lib/utils";
 
 /**
  * Smart, gentle "Add to Home Screen" hint for iOS Safari.
@@ -26,6 +29,13 @@ import { PRODUCT_NAME } from "@/lib/brand/brandNames";
  *
  * Portaled to <body> so a transformed ancestor (route-transition wrapper, page-body
  * reveal) can never trap its `position: fixed`.
+ *
+ * Never over a control (test drive W1-30, 2026-09-26). It used to sit at the foot of the
+ * screen above everything, dock included, and covered the Log run steps and a setup
+ * editor's Save until it was closed. It now sits just above the dock, under every bar,
+ * sheet and scrim the app portals to <body>, leaves the page room to scroll clear of it,
+ * and stays off the screens whose own bar owns the bottom edge — see `.pwa-install` in
+ * globals.css.
  */
 
 const DISMISS_KEY = "pwa-install-dismissed-at";
@@ -83,6 +93,10 @@ export function PwaInstallPrompt(): React.ReactNode {
   const isDemo = session?.user?.isDemo === true;
   /** The eligibility pass is a one-shot: `bumpVisits` writes, so it must not run twice. */
   const decided = useRef(false);
+  const pathname = usePathname();
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  /** The card's height, for the room the page leaves under it. */
+  const [cardHeight, setCardHeight] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -117,6 +131,18 @@ export function PwaInstallPrompt(): React.ReactNode {
     }
   }, [isDemo, visible]);
 
+  // Measured, not guessed, like `SetupEditorSaveBar`'s spacer: the copy wraps to a third line
+  // on a narrow phone, and the card measures 0 while a screen's own bar has it hidden.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!visible || !el) return;
+    const measure = () => setCardHeight(el.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [visible]);
+
   function dismiss(): void {
     setShown(false);
     try {
@@ -131,50 +157,60 @@ export function PwaInstallPrompt(): React.ReactNode {
 
   return createPortal(
     <div
-      role="dialog"
-      aria-label={`Install ${PRODUCT_NAME}`}
-      className="fixed inset-x-0 z-[60] flex justify-center px-4"
-      style={{
-        bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)",
-        transform: shown ? "translateY(0)" : "translateY(140%)",
-        opacity: shown ? 1 : 0,
-        transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease",
-      }}
+      // No dock on the signed-out pages at any width: the card keeps its old place there.
+      className={cn("pwa-install", isHiddenNavRoute(pathname) && "is-dockless")}
+      style={{ "--pwa-install-h": `${cardHeight}px` } as CSSProperties}
     >
-      <div className="glass-card relative w-full max-w-sm rounded-2xl border border-white/10 p-4 shadow-2xl">
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label="Dismiss"
-          className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <CloseIcon />
-        </button>
-
-        <div className="flex items-start gap-3 pr-6">
-          <span
-            aria-hidden="true"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl primary-face bg-primary text-primary-foreground"
+      {/* In the flow at the foot of <body>: the room that lets the page scroll clear of the card. */}
+      <div aria-hidden="true" className="pwa-install-room" />
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-label={`Install ${PRODUCT_NAME}`}
+        /* z-28: under every bar, sheet and scrim portaled to <body> (the lowest is 29). The
+           row is click-through, so only the card itself takes a tap, not the air beside it. */
+        className="pwa-install-card pointer-events-none fixed inset-x-0 z-[28] flex justify-center px-4"
+        style={{
+          transform: shown ? "translateY(0)" : "translateY(140%)",
+          opacity: shown ? 1 : 0,
+          transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease",
+        }}
+      >
+        <div className="glass-card pointer-events-auto relative w-full max-w-sm rounded-2xl border border-white/10 p-4 shadow-2xl">
+          <button
+            type="button"
+            onClick={dismiss}
+            aria-label="Dismiss"
+            className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <BoltIcon />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[15px] font-bold leading-tight text-foreground">
-              Install {PRODUCT_NAME}
-            </p>
-            <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
-              Add it to your home screen for a full-screen app — faster to open at the
-              track, and the first step to run alerts.
-            </p>
-          </div>
-        </div>
+            <CloseIcon />
+          </button>
 
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-secondary/60 px-3 py-2 text-[13px] text-foreground">
-          <span>Tap</span>
-          <ShareIcon />
-          <span className="font-semibold">Share</span>
-          <span className="text-muted-foreground">→</span>
-          <span className="font-semibold">Add to Home Screen</span>
+          <div className="flex items-start gap-3 pr-6">
+            <span
+              aria-hidden="true"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl primary-face bg-primary text-primary-foreground"
+            >
+              <BoltIcon />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[15px] font-bold leading-tight text-foreground">
+                Install {PRODUCT_NAME}
+              </p>
+              <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
+                Add it to your home screen for a full-screen app — faster to open at the
+                track, and the first step to run alerts.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-secondary/60 px-3 py-2 text-[13px] text-foreground">
+            <span>Tap</span>
+            <ShareIcon />
+            <span className="font-semibold">Share</span>
+            <span className="text-muted-foreground">→</span>
+            <span className="font-semibold">Add to Home Screen</span>
+          </div>
         </div>
       </div>
     </div>,
