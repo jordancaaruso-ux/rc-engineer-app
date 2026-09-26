@@ -6,6 +6,7 @@ import { CardPanel } from "@/components/ui/CardPanel";
 import { Button } from "@/components/ui/Button";
 import { Eyebrow } from "@/components/ui/panel";
 import { RelativeTime } from "@/components/ui/RelativeTime";
+import { ModerationSheet, MoreButton } from "@/components/moderation/ModerationSheet";
 
 type MemberRow = {
   userId: string;
@@ -13,6 +14,8 @@ type MemberRow = {
   joinedAt: string;
   name: string | null;
   email: string | null;
+  /** The viewer blocked this teammate: their runs and comments are out of the viewer's feed. */
+  blockedByViewer?: boolean;
 };
 
 /** Invited, not yet answered — not a member, so nothing is shared with them yet. */
@@ -74,6 +77,8 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
   const [pendingLeave, setPendingLeave] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
+  // Report / Block for one teammate (App Store guideline 1.2).
+  const [moreFor, setMoreFor] = useState<MemberRow | null>(null);
 
   const load = useCallback(async () => {
     setLoadErr(null);
@@ -309,29 +314,39 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
                       {isSelf ? " (you)" : ""}
                     </p>
                     <p className="type-timestamp truncate">
+                      {/* First, so a long email can't truncate it away. */}
+                      {member.blockedByViewer ? "Blocked · " : ""}
                       {member.email ?? "—"} · {member.role}
                     </p>
                   </div>
-                  {isAdmin && !isSelf ? (
-                    pendingRemoval === member.userId ? (
-                      <div className="flex shrink-0 gap-2">
-                        <Button variant="outline" onClick={() => void removeMember(member.userId)}>
-                          Confirm
-                        </Button>
-                        <Button variant="outline" onClick={() => setPendingRemoval(null)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="type-timestamp shrink-0 hover:text-destructive"
-                        onClick={() => setPendingRemoval(member.userId)}
-                      >
-                        Remove
-                      </button>
-                    )
-                  ) : null}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {isAdmin && !isSelf ? (
+                      pendingRemoval === member.userId ? (
+                        <div className="flex shrink-0 gap-2">
+                          <Button variant="outline" onClick={() => void removeMember(member.userId)}>
+                            Confirm
+                          </Button>
+                          <Button variant="outline" onClick={() => setPendingRemoval(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="type-timestamp shrink-0 hover:text-destructive"
+                          onClick={() => setPendingRemoval(member.userId)}
+                        >
+                          Remove
+                        </button>
+                      )
+                    ) : null}
+                    {!isSelf && pendingRemoval !== member.userId ? (
+                      <MoreButton
+                        label={`More for ${member.name ?? member.email ?? "this teammate"}`}
+                        onClick={() => setMoreFor(member)}
+                      />
+                    ) : null}
+                  </div>
                 </div>
                 {pendingRemoval === member.userId ? (
                   <p className="mt-1.5 text-[12px] text-muted-foreground">
@@ -343,6 +358,35 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
           })}
         </ul>
       </CardPanel>
+
+      <ModerationSheet
+        open={moreFor !== null}
+        onClose={() => setMoreFor(null)}
+        title={moreFor?.name ?? moreFor?.email ?? "Teammate"}
+        report={
+          moreFor
+            ? {
+                kind: "driver",
+                targetId: moreFor.userId,
+                teamId: detail.id,
+                label: `Report ${moreFor.name ?? moreFor.email ?? "teammate"}`,
+              }
+            : undefined
+        }
+        block={
+          moreFor
+            ? {
+                userId: moreFor.userId,
+                name: moreFor.name ?? moreFor.email ?? "this teammate",
+                blocked: Boolean(moreFor.blockedByViewer),
+              }
+            : undefined
+        }
+        onBlockChange={() => {
+          void load();
+          router.refresh();
+        }}
+      />
 
       <CardPanel contentClassName="space-y-2.5">
         <Eyebrow>Leave team</Eyebrow>

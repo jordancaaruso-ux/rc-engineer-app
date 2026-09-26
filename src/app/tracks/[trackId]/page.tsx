@@ -22,6 +22,7 @@ import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { UnverifiedBadge } from "@/components/assets/CatalogVerifyControl";
 import { CatalogVerifyToggleButton } from "@/components/assets/CatalogVerifyToggleButton";
 import { CatalogMergeControl } from "@/components/admin/CatalogMergeControl";
+import { ReportEntryButton } from "@/components/moderation/ModerationSheet";
 
 export default async function TrackDetailPage(props: {
   params: Promise<{ trackId: string }>;
@@ -125,12 +126,16 @@ export default async function TrackDetailPage(props: {
       <section className="page-body">
         <div className="space-y-4">
           <CardPanel contentClassName="text-[13px]">
-            <div className="grid gap-2">
-              <div><span className="font-medium text-muted-foreground">Created</span> <span className="ml-2 fig-stat">{formatRunCreatedAtDateTime(track.createdAt, displayTimeZone)}</span></div>
-              <div><span className="font-medium text-muted-foreground">Runs</span> <span className="ml-2 fig-stat">{runCount}</span></div>
-              {track.location ? (
-                <div><span className="font-medium text-muted-foreground">Location</span> <span className="ml-2">{track.location}</span></div>
-              ) : null}
+            <div className="flex items-start justify-between gap-3">
+              <div className="grid gap-2">
+                <div><span className="font-medium text-muted-foreground">Created</span> <span className="ml-2 fig-stat">{formatRunCreatedAtDateTime(track.createdAt, displayTimeZone)}</span></div>
+                <div><span className="font-medium text-muted-foreground">Runs</span> <span className="ml-2 fig-stat">{runCount}</span></div>
+                {track.location ? (
+                  <div><span className="font-medium text-muted-foreground">Location</span> <span className="ml-2">{track.location}</span></div>
+                ) : null}
+              </div>
+              {/* Every driver sees a track another driver added (App Store guideline 1.2). */}
+              <ReportEntryButton kind="track" targetId={track.id} noun="track" className="-mr-1 -mt-0.5" />
             </div>
           </CardPanel>
 

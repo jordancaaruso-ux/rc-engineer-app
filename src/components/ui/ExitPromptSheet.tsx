@@ -21,7 +21,7 @@ export const SHEET_PILL_PRIMARY = cn(
   PILL_BASE,
   "bg-[linear-gradient(180deg,#FFDF3D_0%,#FFD60A_55%,#F1C700_100%)] text-primary-foreground shadow-[0_10px_22px_-8px_rgba(255,214,10,0.35),inset_0_1px_0_rgba(255,255,255,0.4)] hover:brightness-[0.96]"
 );
-const PILL_DANGER = cn(
+export const SHEET_PILL_DANGER = cn(
   PILL_BASE,
   "border border-destructive/40 bg-destructive/10 text-destructive"
 );
@@ -115,7 +115,7 @@ export function ExitPromptSheet({
           </button>
           <button
             type="button"
-            className={cn(PILL_DANGER, busy && "pointer-events-none opacity-60")}
+            className={cn(SHEET_PILL_DANGER, busy && "pointer-events-none opacity-60")}
             onClick={onDiscard}
             disabled={busy}
           >

@@ -8,6 +8,7 @@ import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { parseTireBucket } from "@/lib/tires/tireCatalogFilter";
 import { TIRE_CATALOG_MAX, tireCatalogScopeWhere } from "@/lib/tires/tireCatalogScope";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 /**
  * The picker downloads the catalog once and filters locally, so this is the ceiling on what is
@@ -110,6 +111,9 @@ export async function POST(request: Request) {
     if (!displayName) {
       return NextResponse.json({ error: "displayName is required" }, { status: 400 });
     }
+    // Other drivers see a typed name in their pickers straight away.
+    const unclean = objectionableTextError(displayName);
+    if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
 
     const modelCodeRaw = body.modelCode?.trim() || suggestModelCodeFromDisplayName(displayName);
     const modelCode = modelCodeRaw.toUpperCase().replace(/\s+/g, "-");

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { getMyNameSetting, setMyNameSetting } from "@/lib/appSettings";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 export async function GET() {
   if (!hasDatabaseUrl()) {
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
   const userId = await getAuthenticatedApiUserId();
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => null)) as { myName?: string | null } | null;
+  const unclean = objectionableTextError(typeof body?.myName === "string" ? body.myName : null);
+  if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
   await setMyNameSetting(userId, typeof body?.myName === "string" ? body.myName : null);
   const myName = await getMyNameSetting(userId);
   return NextResponse.json({ myName });

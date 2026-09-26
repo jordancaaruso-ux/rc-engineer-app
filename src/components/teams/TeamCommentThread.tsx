@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { ModerationSheet, MoreButton } from "@/components/moderation/ModerationSheet";
+import { applyCommentVisibility } from "@/lib/moderation/visibilityRules";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { COMMENT_MAX_LENGTH } from "@/lib/teams/commentRules";
 import { cn } from "@/lib/utils";
@@ -32,6 +35,11 @@ export function TeamCommentThread({
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
+  // Report and Block act here at once; the server applies the same rule on the next load.
+  const router = useRouter();
+  const [moreFor, setMoreFor] = useState<TeamFeedComment | null>(null);
+  const [reportedIds, setReportedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [blockedAuthorIds, setBlockedAuthorIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const base = `/api/teams/${encodeURIComponent(teamId)}/comments`;
 
@@ -116,9 +124,22 @@ export function TeamCommentThread({
     }
   }
 
-  const roots = comments.filter((c) => !c.parentId);
+  const shown = useMemo(
+    () =>
+      applyCommentVisibility(comments, {
+        authorIds: blockedAuthorIds,
+        commentIds: new Set([...reportedIds, ...comments.filter((c) => c.hidden).map((c) => c.id)]),
+      }).map(({ row, hidden }) =>
+        hidden
+          ? { ...row, hidden: true, body: "", viewerCanEdit: false, viewerCanDelete: false, viewerCanReport: false }
+          : row
+      ),
+    [comments, reportedIds, blockedAuthorIds]
+  );
+
+  const roots = shown.filter((c) => !c.parentId);
   const repliesByParent = new Map<string, TeamFeedComment[]>();
-  for (const c of comments) {
+  for (const c of shown) {
     if (!c.parentId) continue;
     repliesByParent.set(c.parentId, [...(repliesByParent.get(c.parentId) ?? []), c]);
   }
@@ -140,6 +161,7 @@ export function TeamCommentThread({
             onSaveEdit={() => void saveEdit(comment.id)}
             onDelete={() => void remove(comment.id)}
             onReply={() => setReplyTo(comment.id)}
+            onMore={() => setMoreFor(comment)}
             busy={busy}
           />
           {(repliesByParent.get(comment.id) ?? []).map((reply) => (
@@ -157,6 +179,7 @@ export function TeamCommentThread({
               onCancelEdit={() => setEditingId(null)}
               onSaveEdit={() => void saveEdit(reply.id)}
               onDelete={() => void remove(reply.id)}
+              onMore={() => setMoreFor(reply)}
               busy={busy}
             />
           ))}
@@ -192,6 +215,33 @@ export function TeamCommentThread({
         </div>
         {error ? <p className="mt-1 text-[12px] text-destructive">{error}</p> : null}
       </div>
+
+      <ModerationSheet
+        open={moreFor !== null}
+        onClose={() => setMoreFor(null)}
+        title={moreFor ? `${moreFor.authorLabel}’s comment` : ""}
+        report={
+          moreFor
+            ? { kind: "comment", targetId: moreFor.id, teamId, label: "Report comment" }
+            : undefined
+        }
+        block={
+          moreFor
+            ? { userId: moreFor.authorUserId, name: moreFor.authorLabel, blocked: false }
+            : undefined
+        }
+        onReported={() => {
+          const id = moreFor?.id;
+          if (id) setReportedIds((prev) => new Set([...prev, id]));
+        }}
+        onBlockChange={(blocked) => {
+          const authorId = moreFor?.authorUserId;
+          if (!blocked || !authorId) return;
+          setBlockedAuthorIds((prev) => new Set([...prev, authorId]));
+          // Their runs leave the feed too.
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
@@ -207,6 +257,7 @@ function CommentRow({
   onSaveEdit,
   onDelete,
   onReply,
+  onMore,
   busy,
 }: {
   comment: TeamFeedComment;
@@ -219,6 +270,8 @@ function CommentRow({
   onSaveEdit: () => void;
   onDelete: () => void;
   onReply?: () => void;
+  /** Opens Report / Block. Only offered on someone else's live comment. */
+  onMore?: () => void;
   busy: boolean;
 }) {
   return (
@@ -237,6 +290,8 @@ function CommentRow({
 
       {comment.deletedAt ? (
         <p className="mt-0.5 text-[13px] italic text-muted-foreground">Comment deleted</p>
+      ) : comment.hidden ? (
+        <p className="mt-0.5 text-[13px] italic text-muted-foreground">Comment hidden</p>
       ) : isEditing ? (
         <div className="mt-1 flex items-end gap-2">
           <textarea
@@ -260,8 +315,8 @@ function CommentRow({
         </p>
       )}
 
-      {!comment.deletedAt && !isEditing ? (
-        <div className="mt-1 flex gap-3">
+      {!comment.deletedAt && !comment.hidden && !isEditing ? (
+        <div className="mt-1 flex items-center gap-3">
           {onReply ? (
             <button type="button" className="type-timestamp hover:text-foreground" onClick={onReply}>
               Reply
@@ -276,6 +331,9 @@ function CommentRow({
             <button type="button" className="type-timestamp hover:text-destructive" onClick={onDelete}>
               Delete
             </button>
+          ) : null}
+          {comment.viewerCanReport && onMore ? (
+            <MoreButton label={`More for ${comment.authorLabel}’s comment`} onClick={onMore} className="-my-1" />
           ) : null}
         </div>
       ) : null}

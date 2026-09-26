@@ -3,14 +3,15 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/webPush/server";
 import { listTeamMemberUserIds } from "@/lib/teamAccess";
+import { loadBlockedPeerIds } from "@/lib/moderation/blocks";
 import { resolveCommentNotifyRecipients, teamCommentNotificationTag } from "@/lib/teams/commentRules";
 
 /**
  * Best-effort push when a comment lands on a run in a team feed.
  *
  * Goes to the run's owner and to everyone already talking on that run in this team — never
- * the whole team. An unread badge for every member on every comment is exactly what makes
- * people mute a feed, and the feed is the product.
+ * the whole team, and never anyone in a block with the author. An unread badge for every
+ * member on every comment is exactly what makes people mute a feed, and the feed is the product.
  *
  * The shared `tag` matters: `public/sw.js` passes it to `showNotification`, so a second
  * comment on the same thread replaces the first notification instead of stacking another one
@@ -28,7 +29,7 @@ export async function notifyTeamComment(input: {
   body: string;
 }): Promise<void> {
   try {
-    const [run, priorComments, memberIds] = await Promise.all([
+    const [run, priorComments, memberIds, blockedPeerIds] = await Promise.all([
       prisma.run.findFirst({ where: { id: input.runId }, select: { userId: true } }),
       prisma.teamRunComment.findMany({
         where: { teamId: input.teamId, runId: input.runId, id: { not: input.commentId } },
@@ -36,6 +37,7 @@ export async function notifyTeamComment(input: {
         distinct: ["authorUserId"],
       }),
       listTeamMemberUserIds(input.teamId),
+      loadBlockedPeerIds(input.authorUserId),
     ]);
     if (!run) return;
 
@@ -44,7 +46,7 @@ export async function notifyTeamComment(input: {
       priorCommenterUserIds: priorComments.map((c) => c.authorUserId),
       authorUserId: input.authorUserId,
       teamMemberUserIds: memberIds,
-    });
+    }).filter((userId) => !blockedPeerIds.has(userId));
     if (recipients.length === 0) return;
 
     const preview = input.body.length > 120 ? `${input.body.slice(0, 119)}…` : input.body;

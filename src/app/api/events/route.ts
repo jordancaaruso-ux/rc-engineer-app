@@ -15,6 +15,7 @@ import {
 import { findEventByTrackAndResultsUrl } from "@/lib/events/findEventForLiveRc";
 import { eventTrackFieldsForLink } from "@/lib/tracks/legacyTrackSnapshot";
 import { revalidateAfterEventMutation } from "@/lib/revalidateUser";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,9 @@ export async function POST(request: Request) {
     if (!name) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
+    // Teammates and drivers joining the same meeting read the name.
+    const unclean = objectionableTextError(name);
+    if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
     const trackId = body.trackId?.toString().trim();
     if (!trackId) {
       return NextResponse.json({ error: "trackId is required" }, { status: 400 });

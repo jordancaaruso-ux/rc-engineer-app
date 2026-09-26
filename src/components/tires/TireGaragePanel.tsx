@@ -11,6 +11,7 @@ import { HubRowTitle } from "@/components/ui/panel";
 import { Collapse } from "@/components/ui/Collapse";
 import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { CatalogVerifyControl } from "@/components/assets/CatalogVerifyControl";
+import { ReportEntryButton } from "@/components/moderation/ModerationSheet";
 import type { TireTypeOption } from "@/components/tires/TireTypeCombobox";
 
 export function TireGaragePanel({
@@ -239,6 +240,8 @@ export function TireGaragePanel({
                       {t.displayName}
                     </HubRowTitle>
                     {!t.verifiedAt ? <CatalogVerifyControl verified={false} isAdmin={false} /> : null}
+                    {/* A tire a driver typed is the only kind on this list another driver wrote. */}
+                    {!t.verifiedAt ? <ReportEntryButton kind="tire" targetId={t.id} noun="tire" /> : null}
                   </li>
                 );
               }

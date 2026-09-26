@@ -9,6 +9,7 @@ import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeMo
 import { headSetupDocumentUpload, StorageConfigurationError } from "@/lib/setupDocuments/storage";
 import { recordChassisTypeRequest } from "@/lib/setupSheetModels/chassisTypeRequests";
 import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 import {
   createModelFromBlank,
   type BlankUploadSource,
@@ -95,6 +96,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   if (!name) return NextResponse.json({ error: "A chassis name is required." }, { status: 400 });
+  const unclean = objectionableTextError(name);
+  if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
 
   /*
    * DISCIPLINE IS REQUIRED ON THE DRIVER'S DOOR (founder call, 2026-08-26).

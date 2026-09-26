@@ -1,36 +1,43 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { isBlockedPair, loadBlockedPeerIds } from "@/lib/moderation/blocks";
 
 /**
  * Mutual team access: true iff `viewerId` and `targetUserId` are both members
- * of at least one team (pilot contract).
+ * of at least one team (pilot contract), and neither has blocked the other.
  */
 export async function hasTeamAccess(viewerId: string, targetUserId: string): Promise<boolean> {
   if (viewerId === targetUserId) return true;
-  const row = await prisma.teamMembership.findFirst({
-    where: {
-      userId: targetUserId,
-      team: { memberships: { some: { userId: viewerId } } },
-    },
-    select: { id: true },
-  });
-  return Boolean(row);
+  const [row, blocked] = await Promise.all([
+    prisma.teamMembership.findFirst({
+      where: {
+        userId: targetUserId,
+        team: { memberships: { some: { userId: viewerId } } },
+      },
+      select: { id: true },
+    }),
+    isBlockedPair(viewerId, targetUserId),
+  ]);
+  return Boolean(row) && !blocked;
 }
 
-/** Distinct peer user ids sharing any team with the viewer (excludes viewer). */
+/** Distinct peer user ids sharing any team with the viewer (excludes viewer and blocks). */
 export async function listTeamPeerUserIds(viewerId: string): Promise<string[]> {
-  const mine = await prisma.teamMembership.findMany({
-    where: { userId: viewerId },
-    select: { teamId: true },
-  });
+  const [mine, blocked] = await Promise.all([
+    prisma.teamMembership.findMany({
+      where: { userId: viewerId },
+      select: { teamId: true },
+    }),
+    loadBlockedPeerIds(viewerId),
+  ]);
   const teamIds = mine.map((m) => m.teamId);
   if (teamIds.length === 0) return [];
   const others = await prisma.teamMembership.findMany({
     where: { teamId: { in: teamIds }, userId: { not: viewerId } },
     select: { userId: true },
   });
-  return [...new Set(others.map((o) => o.userId))];
+  return [...new Set(others.map((o) => o.userId))].filter((id) => !blocked.has(id));
 }
 
 export type TeamListRow = { id: string; name: string; role: string };

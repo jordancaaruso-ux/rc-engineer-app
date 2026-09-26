@@ -178,6 +178,7 @@
     "test:event-active": "npx tsx src/lib/eventActive.test.ts",
     "test:nav": "node --import tsx --test src/components/layout/navConfig.test.ts",
     "test:teams": "node --import tsx --test src/lib/teams/teamInviteRules.test.ts",
+    "test:moderation": "npx tsx --test src/lib/moderation/moderation.test.ts",
     "test:share": "node --import tsx --test src/lib/share/shareCardModel.test.ts src/lib/share/storyModel.test.ts",
     "test:share-render": "node --conditions=react-server --import tsx --test src/lib/share/renderShare.test.tsx",
     "share:shots": "node --conditions=react-server --import tsx scripts/dev-share-card-shot.ts",

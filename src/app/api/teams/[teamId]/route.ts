@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { assertTeamAdmin, assertUserInTeam } from "@/lib/teamAccess";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
+import { loadBlocksMadeBy } from "@/lib/moderation/blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +52,8 @@ export async function GET(_request: Request, ctx: Ctx) {
 
   const viewerMembership = team.memberships.find((m) => m.userId === user.id);
   const viewerRole = viewerMembership?.role ?? "member";
+  // Only the viewer's own blocks: whether someone blocked the viewer is never shown to them.
+  const blockedByViewer = await loadBlocksMadeBy(user.id);
 
   return NextResponse.json({
     team: {
@@ -64,6 +68,7 @@ export async function GET(_request: Request, ctx: Ctx) {
         joinedAt: m.joinedAt.toISOString(),
         name: m.user.name?.trim() || null,
         email: m.user.email?.trim() || null,
+        blockedByViewer: blockedByViewer.has(m.userId),
       })),
       /** Invited but not yet answered — visible to every member, revocable only by an admin. */
       pendingInvites: team.invites.map((i) => ({
@@ -91,6 +96,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
   if (!name) {
     return NextResponse.json({ error: "Team name is required" }, { status: 400 });
   }
+  const unclean = objectionableTextError(name);
+  if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
   const team = await prisma.team.update({
     where: { id: teamId },
     data: { name },

@@ -17,6 +17,7 @@ import { canEditSharedEventFields } from "@/lib/events/eventAccess";
 import { mergeEventIntoExistingByResultsUrl } from "@/lib/events/mergeEvents";
 import { eventTrackFieldsForLink } from "@/lib/tracks/legacyTrackSnapshot";
 import { revalidateAfterEventMutation } from "@/lib/revalidateUser";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 function optString(v: unknown): string | null | undefined {
   if (v === undefined) return undefined;
@@ -104,6 +105,8 @@ export async function PATCH(
     if (!name) {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
+    const unclean = objectionableTextError(name);
+    if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
     eventData.name = name;
   }
 

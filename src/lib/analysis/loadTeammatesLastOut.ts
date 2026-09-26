@@ -4,6 +4,7 @@ import { perfSpan } from "@/lib/perfLog";
 import { calendarYmdInTimeZone } from "@/lib/formatDate";
 import { formatRelativeFromNow } from "@/lib/formatRelative";
 import { loadTeamMemberDisplays } from "@/lib/teams/teamMemberDisplay";
+import { loadBlockedPeerIds } from "@/lib/moderation/blocks";
 import { resolveRunLocalTimeZone, runLocalDayKey } from "@/lib/runs/buildRunHistoryGroups";
 import {
   sortTeammatesByLastOut,
@@ -85,15 +86,20 @@ export async function loadTeammatesLastOut(
      * with resolves to the one you have both been in longest, and the same person's row opens
      * the same team's Sessions view on every load.
      */
-    const memberships = await prisma.teamMembership.findMany({
-      where: { teamId: { in: myTeams.map((t) => t.teamId) }, userId: { not: userId } },
-      select: { userId: true, teamId: true },
-      orderBy: { joinedAt: "asc" },
-    });
+    const [memberships, blockedPeerIds] = await Promise.all([
+      prisma.teamMembership.findMany({
+        where: { teamId: { in: myTeams.map((t) => t.teamId) }, userId: { not: userId } },
+        select: { userId: true, teamId: true },
+        orderBy: { joinedAt: "asc" },
+      }),
+      loadBlockedPeerIds(userId),
+    ]);
 
     const teamByUserId = new Map<string, string>();
     for (const row of memberships) {
       if (teamByUserId.size >= MAX_TEAMMATES) break;
+      // A driver in a block with the viewer is not their teammate on any card.
+      if (blockedPeerIds.has(row.userId)) continue;
       if (!teamByUserId.has(row.userId)) teamByUserId.set(row.userId, row.teamId);
     }
     const teammateIds = [...teamByUserId.keys()];

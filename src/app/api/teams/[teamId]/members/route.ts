@@ -6,6 +6,8 @@ import { assertTeamAdmin, assertUserInTeam } from "@/lib/teamAccess";
 import { isEmailAuthAllowed } from "@/lib/authAllowlist";
 import { checkInviteCreate } from "@/lib/teams/teamInviteRules";
 import { notifyUserOfTeamInvite } from "@/lib/teams/notifyTeamInvite";
+import { isBlockedPair } from "@/lib/moderation/blocks";
+import { removeTeamMember } from "@/lib/teams/removeTeamMember";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,11 @@ export async function POST(request: Request, ctx: Ctx) {
     where: { email },
     select: { id: true, email: true, name: true },
   });
+
+  // A block either way stops the invite. Worded so it never says which side blocked.
+  if (peer && (await isBlockedPair(user.id, peer.id))) {
+    return NextResponse.json({ error: "You can't invite this driver." }, { status: 403 });
+  }
 
   const [existingMembership, existingInvite] = peer
     ? await Promise.all([
@@ -133,43 +140,9 @@ export async function DELETE(request: Request, ctx: Ctx) {
     }
   }
 
-  const membership = await prisma.teamMembership.findFirst({
-    where: { teamId, userId: targetUserId },
-    select: { id: true, role: true },
-  });
-  if (!membership) {
+  if (!(await removeTeamMember(teamId, targetUserId))) {
     return NextResponse.json({ error: "Not a member" }, { status: 404 });
   }
-
-  await prisma.$transaction(async (tx) => {
-    if (membership.role === "admin") {
-      const adminCount = await tx.teamMembership.count({
-        where: { teamId, role: "admin" },
-      });
-      if (adminCount === 1) {
-        const next = await tx.teamMembership.findFirst({
-          where: { teamId, userId: { not: targetUserId } },
-          orderBy: { joinedAt: "asc" },
-          select: { userId: true },
-        });
-        if (next) {
-          await tx.teamMembership.update({
-            where: { teamId_userId: { teamId, userId: next.userId } },
-            data: { role: "admin" },
-          });
-        }
-      }
-    }
-
-    await tx.teamMembership.delete({
-      where: { teamId_userId: { teamId, userId: targetUserId } },
-    });
-
-    const remaining = await tx.teamMembership.count({ where: { teamId } });
-    if (remaining === 0) {
-      await tx.team.delete({ where: { id: teamId } });
-    }
-  });
 
   return NextResponse.json({ ok: true });
 }

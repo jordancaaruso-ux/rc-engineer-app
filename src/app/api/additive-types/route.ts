@@ -4,6 +4,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { suggestModelCodeFromDisplayName } from "@/lib/tires/matchTireType";
 import { ensureSeedAdditiveTypes } from "@/lib/additives/ensureSeedAdditiveTypes";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 const ADDITIVE_TYPE_SELECT = {
   id: true,
@@ -72,6 +73,9 @@ export async function POST(request: Request) {
     if (!displayName) {
       return NextResponse.json({ error: "displayName is required" }, { status: 400 });
     }
+    // Other drivers see a typed name in their pickers straight away.
+    const unclean = objectionableTextError(displayName);
+    if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
 
     const modelCodeRaw = body.modelCode?.trim() || suggestModelCodeFromDisplayName(displayName);
     const modelCode = modelCodeRaw.toUpperCase().replace(/\s+/g, "-");

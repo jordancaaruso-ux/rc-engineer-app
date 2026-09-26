@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/Button";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { Eyebrow } from "@/components/ui/panel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
+import { ReportEntryButton } from "@/components/moderation/ModerationSheet";
 import { CreateCalibrationForModel } from "@/components/setup-sheet-models/CreateCalibrationForModel";
 import { setCalibrationVerificationAction } from "./actions";
 
@@ -130,7 +131,11 @@ export default async function SetupSheetModelWorkbenchPage({
 
       <section className="page-body space-y-3 pb-6">
         <CardPanel contentClassName="space-y-3">
-          <Eyebrow>Calibration status</Eyebrow>
+          <div className="flex items-start justify-between gap-3">
+            <Eyebrow>Calibration status</Eyebrow>
+            {/* A chassis made from a driver's upload shows that sheet to everyone on the car. */}
+            <ReportEntryButton kind="chassis" targetId={model.id} noun="chassis" className="-mr-1 -mt-1" />
+          </div>
           {calibration ? (
             <>
               <div className="text-sm">

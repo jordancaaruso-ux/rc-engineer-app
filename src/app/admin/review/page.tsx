@@ -21,6 +21,14 @@ import { BlankReviewedButton } from "@/components/admin/BlankReviewedButton";
 import { loadBlankReviewQueue } from "@/lib/setupSheetModels/blankReviewQueue";
 import { tireTypeIdsInUse } from "@/lib/assets/catalogUsageBulk";
 import { tireLookalikeFinder } from "@/lib/tires/tireLookalike";
+import { ReportActions } from "@/components/admin/ReportActions";
+import {
+  REPORT_KIND_LABEL,
+  REPORT_REASON_LABEL,
+  isReportKind,
+  isReportReason,
+  reportCanRemove,
+} from "@/lib/moderation/reportRules";
 
 const TAKE = 50;
 
@@ -62,7 +70,7 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
   if (!isAuthAdminEmail(user.email)) notFound();
 
   const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
-  const [typedTires, trustedTires, handBuiltChassis, chassisRequests, blanks] = await Promise.all([
+  const [typedTires, trustedTires, handBuiltChassis, chassisRequests, blanks, openReports] = await Promise.all([
     // Tires a driver typed. Ours, the founder's own and anything a list vouched for are verified on
     // arrival, so `createdByUserId` is not what keeps them out — it keeps out any of ours an older
     // import left unverified, which is the flood this page used to be.
@@ -105,7 +113,48 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
     }),
     listPendingChassisTypeRequests(TAKE),
     loadBlankReviewQueue(),
+    // What drivers reported (App Store guideline 1.2): Apple expects an answer within 24 hours.
+    prisma.contentReport.findMany({
+      where: { status: "open" },
+      orderBy: { createdAt: "desc" },
+      take: TAKE,
+      select: {
+        id: true,
+        kind: true,
+        targetId: true,
+        targetUserId: true,
+        teamId: true,
+        reason: true,
+        excerpt: true,
+        createdAt: true,
+        reporter: { select: { email: true } },
+      },
+    }),
   ]);
+
+  const reportedUserIds = [
+    ...new Set(openReports.map((r) => r.targetUserId).filter((id): id is string => !!id)),
+  ];
+  const reportTeamIds = [...new Set(openReports.map((r) => r.teamId).filter((id): id is string => !!id))];
+  const [reportedUsers, reportTeams] = await Promise.all([
+    reportedUserIds.length
+      ? prisma.user.findMany({ where: { id: { in: reportedUserIds } }, select: { id: true, email: true } })
+      : Promise.resolve([]),
+    reportTeamIds.length
+      ? prisma.team.findMany({ where: { id: { in: reportTeamIds } }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+  ]);
+  const emailOfUser = new Map(reportedUsers.map((u) => [u.id, u.email]));
+  const nameOfTeam = new Map(reportTeams.map((tm) => [tm.id, tm.name]));
+  /** Where the founder fixes a catalog entry: its own page, which has delete and merge. */
+  const reportOpenHref = (kind: string, targetId: string): string | null =>
+    kind === "track"
+      ? `/tracks/${targetId}`
+      : kind === "chassis"
+        ? `/setup-sheet-models/${targetId}`
+        : kind === "tire"
+          ? "/tires"
+          : null;
 
   const lookalikeOf = tireLookalikeFinder(trustedTires);
 
@@ -113,6 +162,7 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
   const tireInUse = await tireTypeIdsInUse(typedTires.map((t) => t.id));
 
   const total =
+    openReports.length +
     typedTires.length +
     handBuiltChassis.length +
     chassisRequests.length +
@@ -146,9 +196,43 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
       <section className="page-body max-w-2xl space-y-4">
         {total === 0 ? (
           <CardPanel contentClassName="text-sm text-muted-foreground">
-            New chassis and tires drivers type land here.
+            Reports, new chassis and tires drivers type land here.
           </CardPanel>
         ) : null}
+
+        <div id="reports" className="scroll-mt-20">
+          <ReviewSection eyebrow="Reports · answer within 24 hours" empty={openReports.length === 0}>
+            {openReports.map((r) => {
+              const kind = isReportKind(r.kind) ? r.kind : null;
+              const openHref = kind ? reportOpenHref(kind, r.targetId) : null;
+              const about = r.targetUserId ? emailOfUser.get(r.targetUserId) ?? "account gone" : null;
+              const team = r.teamId ? nameOfTeam.get(r.teamId) ?? "team gone" : null;
+              return (
+                <li key={r.id} className="flex items-start justify-between gap-3 px-4 py-2.5">
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {kind ? REPORT_KIND_LABEL[kind] : r.kind} ·{" "}
+                      {isReportReason(r.reason) ? REPORT_REASON_LABEL[r.reason] : r.reason} · {fmt(r.createdAt)}
+                    </div>
+                    {openHref ? (
+                      <Link href={openHref} className="block text-xs text-foreground hover:underline">
+                        {r.excerpt}
+                      </Link>
+                    ) : (
+                      <p className="whitespace-pre-wrap text-xs text-foreground">{r.excerpt}</p>
+                    )}
+                    <div className="text-[10px] text-muted-foreground">
+                      by {r.reporter.email ?? "unknown"}
+                      {about ? ` · about ${about}` : ""}
+                      {team ? ` · ${team}` : ""}
+                    </div>
+                  </div>
+                  <ReportActions reportId={r.id} canRemove={kind ? reportCanRemove(kind, r.teamId) : false} />
+                </li>
+              );
+            })}
+          </ReviewSection>
+        </div>
 
         <ReviewSection eyebrow="Setup sheets drivers uploaded" empty={blanks.waiting.length === 0}>
           {blanks.waiting.map((b) => (

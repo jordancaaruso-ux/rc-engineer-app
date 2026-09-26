@@ -77,6 +77,9 @@ model User {
   setupFillDrafts SetupFillDraft[]
   setupSheetBlanksUploaded SetupSheetBlank[] @relation("SetupSheetBlankUploader")
   meetingDebriefs MeetingDebrief[]
+  contentReportsFiled ContentReport[] @relation("ContentReportsFiled")
+  userBlocksMade      UserBlock[]     @relation("UserBlocksMade")
+  userBlocksReceived  UserBlock[]     @relation("UserBlocksReceived")
 }
 
 /**
@@ -263,6 +266,62 @@ model TeamRunComment {
   @@index([runId])
   @@index([authorUserId])
   @@index([parentId])
+}
+
+/**
+ * A driver reported something another driver wrote or added: a team comment, a teammate, or a
+ * shared catalog entry (track, tire, chassis). App Store guideline 1.2 asks every app with
+ * user-generated content for this, and for a response within 24 hours (2026-09-26).
+ *
+ * `targetId` is deliberately not a foreign key: removing the reported thing is the usual fix,
+ * and the report must outlive it. `excerpt` keeps what it said when reported for the same reason.
+ * One report per (reporter, kind, target); reporting again only refreshes the reason.
+ * Rules: `src/lib/moderation/reportRules.ts`.
+ */
+model ContentReport {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  reporterUserId String
+  reporter       User   @relation("ContentReportsFiled", fields: [reporterUserId], references: [id], onDelete: Cascade)
+
+  /** `comment` \| `driver` \| `track` \| `tire` \| `chassis` */
+  kind     String
+  targetId String
+  /** Who wrote or added it, when known. */
+  targetUserId String?
+  /** The team a comment or driver was reported from. */
+  teamId String?
+
+  /** `abusive` \| `spam` \| `wrong` \| `other` */
+  reason  String
+  /** What it said when reported, capped. */
+  excerpt String
+
+  /** `open` \| `removed` \| `dismissed` */
+  status     String    @default("open")
+  resolvedAt DateTime?
+
+  @@unique([reporterUserId, kind, targetId])
+  @@index([status, createdAt])
+}
+
+/**
+ * One driver blocked another. Works both ways once it exists: neither sees the other's runs or
+ * comments, neither gets the other's comment pushes, and neither can invite the other to a team.
+ * Only the blocker can lift it. Rules: `src/lib/moderation/blocks.ts`.
+ */
+model UserBlock {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  blockerUserId String
+  blocker       User   @relation("UserBlocksMade", fields: [blockerUserId], references: [id], onDelete: Cascade)
+  blockedUserId String
+  blocked       User   @relation("UserBlocksReceived", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerUserId, blockedUserId])
+  @@index([blockedUserId])
 }
 
 /** Emails allowed to receive magic-link sign-in (invite list). */

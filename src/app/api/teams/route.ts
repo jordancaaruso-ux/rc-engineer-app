@@ -4,6 +4,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser, getAuthenticatedApiUserId } from "@/lib/currentUser";
 import { listTeamsForUser } from "@/lib/teamAccess";
 import { teamJoinLock, teamLockMessage } from "@/lib/teams/teamLimit";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,8 @@ export async function POST(request: Request) {
   if (!name) {
     return NextResponse.json({ error: "Team name is required" }, { status: 400 });
   }
+  const unclean = objectionableTextError(name);
+  if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
 
   const lock = await teamJoinLock({ id: user.id, email: user.email ?? null });
   if (lock) return NextResponse.json({ error: teamLockMessage(lock.includedIn) }, { status: 402 });

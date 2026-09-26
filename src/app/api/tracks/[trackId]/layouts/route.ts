@@ -5,6 +5,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { communityTrackByIdWhere } from "@/lib/tracks/communityTrackAccess";
 import { canManageCommunityTrack } from "@/lib/tracks/trackAccess";
 import { revalidateAfterTrackMutation } from "@/lib/revalidateUser";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 const LAYOUT_SELECT = {
   id: true,
@@ -89,6 +90,8 @@ export async function PUT(
   if (incoming.some((row) => row.name.length > 120)) {
     return NextResponse.json({ error: "Layout names must be 120 characters or fewer." }, { status: 400 });
   }
+  const unclean = objectionableTextError(...incoming.flatMap((row) => [row.name, row.notes]));
+  if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
 
   const existing = await prisma.trackLayout.findMany({
     where: { trackId },

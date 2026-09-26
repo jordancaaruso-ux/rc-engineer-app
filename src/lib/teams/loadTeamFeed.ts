@@ -11,6 +11,8 @@ import {
 } from "@/lib/teams/teamFeedModel";
 import { loadTeamMemberDisplays, type TeamMemberDisplay } from "@/lib/teams/teamMemberDisplay";
 import { teamsIndexSkipsTo } from "@/lib/teams/teamInviteRules";
+import { loadBlockedPeerIds } from "@/lib/moderation/blocks";
+import { applyCommentVisibility } from "@/lib/moderation/visibilityRules";
 import type { UnitSystem } from "@/lib/units/unitSystem";
 
 /** One page of the feed. Small on purpose — this is a glanceable surface, not an archive. */
@@ -37,6 +39,13 @@ export type TeamFeedComment = {
   parentId: string | null;
   viewerCanEdit: boolean;
   viewerCanDelete: boolean;
+  /** Someone else's live comment: the viewer may report it or block its author. */
+  viewerCanReport: boolean;
+  /**
+   * Reported by the viewer, or written by someone in a block with them, but kept as a "hidden"
+   * line because a reply under it is still shown. Body is empty. See `applyCommentVisibility`.
+   */
+  hidden: boolean;
 };
 
 export type TeamFeedEntryView = {
@@ -203,10 +212,13 @@ export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<Tea
   const { viewerId, teamId, timeZone } = params;
   const units = params.units ?? "metric";
 
-  const team = await prisma.team.findFirst({
-    where: { id: teamId },
-    select: { id: true, name: true, memberships: { select: { userId: true, role: true } } },
-  });
+  const [team, blockedPeerIds] = await Promise.all([
+    prisma.team.findFirst({
+      where: { id: teamId },
+      select: { id: true, name: true, memberships: { select: { userId: true, role: true } } },
+    }),
+    loadBlockedPeerIds(viewerId),
+  ]);
   if (!team) return null;
 
   const memberIds = team.memberships.map((m) => m.userId);
@@ -222,10 +234,14 @@ export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<Tea
    */
   if (!memberIds.includes(viewerId)) return null;
 
+  // A teammate in a block with the viewer (either way) drops out of everything below: runs,
+  // roster, last activity and comments. They stay members; Team settings still lists them.
+  const visibleMemberIds = memberIds.filter((id) => !blockedPeerIds.has(id));
+
   // Only runs the owner chose to share, and never half-logged drafts — a draft has no laps
   // and an unfinished setup, so it would render as a pace-less entry with a huge diff.
   const sharedRunFilter = {
-    userId: { in: memberIds },
+    userId: { in: visibleMemberIds },
     shareWithTeam: true,
     loggingComplete: true,
   } as const;
@@ -239,7 +255,7 @@ export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<Tea
    * route, and this chain is why.
    */
   const [displays, pageRows, pinnedRow, lastActivityByUserId] = await Promise.all([
-    loadTeamMemberDisplays(memberIds, viewerId),
+    loadTeamMemberDisplays(visibleMemberIds, viewerId),
     fetchRunRows({
       where: {
         ...sharedRunFilter,
@@ -261,7 +277,7 @@ export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<Tea
           take: 1,
         }).then((rows) => rows[0] ?? null)
       : Promise.resolve(null),
-    loadLastActivityByUser(memberIds),
+    loadLastActivityByUser(visibleMemberIds),
   ]);
 
   const hasMore = pageRows.length > TEAM_FEED_PAGE_SIZE;
@@ -272,7 +288,7 @@ export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<Tea
     : pageRuns;
 
   const entriesByRunId = focusRuns.length
-    ? await buildEntriesForRuns({ focusRuns, memberIds, sharedRunFilter, timeZone, units, displays, viewerId, teamId, viewerIsAdmin })
+    ? await buildEntriesForRuns({ focusRuns, sharedRunFilter, timeZone, units, displays, viewerId, teamId, viewerIsAdmin, blockedPeerIds })
     : new Map<string, TeamFeedEntryView>();
 
   const oldest = pageRuns[pageRuns.length - 1];
@@ -292,7 +308,6 @@ export async function loadTeamFeedModel(params: LoadTeamFeedParams): Promise<Tea
 
 async function buildEntriesForRuns(args: {
   focusRuns: RunRow[];
-  memberIds: string[];
   sharedRunFilter: { userId: { in: string[] }; shareWithTeam: true; loggingComplete: true };
   timeZone: string;
   units: UnitSystem;
@@ -300,8 +315,9 @@ async function buildEntriesForRuns(args: {
   viewerId: string;
   teamId: string;
   viewerIsAdmin: boolean;
+  blockedPeerIds: ReadonlySet<string>;
 }): Promise<Map<string, TeamFeedEntryView>> {
-  const { focusRuns, sharedRunFilter, timeZone, units, displays, viewerId, teamId, viewerIsAdmin } = args;
+  const { focusRuns, sharedRunFilter, timeZone, units, displays, viewerId, teamId, viewerIsAdmin, blockedPeerIds } = args;
 
   // Baseline candidates: the same members' runs within a few days of the oldest entry on the
   // page, plus everything from the meetings on this page (a meeting can span several days).
@@ -368,6 +384,7 @@ async function buildEntriesForRuns(args: {
     viewerId,
     viewerIsAdmin,
     displays,
+    blockedPeerIds,
   });
 
   const out = new Map<string, TeamFeedEntryView>();
@@ -409,21 +426,27 @@ async function buildEntriesForRuns(args: {
   return out;
 }
 
-/** All comments for a page of runs in one query, grouped in memory. */
+/**
+ * All comments for a page of runs in one query, grouped in memory. Comments by a driver in a block
+ * with the viewer, and comments the viewer reported, are taken out (`applyCommentVisibility`).
+ */
 export async function loadCommentsForRuns(args: {
   teamId: string;
   runIds: string[];
   viewerId: string;
   viewerIsAdmin: boolean;
   displays: ReadonlyMap<string, TeamMemberDisplay>;
+  /** Pass when already loaded; read here otherwise. */
+  blockedPeerIds?: ReadonlySet<string>;
 }): Promise<Map<string, TeamFeedComment[]>> {
   const { teamId, runIds, viewerId, viewerIsAdmin, displays } = args;
   if (runIds.length === 0) return new Map();
 
-  const rows = await prisma.teamRunComment.findMany({
-    where: { teamId, runId: { in: runIds } },
-    orderBy: { createdAt: "asc" },
-    select: {
+  const [rows, blockedPeerIds, reported] = await Promise.all([
+    prisma.teamRunComment.findMany({
+      where: { teamId, runId: { in: runIds } },
+      orderBy: { createdAt: "asc" },
+      select: {
       id: true,
       runId: true,
       authorUserId: true,
@@ -431,13 +454,25 @@ export async function loadCommentsForRuns(args: {
       createdAt: true,
       updatedAt: true,
       deletedAt: true,
-      parentId: true,
-      author: { select: { name: true, email: true } },
-    },
+        parentId: true,
+        author: { select: { name: true, email: true } },
+      },
+    }),
+    args.blockedPeerIds ?? loadBlockedPeerIds(viewerId),
+    // A driver's own reports are a handful at most, so all of them, filtered below.
+    prisma.contentReport.findMany({
+      where: { reporterUserId: viewerId, kind: "comment" },
+      select: { targetId: true },
+    }),
+  ]);
+
+  const shown = applyCommentVisibility(rows, {
+    authorIds: blockedPeerIds,
+    commentIds: new Set(reported.map((r) => r.targetId)),
   });
 
   const byRunId = new Map<string, TeamFeedComment[]>();
-  for (const row of rows) {
+  for (const { row, hidden } of shown) {
     const display = displays.get(row.authorUserId);
     const fallback = row.author?.name?.trim() || row.author?.email?.trim() || "Teammate";
     const isAuthor = row.authorUserId === viewerId;
@@ -447,13 +482,15 @@ export async function loadCommentsForRuns(args: {
       id: row.id,
       authorUserId: row.authorUserId,
       authorLabel: display?.label ?? fallback,
-      body: row.deletedAt ? "" : row.body,
+      body: row.deletedAt || hidden ? "" : row.body,
       createdAt: row.createdAt.toISOString(),
-      editedAt: edited && !row.deletedAt ? row.updatedAt.toISOString() : null,
+      editedAt: edited && !row.deletedAt && !hidden ? row.updatedAt.toISOString() : null,
       deletedAt: row.deletedAt?.toISOString() ?? null,
       parentId: row.parentId,
-      viewerCanEdit: isAuthor && !row.deletedAt,
-      viewerCanDelete: (isAuthor && !row.deletedAt) || viewerIsAdmin,
+      viewerCanEdit: isAuthor && !row.deletedAt && !hidden,
+      viewerCanDelete: !hidden && ((isAuthor && !row.deletedAt) || viewerIsAdmin),
+      viewerCanReport: !isAuthor && !row.deletedAt && !hidden,
+      hidden,
     });
     byRunId.set(row.runId, list);
   }

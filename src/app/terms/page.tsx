@@ -125,8 +125,8 @@ export default function TermsPage() {
           clean.
         </p>
         <p>
-          Your individual runs, notes, videos and setup sheets stay private to your account, as
-          described in the{" "}
+          Your individual runs, notes, videos and setup sheets stay private to your account, except
+          the runs you share with a team you have joined, as described in the{" "}
           <Link className="underline underline-offset-4" href="/privacy">
             Privacy policy
           </Link>
@@ -143,8 +143,15 @@ export default function TermsPage() {
             around usage limits;
           </li>
           <li>upload malware, or content that is unlawful, abusive, or infringing;</li>
+          <li>post anything hateful, harassing, sexual or threatening, or abuse another driver;</li>
           <li>resell or redistribute the service or its AI output as your own product.</li>
         </ul>
+        <p>
+          There is no tolerance for objectionable content or abusive users. Report a comment, a driver
+          or a shared track, tire or chassis from its &ldquo;&bull;&bull;&bull;&rdquo; menu, where you can
+          also block a driver. We review every report within 24 hours and remove the content, or close
+          the account, when it breaks these terms.
+        </p>
         <p>
           AI features have usage limits so one account cannot exhaust shared capacity. We may adjust
           those limits without notice.
@@ -161,7 +168,7 @@ export default function TermsPage() {
 
       <Section title="Ending your use">
         <p>
-          You can delete your account at any time from Settings → Account, which permanently removes
+          You can delete your account at any time from Settings → Delete account, which permanently removes
           your data and uploaded files. We may suspend or close an account that breaks these terms,
           or if we stop operating the service — we will give reasonable notice and a chance to
           export your data where we can.

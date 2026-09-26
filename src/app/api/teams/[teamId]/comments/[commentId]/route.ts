@@ -8,6 +8,7 @@ import {
   resolveCommentDeleteMode,
   validateCommentBody,
 } from "@/lib/teams/commentRules";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
   const payload = (await request.json().catch(() => null)) as { body?: unknown } | null;
   const validated = validateCommentBody(payload?.body);
   if (!validated.ok) return NextResponse.json({ error: validated.error }, { status: 400 });
+  const unclean = objectionableTextError(validated.body);
+  if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
 
   const updated = await prisma.teamRunComment.update({
     where: { id: commentId },

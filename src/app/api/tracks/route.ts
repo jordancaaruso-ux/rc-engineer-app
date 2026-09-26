@@ -15,6 +15,7 @@ import {
 import { parseCoordinates } from "@/lib/location/coordinates";
 import { timeZoneForCoordinates } from "@/lib/tracks/trackTimeZone";
 import { fillTrackLocation } from "@/lib/tracks/trackLocationFill";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -124,6 +125,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    // Every driver sees a new track in their catalog straight away.
+    const unclean = objectionableTextError(name, body.location);
+    if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

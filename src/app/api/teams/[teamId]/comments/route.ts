@@ -9,6 +9,7 @@ import { loadCommentsForRuns } from "@/lib/teams/loadTeamFeed";
 import { listTeamMemberUserIds } from "@/lib/teamAccess";
 import { resolveReplyParentId, validateCommentBody } from "@/lib/teams/commentRules";
 import { notifyTeamComment } from "@/lib/teams/notifyTeamComment";
+import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,8 @@ export async function POST(request: Request, ctx: Ctx) {
 
   const validated = validateCommentBody(body?.body);
   if (!validated.ok) return NextResponse.json({ error: validated.error }, { status: 400 });
+  const unclean = objectionableTextError(validated.body);
+  if (unclean) return NextResponse.json({ error: unclean }, { status: 400 });
 
   const target = await resolveCommentTarget(teamId, runId, userId);
   if ("error" in target) return NextResponse.json({ error: target.error }, { status: 404 });
@@ -140,6 +143,8 @@ export async function POST(request: Request, ctx: Ctx) {
       parentId: created.parentId,
       viewerCanEdit: true,
       viewerCanDelete: true,
+      viewerCanReport: false,
+      hidden: false,
     },
   });
 }
