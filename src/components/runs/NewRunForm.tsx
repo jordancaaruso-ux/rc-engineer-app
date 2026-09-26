@@ -21,8 +21,8 @@ import {
   type SetupSnapshotData,
 } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
-import { chassisValueCount, isRunContextSetupKey, setupHasChassisValue } from "@/lib/setup/runContextSetupKeys";
-import { buildSetupDiffRows } from "@/lib/setupDiff";
+import { chassisValueCount, setupHasChassisValue } from "@/lib/setup/runContextSetupKeys";
+import { setupChangesSinceLoaded } from "@/lib/setup/setupChangesSinceLoaded";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { RunSheetSetupFill } from "@/components/runs/RunSheetSetupFill";
 import { haptic } from "@/lib/haptics";
@@ -2020,14 +2020,13 @@ export function NewRunForm(props: {
    * last-saved snapshot). Zero when nothing has been edited since load, or when there's
    * no baseline yet (scratch setup). Drives the "X changes since loaded" badge in the
    * collapsed Setup view so drivers can see at a glance that they've touched the sheet
-   * without having to re-expand it.
+   * without having to re-expand it. Compared as stored, so one edit counts once and
+   * putting it back clears it (see `setupChangesSinceLoaded`).
    */
-  const setupChangedRowsSinceBaseline = useMemo(() => {
-    if (!setupBaselineData) return [] as ReturnType<typeof buildSetupDiffRows>;
-    return buildSetupDiffRows(setupData, setupBaselineData).filter(
-      (r) => r.changed && !isRunContextSetupKey(r.key)
-    );
-  }, [setupData, setupBaselineData]);
+  const setupChangedRowsSinceBaseline = useMemo(
+    () => setupChangesSinceLoaded(setupData, setupBaselineData),
+    [setupData, setupBaselineData]
+  );
   const setupChangeCountSinceBaseline = setupChangedRowsSinceBaseline.length;
   /** Boxes on the run's setup that hold a value. Not the tyre the form writes in by itself:
    *  counting that ticked Setup and read "1 values" on runs with no setup at all. */
