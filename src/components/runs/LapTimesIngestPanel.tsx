@@ -47,7 +47,7 @@ import {
   type ImportedSessionTimeFormatOptions,
   type LapTimingSource,
 } from "@/lib/lapImport/labels";
-import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
+import { matchPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
 import {
   SOURCE_LABELS,
   type LapDiscoverySessionRow,
@@ -963,7 +963,10 @@ export function LapTimesIngestPanel({
 
   useEffect(() => {
     if (value.sourceKind === "url" && value.urlImportBlocks.length > 0) {
-      setTab("url-auto");
+      // Laps from a timing site open on the URL side, but a URL face the racer is on stays put:
+      // jumping from URL Manual to URL Auto after a paste hid the driver list (test drive,
+      // 2026-09-26).
+      setTab((prev) => (isUrlTab(prev) ? prev : "url-auto"));
     }
   }, [value.sourceKind, value.urlImportBlocks.length]);
 
@@ -1831,23 +1834,25 @@ export function LapTimesIngestPanel({
       const topLaps = row.laps ?? [];
       const lapRowsFromApi = row.lapRows;
 
+      // Only a row the racer's own details point at is preselected — never the first row. That
+      // was the race winner, filed as "Your laps" for anyone whose name didn't match (test drive,
+      // 2026-09-26). With no match the racer picks themselves from the list.
+      const matchedDriver = opts
+        ? null
+        : matchPrimarySessionDriver(sessionDrivers, {
+            liveRcDriverId,
+            liveRcDriverName,
+            // Server-side match (Speedhive transponder / driver name aware) — used
+            // when the local LiveRC id/name don't identify a row.
+            sessionHintName: typeof row.sessionHint?.name === "string" ? row.sessionHint.name : null,
+          });
       const autoSelectIds = opts
         ? opts.primaryDriverId && sessionDrivers.some((d) => d.driverId === opts.primaryDriverId)
           ? [opts.primaryDriverId]
           : []
-        : sessionDrivers.length === 0
-          ? []
-          : sessionDrivers.length === 1 && sessionDrivers[0]?.driverId
-            ? [sessionDrivers[0].driverId]
-            : [
-              pickPrimarySessionDriver(sessionDrivers, {
-                liveRcDriverId,
-                liveRcDriverName,
-                // Server-side match (Speedhive transponder / driver name aware) — used
-                // when the local LiveRC id/name don't identify a row.
-                sessionHintName: typeof row.sessionHint?.name === "string" ? row.sessionHint.name : null,
-              }).driverId,
-            ];
+        : matchedDriver
+          ? [matchedDriver.driverId]
+          : [];
 
       const recordedAt = row.recordedAt ?? new Date().toISOString();
       const sessionCompletedAtIso =
@@ -1941,8 +1946,15 @@ export function LapTimesIngestPanel({
       } else if (leadBlockId) {
         haptic("light");
       }
+      // A whole field and nobody matched: open the face that lists it, so the racer picks
+      // themselves there. It sat on the other face, which is frozen while hidden, so a paste
+      // landed with no list in sight (test drive, 2026-09-26). The PDF door has its own picker.
+      const needsPick = !opts && !leadBlockId && sessionDrivers.length > 1 && autoSelectIds.length === 0;
+      if (needsPick) setTab("url-manual");
       setUrlInput("");
-      setUrlMessage(sameRaceMessage(attached.outcome, newBlock, shown) ?? combinedMessage);
+      setUrlMessage(
+        sameRaceMessage(attached.outcome, newBlock, shown) ?? (needsPick ? null : combinedMessage)
+      );
     }
   }
 
@@ -2178,9 +2190,14 @@ export function LapTimesIngestPanel({
                   bestLapSeconds={stats?.bestLap ?? null}
                   medianSeconds={stats?.median ?? null}
                   sourceLabel={sourceLineByBlockId.get(block.blockId) ?? null}
-                  isFocused={activeImportBlock?.blockId === block.blockId}
-                  selectable={attachedBlocks.length > 1}
-                  onFocus={() => setFocusedBlockId(block.blockId)}
+                  isFocused={attachedBlocks.length > 1 && activeImportBlock?.blockId === block.blockId}
+                  // A whole field on the import: a tap opens its list to pick or change whose laps
+                  // these are. With one import attached it could not be tapped at all.
+                  selectable={attachedBlocks.length > 1 || block.sessionDrivers.length > 1}
+                  onFocus={() => {
+                    setFocusedBlockId(block.blockId);
+                    if (block.sessionDrivers.length > 1) setTab("url-manual");
+                  }}
                   onRemove={() => removeImportBlock(block.blockId)}
                 />
               );
@@ -2740,6 +2757,10 @@ export function LapTimesIngestPanel({
 
               {activeImportBlock.sessionDrivers.length > 0 ? (
                 <>
+                  {activeImportBlock.sessionDrivers.length > 1 &&
+                  !activeImportBlock.selectedDriverIds?.[0] ? (
+                    <p className="text-[12px] font-semibold text-foreground">Tap your name</p>
+                  ) : null}
                   <div className="space-y-2">
                     {activeImportBlock.sessionDrivers.map((d) => {
                       const key = `${activeImportBlock.blockId}:${d.driverId}`;

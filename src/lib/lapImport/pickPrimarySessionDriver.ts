@@ -29,6 +29,20 @@ export function pickPrimarySessionDriver(
   if (drivers.length === 0) {
     throw new Error("pickPrimarySessionDriver: empty drivers");
   }
+  return matchPrimarySessionDriver(drivers, opts) ?? drivers[0]!;
+}
+
+/**
+ * The row that is yours by what you've told us — a lone row, your LiveRC id and name, your
+ * LiveRC name, or the server's own match — and null when nothing does. Never P1: the lap step's
+ * picker preselects only this, because defaulting to the first row filed the race winner's laps
+ * as the racer's own, and the Engineer then reasoned from them (test drive, 2026-09-26).
+ */
+export function matchPrimarySessionDriver(
+  drivers: LapUrlSessionDriver[],
+  opts: PickPrimarySessionDriverOpts
+): LapUrlSessionDriver | null {
+  if (drivers.length === 0) return null;
   if (drivers.length === 1) {
     return drivers[0]!;
   }
@@ -62,5 +76,5 @@ export function pickPrimarySessionDriver(
     if (byHint) return byHint;
   }
 
-  return drivers[0]!;
+  return null;
 }

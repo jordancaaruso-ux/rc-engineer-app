@@ -763,7 +763,8 @@ export async function importLiveRcRaceResult(pageUrl: string, contextName?: stri
     sessionCompletedAtIso,
     candidates: buildCandidateRows(orderedDrivers),
     sessionDrivers: orderedDrivers,
-    message: `Imported session with ${driversWithLaps.length} drivers. Select one or more drivers below.`,
+    // Shown under the driver list on the lap step, which picks one row — not "below", not "more".
+    message: `${driversWithLaps.length} drivers in this race.`,
     /*
      * The race's own name, and `className` because that is where the LiveRC PRACTICE
      * parser puts the same kind of string. `name` is not free: `pickPrimarySessionDriver`
