@@ -8,6 +8,7 @@ import {
   runHasLaps,
   runIsShareable,
   serializeSections,
+  shareRunLabel,
   type ShareCardStyle,
   type ShareRunInput,
   type ShareSections,
@@ -146,6 +147,41 @@ test("hero and story carry no wells — the figures they lead with are the tiles
 
 test("the event travels on its own, for the layouts that set it apart", () => {
   assert.equal(build("story").eventName, "Round 4");
+});
+
+// A new meeting is named "<track> · <day>" (test drive, 2026-09-26).
+const DEFAULT_MEETING = { track: { name: "Indoor Raceway" }, event: { name: "Indoor Raceway · Sat 26 Sep" } };
+
+test("the long picture names the track once: a meeting named after it loses it from the eyebrow", () => {
+  for (const style of ["hero", "report"] as const) {
+    const card = buildShareRunCard({
+      run: run(DEFAULT_MEETING),
+      style,
+      sections: allSectionsOn(),
+      dateTimeLabel: "26 Sept 2026, 10:42 AM",
+    });
+    assert.equal(card.eyebrow, "Sat 26 Sep", `${style}: the meeting, less the track`);
+    assert.equal(card.trackName, "Indoor Raceway", `${style}: the track keeps its own line`);
+    // The story drops the track itself (`storyLooks.tsx`), so the event still travels whole.
+    assert.equal(card.eventName, "Indoor Raceway · Sat 26 Sep");
+  }
+  const onlyTrack = buildShareRunCard({
+    run: run({ ...DEFAULT_MEETING, event: { name: "Indoor Raceway" } }),
+    style: "report",
+    sections: allSectionsOn(),
+    dateTimeLabel: "26 Sept 2026, 10:42 AM",
+  });
+  assert.equal(onlyTrack.eyebrow, "", "a meeting that is only the track adds nothing");
+  assert.equal(build("report").eyebrow, "Round 4", "any other name is kept whole");
+});
+
+test("the share sheet's line names the track once", () => {
+  assert.equal(shareRunLabel(run(DEFAULT_MEETING)), "Sat 26 Sep · Qualifying · Q2 · Indoor Raceway");
+  assert.equal(shareRunLabel(run()), "Round 4 · Qualifying · Q2 · Barton Park Raceway");
+  assert.equal(
+    shareRunLabel(run({ event: null, track: null, trackNameSnapshot: "Old Track" })),
+    "Qualifying · Q2 · Old Track"
+  );
 });
 
 // --------------------------------------------------------------------------

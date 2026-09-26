@@ -5,7 +5,7 @@ import { Eyebrow } from "@/components/ui/panel";
 import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
 import type { OptionSection } from "@/lib/search/optionSearch";
 import type { TireBucket } from "@/lib/cars/tireProfile";
-import { tireFitsEnd, type TireEnd } from "@/lib/tires/tireCatalogFilter";
+import { tireFitsEnd, tirePickerKeywords, type TireEnd } from "@/lib/tires/tireCatalogFilter";
 
 export type TireTypeOption = {
   id: string;
@@ -17,6 +17,8 @@ export type TireTypeOption = {
   discipline?: string | null;
   /** "front" | "rear" | "all"; only sorts the list for a front/rear picker. */
   position?: string | null;
+  /** The size its list printed ("1/12 donut, 1.925in"); searched, never shown. */
+  size?: string | null;
 };
 
 /**
@@ -229,13 +231,15 @@ export function TireTypeCombobox({
   );
 
   const sections = useMemo<OptionSection[]>(() => {
-    // `keywords` carries the model code: never shown, always searched, so "D32"
-    // finds a compound whose visible name never says D32.
+    // `keywords` carries the model code and the size: never shown, always searched, so "D32"
+    // finds a compound whose visible name never says D32, and "1/12" the 1/12 tires. "Recently
+    // used" rows arrive without a size, so theirs is read off the catalog.
+    const sizeById = new Map(options.map((o) => [o.id, o.size ?? null]));
     const toRow = (o: TireTypeOption) => ({
       value: o.id,
       label: o.displayName,
       detail: isUnreviewed(o) ? "Unreviewed" : null,
-      keywords: o.modelCode,
+      keywords: tirePickerKeywords({ modelCode: o.modelCode, size: o.size ?? sizeById.get(o.id) }),
     });
     const recent = { key: "recent", label: "Recently used", options: recentOptions.map(toRow) };
     const all = [...options, ...extra];

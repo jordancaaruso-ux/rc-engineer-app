@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   defaultUnitSystemForTimeZone,
+  formatDistance,
+  formatRadius,
   formatTemp,
   formatTempRange,
   formatWind,
@@ -85,6 +87,26 @@ test("what a driver types in °F or mph comes back exactly as typed", () => {
   for (let mph = 0; mph <= 60; mph += 1) {
     assert.equal(windFigure(windFromInput("imperial", mph), "imperial"), String(mph), `${mph} mph`);
   }
+});
+
+test("a track's distance reads in km and m, or on imperial in miles and feet", () => {
+  // Metric reads exactly as it did before imperial had distances.
+  assert.equal(formatDistance(5500, "metric"), "5.5 km");
+  assert.equal(formatDistance(450.4, "metric"), "450 m");
+  // Mini-RC San Diego, 5.5 km from Tyler.
+  assert.equal(formatDistance(5500, "imperial"), "3.4 mi");
+  assert.equal(formatDistance(1609.344, "imperial"), "1.0 mi");
+  assert.equal(formatDistance(170, "imperial"), "0.1 mi");
+  // Under a tenth of a mile: feet.
+  assert.equal(formatDistance(120, "imperial"), "394 ft");
+  assert.equal(formatDistance(0, "imperial"), "0 ft");
+});
+
+test("a search radius rounds down, so 'within' stays true", () => {
+  assert.equal(formatRadius(25_000, "metric"), "25 km");
+  assert.equal(formatRadius(50_000, "metric"), "50 km");
+  assert.equal(formatRadius(25_000, "imperial"), "15 mi");
+  assert.equal(formatRadius(50_000, "imperial"), "31 mi");
 });
 
 test("a range collapses when both ends round to the same figure", () => {

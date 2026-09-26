@@ -17,6 +17,7 @@ import {
   type SheetNamePresence,
 } from "@/lib/setupCalibrations/sheetRecognition";
 import { ensureSetupDocumentCalibrationProfileId } from "@/lib/setup/effectiveCalibration";
+import { isChassisSourceSheet, uploadedSheetStatusWords } from "@/lib/setupDocuments/uploadedSheetStatus";
 import { normalizeCalibrationData } from "@/lib/setupCalibrations/types";
 import { loadSetupSheetModelById } from "@/lib/setupSheetModels/resolveModelForCar";
 import { buildSetupSheetTemplateFromParsedSchema } from "@/lib/setupSheetModels/buildSetupSheetTemplate";
@@ -78,6 +79,7 @@ export default async function SetupDocumentDetailPage({
         setupSheetModelId: true,
         setupSheetTemplate: true,
         setupSheetModel: { select: { id: true, name: true, slug: true } },
+        blankSheet: { select: { setupSheetModelId: true, isEdition: true, setupSheetModel: { select: { name: true } } } },
       },
     }),
     prisma.car.findMany({
@@ -271,13 +273,23 @@ export default async function SetupDocumentDetailPage({
     : 0;
   const showImageCalibrateCta = isImage && linkedCalibrationFields === 0;
   const isAdmin = isAuthAdminEmail(user.email);
+  /*
+   * A blank sheet uploaded to make a chassis holds no setup, so a racer sees what came of it rather
+   * than a setup review that says "Some fields could not be read" and "No setup values imported
+   * yet" about a sheet that worked (test drive, 2026-09-26). An edition's upload is a filled sheet
+   * with values, and keeps the review. Admins keep the full review either way.
+   */
+  const blankSheetLine =
+    doc.blankSheet && isChassisSourceSheet(doc) && !isAdmin
+      ? [uploadedSheetStatusWords(doc), doc.blankSheet.setupSheetModel?.name].filter(Boolean).join(" · ")
+      : null;
 
   return (
     <>
       <header className="page-header">
         <div>
-          <h1 className="page-title">Review setup</h1>
-          <p className="page-subtitle">Check the imported values look right.</p>
+          <h1 className="page-title">{blankSheetLine ? "Uploaded sheet" : "Review setup"}</h1>
+          {blankSheetLine ? null : <p className="page-subtitle">Check the imported values look right.</p>}
         </div>
       </header>
       {showImageCalibrateCta && !aiReviewFields ? (
@@ -372,6 +384,8 @@ export default async function SetupDocumentDetailPage({
         docSetupSheetModelName={docSetupSheetModelName}
         docCarName={linkedCar?.name ?? null}
         defaultCalibrationIdForDocModel={defaultCalibrationIdForDocModel}
+        isAdmin={isAdmin}
+        blankSheetLine={blankSheetLine}
       />
     </>
   );

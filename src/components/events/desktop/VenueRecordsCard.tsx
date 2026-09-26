@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { formatLap } from "@/lib/runLaps";
+import { formatCount } from "@/lib/formatCount";
 import type { VenueRecord } from "@/lib/events/seasonTypes";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 
@@ -54,7 +55,7 @@ export function VenueRecordsCard({
                   {[
                     venue.location,
                     `${venue.visits} ${venue.visits === 1 ? "day" : "days"}`,
-                    `${venue.laps.toLocaleString()} laps`,
+                    `${formatCount(venue.laps)} laps`,
                   ]
                     .filter(Boolean)
                     .join(" · ")}

@@ -53,6 +53,15 @@ export function tireFitsEnd(position: string | null | undefined, end: TireEnd): 
 }
 
 /**
+ * What a tire picker searches besides the name, never shown: the model code, so "D32" finds a
+ * compound whose name never says D32, and the size its list printed (`tireSizeFor`), so "1/12"
+ * finds the 1/12 tires in a pan list that also holds 1/10 ones.
+ */
+export function tirePickerKeywords(tire: { modelCode: string; size?: string | null }): string {
+  return [tire.modelCode, tire.size].filter(Boolean).join(" ");
+}
+
+/**
  * Collapse a seed row's per-class fitment to one tag. The UNION across classes, on purpose: 169
  * of the 584 rows fit different ends on different classes (a 2.2" pin that is a buggy rear and a
  * stadium-truck all-round), and a union can only ever be too generous. Anything that fits both

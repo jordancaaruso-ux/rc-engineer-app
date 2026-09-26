@@ -12,6 +12,7 @@ import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { CatalogVerifyControl } from "@/components/assets/CatalogVerifyControl";
 import type { AdditiveTypeOption } from "@/components/additives/AdditiveTypeCombobox";
 import { ADDITIVE_IN_USE_REASON, type AdditiveAccess } from "@/lib/additives/additiveAccess";
+import { compareAdditiveNames } from "@/lib/additives/additiveOrder";
 
 export function AdditiveGaragePanel({
   initialAdditiveTypes,
@@ -66,7 +67,7 @@ export function AdditiveGaragePanel({
       if (res.status === 409 && data.existing) {
         setAdditiveTypes((prev) => {
           if (prev.some((t) => t.id === data.existing!.id)) return prev;
-          return [...prev, data.existing!].sort((a, b) => a.displayName.localeCompare(b.displayName));
+          return [...prev, data.existing!].sort(compareAdditiveNames);
         });
         setNewName("");
         return;
@@ -76,9 +77,7 @@ export function AdditiveGaragePanel({
         return;
       }
       setAdditiveTypes((prev) =>
-        [...prev.filter((t) => t.id !== data.additiveType!.id), data.additiveType!].sort((a, b) =>
-          a.displayName.localeCompare(b.displayName)
-        )
+        [...prev.filter((t) => t.id !== data.additiveType!.id), data.additiveType!].sort(compareAdditiveNames)
       );
       setMine((prev) => new Set(prev).add(data.additiveType!.id));
       setNewName("");
@@ -120,7 +119,7 @@ export function AdditiveGaragePanel({
       setAdditiveTypes((prev) =>
         prev
           .map((t) => (t.id === additiveTypeId ? data.additiveType! : t))
-          .sort((a, b) => a.displayName.localeCompare(b.displayName))
+          .sort(compareAdditiveNames)
       );
       cancelEdit();
     } catch {

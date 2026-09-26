@@ -5,7 +5,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { getFavouriteTrackIdsForUser } from "@/lib/track-favourites";
 import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 import { parseCoordinates } from "@/lib/location/coordinates";
-import { haversineMeters, sortNearbyTracks } from "@/lib/location/trackProximity";
+import { NEARBY_BROWSE_RADIUS_M, haversineMeters, sortNearbyTracks } from "@/lib/location/trackProximity";
 
 /**
  * Tracks near a position, nearest first.
@@ -18,7 +18,7 @@ import { haversineMeters, sortNearbyTracks } from "@/lib/location/trackProximity
  * The radius here is a BROWSE radius (tens of km: "what can I race at this weekend"), quite
  * separate from NEARBY_TRACK_RADIUS_M (the run form's picker order).
  */
-const DEFAULT_RADIUS_M = 50_000;
+const DEFAULT_RADIUS_M = NEARBY_BROWSE_RADIUS_M;
 const MAX_RADIUS_M = 500_000;
 const MAX_RESULTS = 20;
 

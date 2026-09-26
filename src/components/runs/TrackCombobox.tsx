@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
 import type { OptionSection } from "@/lib/search/optionSearch";
-import { formatDistanceMeters } from "@/lib/location/trackProximity";
+import { useUnits } from "@/components/providers/UnitsProvider";
+import { formatDistance } from "@/lib/units/unitSystem";
 
 export type TrackOption = {
   id: string;
@@ -103,6 +104,7 @@ export function TrackCombobox({
   onCreateRequest?: (query: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const units = useUnits();
 
   // Merge in favouriteTracks so a selected favourite not present in `tracks`
   // still renders its label (previous combobox had the same fallback).
@@ -120,7 +122,7 @@ export function TrackCombobox({
     const nearbyRows = nearby.flatMap((n) => {
       const t = byId.get(n.trackId);
       return t
-        ? [{ ...trackRow(t), detail: [formatDistanceMeters(n.distanceM), t.location].filter(Boolean).join(" · ") }]
+        ? [{ ...trackRow(t), detail: [formatDistance(n.distanceM, units), t.location].filter(Boolean).join(" · ") }]
         : [];
     });
     const nearSet = new Set(nearbyRows.map((r) => r.value));
@@ -142,7 +144,7 @@ export function TrackCombobox({
         options: all.filter((t) => !favSet.has(t.id) && !nearSet.has(t.id)).sort(byName).map(trackRow),
       },
     ];
-  }, [all, favouriteTrackIds, nearby]);
+  }, [all, favouriteTrackIds, nearby, units]);
 
   const selected = all.find((t) => t.id === value) ?? null;
 

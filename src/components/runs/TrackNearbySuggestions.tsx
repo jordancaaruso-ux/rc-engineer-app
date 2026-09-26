@@ -1,6 +1,7 @@
 "use client";
 
-import { formatDistanceMeters } from "@/lib/location/trackProximity";
+import { useUnits } from "@/components/providers/UnitsProvider";
+import { formatDistance } from "@/lib/units/unitSystem";
 import { cn } from "@/lib/utils";
 
 export function TrackNearbySuggestions({
@@ -13,6 +14,7 @@ export function TrackNearbySuggestions({
   selectedId?: string | null;
   onSelect: (trackId: string) => void;
 }) {
+  const units = useUnits();
   if (suggestions.length === 0) return null;
 
   return (
@@ -35,7 +37,7 @@ export function TrackNearbySuggestions({
               )}
             >
               {s.trackName}
-              <span className="text-muted-foreground font-normal">({formatDistanceMeters(s.distanceM)})</span>
+              <span className="text-muted-foreground font-normal">({formatDistance(s.distanceM, units)})</span>
             </button>
           );
         })}

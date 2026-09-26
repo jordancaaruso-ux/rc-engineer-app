@@ -4,6 +4,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { suggestModelCodeFromDisplayName } from "@/lib/tires/matchTireType";
 import { ensureSeedAdditiveTypes } from "@/lib/additives/ensureSeedAdditiveTypes";
+import { compareAdditiveNames } from "@/lib/additives/additiveOrder";
 import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 const ADDITIVE_TYPE_SELECT = {
@@ -12,6 +13,12 @@ const ADDITIVE_TYPE_SELECT = {
   modelCode: true,
   verifiedAt: true,
 } as const;
+
+/**
+ * The picker asks for its whole list (`AdditiveTypeCombobox`, 500) and searches it in the browser,
+ * so this is the ceiling on what is findable at all. It was 50, a sample size.
+ */
+const CATALOG_MAX = 500;
 
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -22,15 +29,17 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.trim() ?? "";
-  const take = Math.min(50, Math.max(1, Number(searchParams.get("limit") ?? 50) || 50));
+  const take = Math.min(CATALOG_MAX, Math.max(1, Number(searchParams.get("limit") ?? 50) || 50));
 
   const count = await prisma.additiveType.count();
   if (count === 0) {
     await ensureSeedAdditiveTypes();
   }
 
+  // Sorted here and then cut, not by the database: it puts upper case first, which both orders the
+  // list unlike the Additives page and decides which rows a cut keeps.
   if (q.length >= 1) {
-    const additiveTypes = await prisma.additiveType.findMany({
+    const matches = await prisma.additiveType.findMany({
       where: {
         OR: [
           { displayName: { contains: q, mode: "insensitive" } },
@@ -39,19 +48,18 @@ export async function GET(request: Request) {
       },
       select: ADDITIVE_TYPE_SELECT,
       orderBy: [{ displayName: "asc" }],
-      take,
     });
-    return NextResponse.json({ additiveTypes, query: q });
+    return NextResponse.json({ additiveTypes: matches.sort(compareAdditiveNames).slice(0, take), query: q });
   }
 
   const additiveTypes = await prisma.additiveType.findMany({
     select: ADDITIVE_TYPE_SELECT,
     orderBy: [{ displayName: "asc" }],
-    take,
   });
+  additiveTypes.sort(compareAdditiveNames);
   // Verified-first (stable → alphabetical within each group). At launch all null → unchanged.
   additiveTypes.sort((a, b) => (a.verifiedAt ? 0 : 1) - (b.verifiedAt ? 0 : 1));
-  return NextResponse.json({ additiveTypes });
+  return NextResponse.json({ additiveTypes: additiveTypes.slice(0, take) });
 }
 
 export async function POST(request: Request) {

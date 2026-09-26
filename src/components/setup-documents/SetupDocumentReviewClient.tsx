@@ -25,6 +25,7 @@ import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { computeA800rrDerived } from "@/lib/setupCalculations/a800rrDerived";
 import { computeDetailedDerivedFieldStatuses } from "@/lib/setup/derivedFields";
 import { buildDocumentCalibrationPickerOptions } from "@/lib/setupCalibrations/documentCalibrationPicker";
+import { uploadedSheetTitle } from "@/lib/setupDocuments/uploadedSheetStatus";
 
 function formatDerivedValidationLine(
   row: { status?: string; absDelta?: number | null } | undefined
@@ -110,6 +111,8 @@ export function SetupDocumentReviewClient({
   docSetupSheetModelName = null,
   docCarName = null,
   defaultCalibrationIdForDocModel = null,
+  isAdmin = false,
+  blankSheetLine = null,
 }: {
   doc: SetupDocumentDetail;
   cars: CarOption[];
@@ -119,6 +122,13 @@ export function SetupDocumentReviewClient({
   docSetupSheetModelName?: string | null;
   docCarName?: string | null;
   defaultCalibrationIdForDocModel?: string | null;
+  /** The Debug switch and everything behind it are the founder's tools. */
+  isAdmin?: boolean;
+  /**
+   * Set for a racer's blank sheet ("Became your chassis sheet · Serpent X20"): it holds no setup to
+   * review, so the page shows what came of it and the sheet itself, nothing else.
+   */
+  blankSheetLine?: string | null;
 }) {
   const useA800 = wantsA800SheetPostProcess(doc);
   const [liveDoc, setLiveDoc] = useState<SetupDocumentDetail>(doc);
@@ -852,6 +862,65 @@ export function SetupDocumentReviewClient({
 
   const displayName = (doc.originalFilename || "Setup").replace(/\.[^.]+$/, "");
 
+  const viewOriginalButton = (
+    <button
+      type="button"
+      onClick={() => setOriginalOpen(true)}
+      className="tap-active flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card/60 px-4 py-2.5 text-[13px] font-semibold tracking-tight text-foreground hover:bg-muted"
+    >
+      <FileText className="size-4 text-muted-foreground" strokeWidth={2} aria-hidden />
+      View original sheet
+    </button>
+  );
+
+  const originalSheetDialog = originalOpen ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Original setup sheet"
+      onClick={(e) => e.target === e.currentTarget && setOriginalOpen(false)}
+    >
+      <div onClick={(e) => e.stopPropagation()}>
+      <SurfaceCard className="w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-xl" contentClassName="p-0">
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-background/95 px-3 py-2">
+          <div className="min-w-0 truncate text-xs text-muted-foreground">
+            {blankSheetLine ? uploadedSheetTitle(doc.originalFilename) : doc.originalFilename}
+          </div>
+          <button
+            type="button"
+            className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+            onClick={() => setOriginalOpen(false)}
+          >
+            Close
+          </button>
+        </div>
+        <div className="h-[80vh] bg-muted/20">
+          {(doc.mimeType ?? "").startsWith("image/") ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={previewUrl} alt={doc.originalFilename} className="h-full w-full object-contain" />
+          ) : (
+            <iframe title={doc.originalFilename} src={previewUrl} className="h-full w-full border-0" />
+          )}
+        </div>
+      </SurfaceCard>
+      </div>
+    </div>
+  ) : null;
+
+  if (blankSheetLine) {
+    return (
+      <section className="page-body">
+        <CardPanel contentClassName="p-4">
+          <h2 className="ui-title text-[15px] normal-case">{uploadedSheetTitle(doc.originalFilename || "Setup sheet")}</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{blankSheetLine}</p>
+        </CardPanel>
+        {viewOriginalButton}
+        {originalSheetDialog}
+      </section>
+    );
+  }
+
   return (
     <section className="page-body">
       <CardPanel contentClassName="p-4">
@@ -905,18 +974,20 @@ export function SetupDocumentReviewClient({
                 Edit setup
               </button>
             )}
-            <button
-              type="button"
-              className={cn(
-                "rounded-md px-2 py-1.5 text-[11px]",
-                showDebug
-                  ? "border border-amber-500/50 bg-amber-500/15 text-amber-100"
-                  : "text-faint hover:text-muted-foreground"
-              )}
-              onClick={() => setShowDebug((d) => !d)}
-            >
-              Debug
-            </button>
+            {isAdmin ? (
+              <button
+                type="button"
+                className={cn(
+                  "rounded-md px-2 py-1.5 text-[11px]",
+                  showDebug
+                    ? "border border-amber-500/50 bg-amber-500/15 text-amber-100"
+                    : "text-faint hover:text-muted-foreground"
+                )}
+                onClick={() => setShowDebug((d) => !d)}
+              >
+                Debug
+              </button>
+            ) : null}
           </div>
         </div>
         {showDebug ? (
@@ -1402,14 +1473,7 @@ export function SetupDocumentReviewClient({
         </div>
       ) : null}
 
-      <button
-        type="button"
-        onClick={() => setOriginalOpen(true)}
-        className="tap-active flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card/60 px-4 py-2.5 text-[13px] font-semibold tracking-tight text-foreground hover:bg-muted"
-      >
-        <FileText className="size-4 text-muted-foreground" strokeWidth={2} aria-hidden />
-        View original sheet
-      </button>
+      {viewOriginalButton}
 
       {showDebug ? (
         <CardPanel contentClassName="p-3">
@@ -1507,38 +1571,7 @@ export function SetupDocumentReviewClient({
         </CardPanel>
       ) : null}
 
-      {originalOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Original setup sheet"
-          onClick={(e) => e.target === e.currentTarget && setOriginalOpen(false)}
-        >
-          <div onClick={(e) => e.stopPropagation()}>
-          <SurfaceCard className="w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-xl" contentClassName="p-0">
-            <div className="flex items-center justify-between gap-2 border-b border-border bg-background/95 px-3 py-2">
-              <div className="min-w-0 truncate text-xs text-muted-foreground">{doc.originalFilename}</div>
-              <button
-                type="button"
-                className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
-                onClick={() => setOriginalOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-            <div className="h-[80vh] bg-muted/20">
-              {(doc.mimeType ?? "").startsWith("image/") ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={previewUrl} alt={doc.originalFilename} className="h-full w-full object-contain" />
-              ) : (
-                <iframe title={doc.originalFilename} src={previewUrl} className="h-full w-full border-0" />
-              )}
-            </div>
-          </SurfaceCard>
-          </div>
-        </div>
-      ) : null}
+      {originalSheetDialog}
     </section>
   );
 }

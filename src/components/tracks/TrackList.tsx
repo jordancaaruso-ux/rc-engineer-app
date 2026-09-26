@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronRight, Search, Star, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
+import { formatCount } from "@/lib/formatCount";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { HubRowTitle } from "@/components/ui/panel";
@@ -330,7 +331,7 @@ export function TrackList({
             spellCheck={false}
             placeholder={
               catalogCount > 0
-                ? `Search ${catalogCount.toLocaleString()} tracks by name, town or state`
+                ? `Search ${formatCount(catalogCount)} tracks by name, town or state`
                 : "Search community catalog by name or location"
             }
           />
@@ -592,7 +593,7 @@ export function TrackList({
           the one outcome the seed exists to prevent. */}
       {!search.trim() && catalogCount > filteredTracks.length ? (
         <p className="px-1 text-xs text-muted-foreground">
-          Showing {filteredTracks.length} of {catalogCount.toLocaleString()} tracks — search to find
+          Showing {filteredTracks.length} of {formatCount(catalogCount)} tracks — search to find
           any of the rest.
         </p>
       ) : null}

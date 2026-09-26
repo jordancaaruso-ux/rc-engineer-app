@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { ensureSeedAdditiveTypes } from "@/lib/additives/ensureSeedAdditiveTypes";
 import { additiveIdsUsedByOthers } from "@/lib/additives/additiveUsage";
+import { compareAdditiveNames } from "@/lib/additives/additiveOrder";
 import { AdditiveGaragePanel } from "@/components/additives/AdditiveGaragePanel";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { PageBackLink } from "@/components/ui/PageBackLink";
@@ -49,10 +50,13 @@ export default async function AdditivesPage(props: {
   if (count === 0) {
     await ensureSeedAdditiveTypes();
   }
-  const additiveTypeRows = await prisma.additiveType.findMany({
-    orderBy: { displayName: "asc" },
-    select: { id: true, displayName: true, modelCode: true, verifiedAt: true, createdByUserId: true },
-  });
+  // Sorted here, not by the database: it puts upper case first, and the panel re-sorts ignoring case.
+  const additiveTypeRows = (
+    await prisma.additiveType.findMany({
+      orderBy: { displayName: "asc" },
+      select: { id: true, displayName: true, modelCode: true, verifiedAt: true, createdByUserId: true },
+    })
+  ).sort(compareAdditiveNames);
   // Who added each row stays on the server; the panel only learns which ones are this driver's,
   // and which of those another driver already uses (so they're locked, and it says why).
   const additiveTypes = additiveTypeRows.map(({ createdByUserId: _maker, ...t }) => ({
