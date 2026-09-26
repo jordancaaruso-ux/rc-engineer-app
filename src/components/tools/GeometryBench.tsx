@@ -157,11 +157,14 @@ export function GeometryBench({ geometry }: { geometry: ToolsGeometry }) {
             the sheet's field names would produce a readout — and it would be another car's
             geometry wearing this car's name, which is the single failure this app refuses. So
             the band says why it is empty and still opens the door.
+
+            The no-model line is two short sentences on the founder's word (2026-09-26): how cars
+            get measured was too long to read, so it just says what the door opens.
           */}
           <p className="px-4 pb-3 pt-2.5 text-[13px] leading-relaxed text-muted-foreground">
             {geometry.reason === "no-setup"
               ? "This car's latest setup doesn't fill in enough of the suspension to solve. The Lab still opens, and you can move the shims by hand."
-              : "No geometry model for this chassis yet — those get measured one car at a time. The Lab still opens, and you can load any setup into it."}
+              : "No geometry model for this chassis yet. There's a generic model you can look at."}
           </p>
           {/*
             One door here, not two. It goes to the same blank calculator the "Blank car" chip

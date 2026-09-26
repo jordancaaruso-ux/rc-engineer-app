@@ -1381,22 +1381,22 @@ export function RollCenterLabClient({ seed, seedLabel, ghostSeed, ghostSeedLabel
          * The honest gap, said out loud on the one surface where a driver would otherwise assume
          * the numbers are theirs. Two wordings, because "we don't have YOUR car" and "you opened
          * a toy with no car at all" are different facts and only one of them is a gap to fill.
+         * Two short sentences each, in the founder's words (2026-09-26). "Generic model" is his
+         * name for it on screen; the code still calls it the teaching model.
          */}
         {sandbox && (
           <p className="rounded-lg border border-border bg-secondary px-3 py-2 text-[11px] leading-relaxed text-faint">
             {active.source || active.setupSheetModelId ? (
               <>
-                We don&rsquo;t have measured hardpoints for this car yet, so this is the{" "}
-                <span className="text-foreground">teaching model</span> — not your chassis.{" "}
+                No geometry model for this chassis yet, so this is a{" "}
+                <span className="text-foreground">generic model</span> of a double-wishbone car.{" "}
               </>
             ) : (
               <>
-                A <span className="text-foreground">teaching model</span>, not a car anyone races —
-                built to what every 1/10 touring car shares, with the mount heights chosen round.{" "}
+                A <span className="text-foreground">generic model</span> of a double-wishbone car.{" "}
               </>
             )}
-            Which way each shim moves the roll centre, and roughly how far, holds for any
-            double-wishbone touring car. The exact millimetre isn&rsquo;t yours.
+            The values won’t match your car, but the general behaviour is very similar.
           </p>
         )}
 

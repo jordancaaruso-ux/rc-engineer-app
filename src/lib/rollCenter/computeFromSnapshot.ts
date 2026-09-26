@@ -274,7 +274,7 @@ function deriveSnapshotInputs(
    * noise on top of a car that is already announced as invented. Its assumption is the whole model.
    */
   if (pack.isTeachingModel) {
-    assumptions.push("teaching model — these numbers belong to no real car");
+    assumptions.push("generic model — these numbers belong to no real car");
   } else if (mountShift == null) {
     assumptions.push(`chassis assumed ${pack.chassisOptions[pack.baseChassisCode].label.toLowerCase()}`);
   }
