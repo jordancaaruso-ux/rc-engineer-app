@@ -41,7 +41,11 @@ export async function getCachedDashboardHomeModel(userId: string, timeZone: stri
       // the drafts card renders "NaN waiting" off an undefined count, and it lists the OLD
       // unwindowed array, so months-old drafts reappear under a card that says "from the last
       // three days". Measured on a warm dev page before this line existed.
-      [`dashboard-home-v8-${userId}-${timeZone}`],
+      // v9 (2026-09-26): same shape, new answers — a run counts as "today" only when it was on
+      // track today, and setup changes read in the car's own words ("1.3 → 1.4", not
+      // "f_1_3 → f_1_4"). A v8 entry holds the old count and the old codes, so right after the
+      // deploy a warm racer would see them once more.
+      [`dashboard-home-v9-${userId}-${timeZone}`],
       { tags: [dashboardTag(userId)], revalidate: 30 }
     )()
   );
