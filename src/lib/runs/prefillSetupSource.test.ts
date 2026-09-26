@@ -64,6 +64,9 @@ test("setupSnapshotHasValues reads the shapes a stored setup actually uses", () 
   assert.equal(setupSnapshotHasValues({ spring_front: { preset: "STD", other: "" } }), true);
   // A cleared box stores "" as a deletion marker — the absence of a value.
   assert.equal(setupSnapshotHasValues({ toe_rear: "", camber_front: "   " }), false);
+  // The run form writes today's tyre into every setup by itself: that alone is not a setup.
+  assert.equal(setupSnapshotHasValues({ tires: "Contact A30", additive: "Paragon" }), false);
+  assert.equal(setupSnapshotHasValues({ tires: "Contact A30", toe_rear: "2.4" }), true);
   assert.equal(setupSnapshotHasValues({}), false);
   assert.equal(setupSnapshotHasValues(null), false);
   assert.equal(setupSnapshotHasValues("nonsense"), false);

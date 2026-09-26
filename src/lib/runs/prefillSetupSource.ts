@@ -38,6 +38,8 @@
  * `setupSourceDefault.ts` and `carSwap.ts` live where they do.
  */
 
+import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
+
 /** Just enough of a run for this decision. */
 export type SetupCarryRun = {
   id: string;
@@ -60,10 +62,17 @@ function holdsAValue(value: unknown): boolean {
   return true;
 }
 
-/** A setup says something about the car only if at least one box has a value in it. */
+/**
+ * A setup says something about the car only if at least one box has a value in it. The run form
+ * writes today's tyre, additive and prep into every run's setup by itself, so those keys don't
+ * count: a draft holding only a tyre would otherwise carry forward as "the setup" (test drive
+ * 2026-09-26).
+ */
 export function setupSnapshotHasValues(data: unknown): boolean {
   if (!data || typeof data !== "object" || Array.isArray(data)) return false;
-  return Object.values(data as Record<string, unknown>).some(holdsAValue);
+  return Object.entries(data as Record<string, unknown>).some(
+    ([key, value]) => !isRunContextSetupKey(key) && holdsAValue(value)
+  );
 }
 
 /**
