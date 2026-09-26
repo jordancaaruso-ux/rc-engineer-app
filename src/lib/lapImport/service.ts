@@ -156,10 +156,14 @@ export async function importOneTimingUrl(
   const fieldStatsJson: Prisma.InputJsonValue | typeof Prisma.DbNull =
     fieldStats === null ? Prisma.DbNull : (fieldStats as Prisma.InputJsonValue);
 
+  // Filed under the address the app knows the session by, when the parser read it under another
+  // spelling (Speedhive's `/practice/<activity>/activity` link), so a paste and URL Auto meet.
+  const sourceUrl = parsed.canonicalUrl?.trim() || normalized;
+
   // One row per (user, URL) — enforced by the unique index, so a sweep tick and a wizard
   // import racing on the same session converge on one row instead of minting two.
   const row = await prisma.importedLapTimeSession.upsert({
-    where: { userId_sourceUrl: { userId, sourceUrl: normalized } },
+    where: { userId_sourceUrl: { userId, sourceUrl } },
     update: {
       parserId: parsed.parserId,
       parsedPayload: payload,
@@ -169,9 +173,9 @@ export async function importOneTimingUrl(
     },
     create: {
       userId,
-      sourceUrl: normalized,
+      sourceUrl,
       parserId: parsed.parserId,
-      sourceType: inferSourceType(normalized),
+      sourceType: inferSourceType(sourceUrl),
       parsedPayload: payload,
       sessionCompletedAt,
       fieldStatsJson,
@@ -180,7 +184,7 @@ export async function importOneTimingUrl(
   });
 
   return {
-    url: normalized,
+    url: sourceUrl,
     success: true,
     importedSessionId: row.id,
     recordedAt: row.createdAt.toISOString(),

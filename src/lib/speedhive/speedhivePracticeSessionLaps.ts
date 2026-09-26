@@ -7,6 +7,8 @@ import { normalizeSpeedhiveTransponderNumber } from "@/lib/speedhive/speedhiveTr
 import {
   parseSpeedhivePracticeActivityRef,
   buildSpeedhivePracticeActivityUrl,
+  buildSpeedhivePracticeRunUrl,
+  isSpeedhivePracticeLocationPageUrl,
 } from "@/lib/speedhive/speedhivePracticeUrl";
 import { isSpeedhiveOrApiUrl } from "@/lib/speedhive/speedhiveUrl";
 import { speedhivePracticeUtcOffsetMinutes } from "@/lib/speedhive/speedhiveSessionTime";
@@ -62,7 +64,9 @@ export async function importSpeedhivePracticeActivity(
       laps: [],
       candidates: [],
       message:
-        "Unsupported Speedhive practice URL — use a link from your track practice page.",
+        typeof urlOrRef === "string" && isSpeedhivePracticeLocationPageUrl(urlOrRef)
+          ? "That link is the track's practice page, not one session. Open your session on Speedhive and paste its link."
+          : "Unsupported Speedhive practice URL — use a link from your track practice page.",
       errorCode: "unsupported_url",
     };
   }
@@ -143,8 +147,19 @@ export async function importSpeedhivePracticeActivity(
     const chipLabel = activity?.chipLabel?.trim() || null;
     const locationName = activity?.location?.name?.trim() || null;
 
+    // A link that names only the visit is filed under the address URL Auto uses, once the practice
+    // API has said which location the visit was at.
+    const locationId = activity?.location?.id;
+    const canonicalUrl =
+      ref.locationId == null && typeof locationId === "number" && locationId > 0
+        ? ref.trainingSessionId != null
+          ? buildSpeedhivePracticeRunUrl(locationId, ref.activityId, ref.trainingSessionId)
+          : buildSpeedhivePracticeActivityUrl(locationId, ref.activityId)
+        : null;
+
     return {
       parserId: PARSER_ID,
+      ...(canonicalUrl ? { canonicalUrl } : {}),
       laps: primary.laps,
       sessionDrivers,
       sessionHint: {
@@ -168,8 +183,13 @@ export async function importSpeedhivePracticeActivity(
   }
 }
 
+/**
+ * A practice link this importer answers for. A club's practice page is one: it has no laps, and the
+ * generic page reader it used to fall through to blamed the site ("may load results in JavaScript
+ * only") instead of saying which link to paste.
+ */
 export function isSpeedhivePracticeImportUrl(url: string): boolean {
   const trimmed = url.trim();
   if (!trimmed || !isSpeedhiveOrApiUrl(trimmed)) return false;
-  return isSpeedhivePracticeActivityUrl(trimmed);
+  return isSpeedhivePracticeActivityUrl(trimmed) || isSpeedhivePracticeLocationPageUrl(trimmed);
 }

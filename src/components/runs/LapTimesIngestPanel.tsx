@@ -1750,8 +1750,15 @@ export function LapTimesIngestPanel({
       }
 
       attachImportRow(successes[0]!, url);
+      // The address it was filed under, which is not always the one pasted: a Speedhive
+      // `/practice/<activity>/activity` link is filed under its location-first address.
+      const filedUrl = successes[0]!.url?.trim() || url;
       setDayScanCandidates((prev) =>
-        prev ? prev.map((c) => (c.sessionUrl === url ? { ...c, alreadyImported: true } : c)) : prev
+        prev
+          ? prev.map((c) =>
+              c.sessionUrl === url || c.sessionUrl === filedUrl ? { ...c, alreadyImported: true } : c
+            )
+          : prev
       );
       void loadEventRaceSessions();
       // Deliberately does NOT advance the wizard any more. Jumping to the next
