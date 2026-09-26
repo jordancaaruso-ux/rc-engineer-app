@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
@@ -11,15 +11,30 @@ import { Collapse } from "@/components/ui/Collapse";
 import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
 import { CatalogVerifyControl } from "@/components/assets/CatalogVerifyControl";
 import type { AdditiveTypeOption } from "@/components/additives/AdditiveTypeCombobox";
+import { ADDITIVE_IN_USE_REASON, type AdditiveAccess } from "@/lib/additives/additiveAccess";
 
 export function AdditiveGaragePanel({
   initialAdditiveTypes,
   isAdmin = false,
+  ownIds = [],
+  ownInUseIds = [],
 }: {
   initialAdditiveTypes: AdditiveTypeOption[];
   isAdmin?: boolean;
+  /**
+   * The additives this driver added. Theirs open to Edit and Delete while nobody else uses them
+   * (founder call 2026-09-26); once another driver does (`ownInUseIds`) the row says why it's
+   * locked instead. The API holds the same rule (`additiveAccess`).
+   */
+  ownIds?: string[];
+  ownInUseIds?: string[];
 }) {
   const [additiveTypes, setAdditiveTypes] = useState(initialAdditiveTypes);
+  // Grows when this driver adds one here: a new additive is theirs, and nobody uses it yet.
+  const [mine, setMine] = useState(() => new Set(ownIds));
+  const inUse = useMemo(() => new Set(ownInUseIds), [ownInUseIds]);
+  const accessFor = (id: string): AdditiveAccess =>
+    isAdmin ? "admin" : !mine.has(id) ? "none" : inUse.has(id) ? "in-use" : "own";
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +80,7 @@ export function AdditiveGaragePanel({
           a.displayName.localeCompare(b.displayName)
         )
       );
+      setMine((prev) => new Set(prev).add(data.additiveType!.id));
       setNewName("");
       setAddOpen(false);
     } catch {
@@ -115,9 +131,8 @@ export function AdditiveGaragePanel({
   }
 
   async function deleteAdditiveType(t: AdditiveTypeOption) {
-    const ok = window.confirm(
-      `Delete "${t.displayName}" from the catalog? Linked runs keep their label but lose this type link.`
-    );
+    // Plain words now that drivers see it too; a run's setup keeps the name it was saved with.
+    const ok = window.confirm(`Delete “${t.displayName}”? Runs that used it keep the name in their setup.`);
     if (!ok) return;
     setDeletingId(t.id);
     setError(null);
@@ -195,7 +210,8 @@ export function AdditiveGaragePanel({
             <li className="px-4 py-4 text-sm text-muted-foreground">No additive types yet.</li>
           ) : (
             additiveTypes.map((t) => {
-              if (!isAdmin) {
+              const access = accessFor(t.id);
+              if (access === "none") {
                 return (
                   <li key={t.id} className="flex items-center gap-2 px-4 py-3">
                     <HubRowTitle as="span" className="min-w-0 flex-1 truncate">
@@ -220,7 +236,11 @@ export function AdditiveGaragePanel({
                     <HubRowTitle as="span" className="min-w-0 flex-1 truncate">
                       {t.displayName}
                     </HubRowTitle>
-                    <CatalogVerifyControl verified={!!t.verifiedAt} isAdmin />
+                    {access === "admin" ? (
+                      <CatalogVerifyControl verified={!!t.verifiedAt} isAdmin />
+                    ) : !t.verifiedAt ? (
+                      <CatalogVerifyControl verified={false} isAdmin={false} />
+                    ) : null}
                     <ChevronRight
                       className={cn(
                         "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
@@ -261,14 +281,18 @@ export function AdditiveGaragePanel({
                             Cancel
                           </button>
                         </div>
+                      ) : access === "in-use" ? (
+                        <p className="text-xs text-muted-foreground">{ADDITIVE_IN_USE_REASON}</p>
                       ) : (
                         <div className="flex flex-wrap items-center gap-2">
-                          <CatalogVerifyControl
-                            verified={!!t.verifiedAt}
-                            isAdmin
-                            pending={verifyingId === t.id}
-                            onToggle={() => void toggleVerify(t)}
-                          />
+                          {access === "admin" ? (
+                            <CatalogVerifyControl
+                              verified={!!t.verifiedAt}
+                              isAdmin
+                              pending={verifyingId === t.id}
+                              onToggle={() => void toggleVerify(t)}
+                            />
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => startEdit(t)}
