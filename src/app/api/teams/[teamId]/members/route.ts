@@ -4,7 +4,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { assertTeamAdmin, assertUserInTeam } from "@/lib/teamAccess";
 import { isEmailAuthAllowed } from "@/lib/authAllowlist";
-import { checkInviteCreate } from "@/lib/teams/teamInviteRules";
+import { checkInviteCreate, inviteResetFields } from "@/lib/teams/teamInviteRules";
 import { notifyUserOfTeamInvite } from "@/lib/teams/notifyTeamInvite";
 import { loadTeamMemberName } from "@/lib/teams/teamMemberDisplay";
 import { isBlockedPair } from "@/lib/moderation/blocks";
@@ -78,7 +78,8 @@ export async function POST(request: Request, ctx: Ctx) {
   }
 
   // `mode: "reset"` reuses the row a previous decline/revoke left behind — the table is unique per
-  // (team, user) for all time, so a re-invite is an update rather than a second row.
+  // (team, user) for all time, so a re-invite is an update rather than a second row. The update
+  // restarts the sent time too (`inviteResetFields`).
   const [invite, inviterName] = await Promise.all([
     prisma.teamInvite.upsert({
       where: { teamId_invitedUserId: { teamId, invitedUserId: peer.id } },
@@ -89,12 +90,7 @@ export async function POST(request: Request, ctx: Ctx) {
         role: "member",
         status: "pending",
       },
-      update: {
-        invitedByUserId: user.id,
-        role: "member",
-        status: "pending",
-        respondedAt: null,
-      },
+      update: inviteResetFields(user.id, new Date()),
       select: { id: true, status: true, createdAt: true, team: { select: { name: true } } },
     }),
     // The name the team shows for the admin, not their email. Best effort: a failed read must not

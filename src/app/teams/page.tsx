@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
  * invite's Accept becomes the door to the plan that holds one more. The two routes refuse too.
  *
  * `?list=1` (`TEAMS_LIST_HREF`) skips the jump: the team page's New team comes here for the form
- * below.
+ * below, and a decline stays here to show its confirmation.
  */
 export default async function TeamsPage({
   searchParams,
@@ -73,7 +73,9 @@ export default async function TeamsPage({
       </header>
 
       <section className="page-body max-w-2xl space-y-4">
-        {invites.length > 0 ? <TeamInvitesCard invites={invites} joinLock={joinLock} /> : null}
+        {/* Always mounted, even with no invites: a decline's toast must outlive the refresh
+            that takes the last invite away. It draws nothing when there is nothing to show. */}
+        <TeamInvitesCard invites={invites} joinLock={joinLock} />
 
         {teams.length > 0 ? (
           <CardPanel contentClassName="p-0">

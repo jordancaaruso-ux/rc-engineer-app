@@ -79,6 +79,45 @@ export function checkInviteCreate(input: {
   return { ok: true, mode: "reset" };
 }
 
+/**
+ * What a re-invite writes over the old row (`mode: "reset"`).
+ *
+ * `createdAt` restarts with the rest because it is the "sent" time both sides read. A re-invite
+ * that kept it went out reading "sent 19 minutes ago", the time of the first invite.
+ */
+export function inviteResetFields(inviterUserId: string, now: Date) {
+  return {
+    invitedByUserId: inviterUserId,
+    role: "member",
+    status: "pending",
+    respondedAt: null,
+    createdAt: now,
+  } as const;
+}
+
+/**
+ * Which of a team's invites Team settings lists.
+ *
+ * Pending ones go to every member, as before. Declined ones go to admins only, shown as Declined
+ * with Invite again: a decline used to just drop out of Invited, and the admin could not tell it
+ * from a glitch. A decline from someone who is on the team now is history, so it is left out.
+ * Revoked and accepted invites are never listed.
+ */
+export function teamSettingsInvites<T extends { status: string; invitedUserId: string }>(
+  invites: readonly T[],
+  viewer: { isAdmin: boolean; memberUserIds: Iterable<string> }
+): { pending: T[]; declined: T[] } {
+  const members = new Set(viewer.memberUserIds);
+  return {
+    pending: invites.filter((i) => isInvitePending(i.status)),
+    declined: viewer.isAdmin
+      ? invites.filter(
+          (i) => normalizeInviteStatus(i.status) === "declined" && !members.has(i.invitedUserId)
+        )
+      : [],
+  };
+}
+
 export type InviteResponseDecision =
   | { ok: true; nextStatus: "accepted" | "declined" }
   | RuleFailure;
@@ -135,7 +174,8 @@ export function parseInviteAction(raw: unknown): TeamInviteAction | null {
  * `/teams` that shows its list even to a one-team driver, instead of jumping to their team.
  *
  * The team page's New team goes here, because the New team form lives on the list: a Race
- * Engineer driver on one team could never reach it to start a second.
+ * Engineer driver on one team could never reach it to start a second. Declining an invite also
+ * lands here, so the confirmation stays on screen instead of leaving with the jump.
  */
 export const TEAMS_LIST_HREF = "/teams?list=1";
 
