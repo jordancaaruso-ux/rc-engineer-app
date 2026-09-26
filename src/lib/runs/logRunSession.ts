@@ -1,14 +1,17 @@
 /**
- * Page-1 session-type helpers for the Log-run entry screen.
+ * Session-step helpers for the Log-run wizard, one section each below.
  *
- * UI model (coarse, founder interview 2026-07-16): Practice / Qualifying / Main,
- * or implicit Testing on a non-event day. Maps onto the app's `meetingSessionType`
- * enum where Main => RACE + a "Main" sessionLabel. Session type defaults to the
- * continued run's value.
+ * Session model: the step's buttons are Practice / Seeding / Qualifying / Race, or implicit
+ * Testing on a non-event day, and the session type defaults to the continued run's. A copied
+ * run keeps its own type, and a race keeps its own label ("A Main"), so the step says what the
+ * run it came from said (test drive 2026-09-26). The coarse July model (Practice / Qualifying /
+ * Main, Main => RACE + a "Main" label) is retired: its buttons are gone, and the "Main" label a
+ * copy saved read "Race · Main" beside "Race" runs logged the same way.
  */
 import type { EntryCandidate } from "@/lib/runs/entryCandidate";
+import { formatRunSessionDisplay } from "@/lib/runSession";
 
-export type UiSessionType = "PRACTICE" | "QUALIFYING" | "MAIN" | "TESTING";
+export type UiSessionType = "PRACTICE" | "SEEDING" | "QUALIFYING" | "RACE" | "TESTING";
 
 /** Default page-1 session for the current context; carries the continued run's type. */
 export function defaultUiSession(
@@ -17,12 +20,14 @@ export function defaultUiSession(
   copying: boolean,
 ): { type: UiSessionType } {
   if (!isEvent) return { type: "TESTING" };
-  if (copying && candidate?.meetingSessionType && candidate.meetingSessionType !== "TESTING") {
-    switch (candidate.meetingSessionType) {
+  if (copying) {
+    switch (candidate?.meetingSessionType) {
       case "RACE":
-        return { type: "MAIN" };
+        return { type: "RACE" };
       case "QUALIFYING":
         return { type: "QUALIFYING" };
+      case "SEEDING":
+        return { type: "SEEDING" };
       case "PRACTICE":
         return { type: "PRACTICE" };
       default:
@@ -32,17 +37,45 @@ export function defaultUiSession(
   return { type: "PRACTICE" };
 }
 
-/** Convert the UI session back to persisted run fields. */
+/**
+ * Convert the UI session back to persisted run fields. A label only ever qualifies a race
+ * ("A Main"), so it rides along on RACE and nowhere else.
+ */
 export function uiSessionToMeeting(
   type: UiSessionType,
+  raceLabel: string | null = null,
 ): { meetingSessionType: string | null; sessionLabel: string | null } {
   if (type === "TESTING") return { meetingSessionType: null, sessionLabel: null };
-  if (type === "MAIN") return { meetingSessionType: "RACE", sessionLabel: "Main" };
-  return { meetingSessionType: type, sessionLabel: null }; // PRACTICE | QUALIFYING
+  return { meetingSessionType: type, sessionLabel: type === "RACE" ? raceLabel?.trim() || null : null };
 }
 
 export function uiSessionLabel(type: UiSessionType): string {
-  if (type === "TESTING") return "Testing";
-  if (type === "MAIN") return "Main";
-  return type === "PRACTICE" ? "Practice" : "Qualifying";
+  switch (type) {
+    case "TESTING":
+      return "Testing";
+    case "SEEDING":
+      return "Seeding";
+    case "QUALIFYING":
+      return "Qualifying";
+    case "RACE":
+      return "Race";
+    default:
+      return "Practice";
+  }
+}
+
+/**
+ * An event-day session as the Log-run form names it: the ticked button's word, then the run's
+ * own label when it has one ("Race", "Race · A Main"), the way Sessions lists the saved run. The
+ * label used to stand in for the word, so a copied race read "Main" beside a ticked "Race".
+ */
+export function meetingSessionKind(
+  meetingSessionType: string | null | undefined,
+  sessionLabel?: string | null,
+): string {
+  return formatRunSessionDisplay({
+    sessionType: "RACE_MEETING",
+    meetingSessionType: meetingSessionType || "PRACTICE",
+    sessionLabel: sessionLabel ?? null,
+  });
 }

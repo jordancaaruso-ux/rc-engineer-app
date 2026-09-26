@@ -73,10 +73,38 @@ test("continue: a past race event still re-attaches (driver keeps logging that m
   );
   assert.equal(e.sessionType, "RACE_MEETING");
   assert.equal(e.meetingSessionType, "RACE");
-  assert.equal(e.sessionLabel, "Main");
+  // No invented "Main": the copy carries only the label its run had (none here).
+  assert.equal(e.sessionLabel, null);
   assert.equal(e.eventId, "event-1");
   // Track derives from the re-attached event.
   assert.equal(e.trackId, null);
+});
+
+test("continue: a copied race keeps its type and its own label; other types carry no label", () => {
+  const race = (sessionLabel: string | null) =>
+    deriveContinueEntry(
+      candidate({ sessionType: "RACE_MEETING", meetingSessionType: "RACE", sessionLabel, eventId: "event-1" }),
+      null,
+    );
+  assert.deepEqual(
+    [race(null).meetingSessionType, race(null).sessionLabel],
+    ["RACE", null],
+  );
+  assert.deepEqual(
+    [race("A Main").meetingSessionType, race("A Main").sessionLabel],
+    ["RACE", "A Main"],
+  );
+  const seeding = deriveContinueEntry(
+    candidate({ sessionType: "RACE_MEETING", meetingSessionType: "SEEDING", eventId: "event-1" }),
+    null,
+  );
+  assert.equal(seeding.meetingSessionType, "SEEDING");
+  const qual = deriveContinueEntry(
+    candidate({ sessionType: "RACE_MEETING", meetingSessionType: "QUALIFYING", sessionLabel: "Q3", eventId: "event-1" }),
+    null,
+  );
+  assert.equal(qual.meetingSessionType, "QUALIFYING");
+  assert.equal(qual.sessionLabel, null);
 });
 
 test("continue: an event day with no formal event stays an event day", () => {

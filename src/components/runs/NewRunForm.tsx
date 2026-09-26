@@ -93,6 +93,9 @@ import {
   type InlineNewTrackRowHandle,
 } from "@/components/runs/InlineNewTrackRow";
 import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEntry";
+import {
+  meetingSessionKind,
+} from "@/lib/runs/logRunSession";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
 import {
   resolveSetupSourceDefault,
@@ -4430,13 +4433,13 @@ export function NewRunForm(props: {
     };
   })();
   /** Session identity pieces — shared by the map-sheet Session row and the
-   *  slim top recap line (F2: the recap is state-only, never nav). */
+   *  slim top recap line (F2: the recap is state-only, never nav). The ticked
+   *  button's word leads, so a race never reads "Main" (meetingSessionKind). */
   const wizardSessionKind =
     sessionType === "RACE_MEETING"
-      ? sessionLabel ||
-        (meetingSessionType === "OTHER"
-          ? meetingSessionCustom.trim() || "Event"
-          : meetingSessionType.charAt(0) + meetingSessionType.slice(1).toLowerCase())
+      ? meetingSessionType === "OTHER"
+        ? meetingSessionCustom.trim() || "Event"
+        : meetingSessionKind(meetingSessionType, sessionLabel)
       : "Testing";
   const wizardTrackName = tracksList.find((t) => t.id === trackId)?.name ?? null;
   const wizardCarName = carsList.find((c) => c.id === carId)?.name ?? null;
@@ -4524,17 +4527,14 @@ export function NewRunForm(props: {
   // the derived plan); APPLIED = the same five rows reading LIVE state, so
   // car swaps and manual edits stay truthful. Locked round 3: the card keeps
   // all five rows in both states and only gains ✓s.
-  const titleCaseSession = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
   const wizardPrefillKindLabel = lastRun
-    ? lastRun.sessionLabel?.trim() ||
-      (lastRun.sessionType === "TESTING" || !lastRun.meetingSessionType
-        ? "Testing"
-        : titleCaseSession(lastRun.meetingSessionType))
-    : props.wizardCandidate?.sessionLabel?.trim() ||
-      (props.wizardCandidate?.meetingSessionType &&
-      props.wizardCandidate.meetingSessionType !== "TESTING"
-        ? titleCaseSession(props.wizardCandidate.meetingSessionType)
-        : "Testing");
+    ? lastRun.sessionType === "TESTING" || !lastRun.meetingSessionType
+      ? lastRun.sessionLabel?.trim() || "Testing"
+      : meetingSessionKind(lastRun.meetingSessionType, lastRun.sessionLabel)
+    : props.wizardCandidate?.meetingSessionType &&
+        props.wizardCandidate.meetingSessionType !== "TESTING"
+      ? meetingSessionKind(props.wizardCandidate.meetingSessionType, props.wizardCandidate.sessionLabel)
+      : props.wizardCandidate?.sessionLabel?.trim() || "Testing";
   const wizardPrefillWhenIso = lastRun?.createdAt ?? props.wizardCandidate?.whenIso ?? "";
   const wizardPrefillRows: WizardPrefillRow[] = wizardActive
     ? wizardPrefillApplied
@@ -4545,10 +4545,9 @@ export function NewRunForm(props: {
             value:
               sessionType === "RACE_MEETING"
                 ? `Event · ${
-                    sessionLabel ||
-                    (meetingSessionType === "OTHER"
+                    meetingSessionType === "OTHER"
                       ? meetingSessionCustom.trim() || "Other"
-                      : titleCaseSession(meetingSessionType))
+                      : meetingSessionKind(meetingSessionType, sessionLabel)
                   }`
                 : "Testing",
           },
@@ -4599,10 +4598,7 @@ export function NewRunForm(props: {
             label: "Session",
             value: wizardPrefillPlan
               ? wizardPrefillPlan.sessionType === "RACE_MEETING"
-                ? `Event · ${
-                    wizardPrefillPlan.sessionLabel ||
-                    titleCaseSession(wizardPrefillPlan.meetingSessionType ?? "PRACTICE")
-                  }`
+                ? `Event · ${meetingSessionKind(wizardPrefillPlan.meetingSessionType, wizardPrefillPlan.sessionLabel)}`
                 : "Testing"
               : "…",
           },
@@ -5329,6 +5325,8 @@ export function NewRunForm(props: {
               size="sm"
               value={meetingSessionType === "OTHER" ? "PRACTICE" : meetingSessionType}
               onChange={(next) => {
+                // A label names a race ("A Main"); it doesn't follow the session to another type.
+                if (next !== meetingSessionType) setSessionLabel(null);
                 setMeetingSessionType(next);
                 setMeetingSessionCustom("");
               }}
