@@ -92,6 +92,25 @@ export function offeredLiveRcMeetings(
 }
 
 /**
+ * LiveRC's meetings that share a day with `startYmd`–`endYmd`, earliest first, each once, never a
+ * placeholder. What the New event form points to before a driver makes their own copy (W1-10).
+ */
+export function liveRcMeetingsOnDays(
+  rows: readonly LiveRcEventListRow[],
+  startYmd: string,
+  endYmd: string,
+): LiveRcEventListRow[] {
+  const byId = new Map<string, LiveRcEventListRow>();
+  for (const row of rows) {
+    if (byId.has(row.eventId) || isLiveRcPlaceholder(row)) continue;
+    if (ymdRangesOverlap(row.startYmd, row.endYmd, startYmd, endYmd)) byId.set(row.eventId, row);
+  }
+  return [...byId.values()].sort(
+    (a, b) => a.startYmd.localeCompare(b.startYmd) || a.name.localeCompare(b.name),
+  );
+}
+
+/**
  * The one LiveRC meeting a hand-made event stands for, or null.
  *
  * Only an unambiguous match counts: exactly one meeting whose listed dates share a day with the

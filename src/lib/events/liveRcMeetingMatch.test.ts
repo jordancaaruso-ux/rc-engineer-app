@@ -7,6 +7,7 @@ import {
   isDefaultEventName,
   isLiveRcPlaceholder,
   liveRcMeetingForEvent,
+  liveRcMeetingsOnDays,
   offeredLiveRcMeetings,
   shortDayLabel,
 } from "@/lib/events/liveRcMeetingMatch";
@@ -74,6 +75,19 @@ test("a hand-made meeting finds the real one even with placeholders overlapping 
   assert.equal(liveRcMeetingForEvent({ startYmd: "2026-09-24", endYmd: "2026-09-24" }, INDOOR)?.eventId, "222");
   // A day with only the placeholders on it has no meeting to join.
   assert.equal(liveRcMeetingForEvent({ startYmd: "2026-09-26", endYmd: "2026-09-26" }, INDOOR), null);
+});
+
+test("the New event form finds LiveRC's meeting on the days picked, however far ahead", () => {
+  // W1-10: Ethan typed "EMCC Cup" for Saturday 26 Sep and nothing pointed him to LiveRC's.
+  assert.deepEqual(
+    liveRcMeetingsOnDays(EMCC, "2026-09-26", "2026-09-26").map((m) => m.name),
+    ["EMCC CUP 25-27 Sept 2026"],
+  );
+  // A race day posted a month ahead is found for its own day, not for the day before.
+  assert.deepEqual(liveRcMeetingsOnDays(EMCC, "2026-10-25", "2026-10-25").map((m) => m.eventId), ["r2510"]);
+  assert.deepEqual(liveRcMeetingsOnDays(EMCC, "2026-10-24", "2026-10-24"), []);
+  // Placeholders never count, and a row listed twice is offered once.
+  assert.deepEqual(liveRcMeetingsOnDays([...INDOOR, INDOOR[0]!], "2026-09-24", "2026-09-26").map((m) => m.eventId), ["222"]);
 });
 
 test("fourteen days is still a meeting; fifteen is a placeholder", () => {
