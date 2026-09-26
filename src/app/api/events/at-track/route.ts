@@ -6,7 +6,8 @@ import { loadEventsAtTrack } from "@/lib/events/eventsAtTrack";
 export const dynamic = "force-dynamic";
 
 /**
- * The log-run event list's LiveRC half: what's on at this track today and in the next week.
+ * The log-run event list's LiveRC half: what's on at this track today, in the next week, and in
+ * the last two weeks. Placeholder rows that span years are left out (`isLiveRcPlaceholder`).
  *
  * A POST because it can write: reading LiveRC is also the moment a hand-made event of the
  * driver's is found to be a meeting LiveRC has since posted, and linked to it (see

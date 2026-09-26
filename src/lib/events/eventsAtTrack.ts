@@ -40,7 +40,8 @@ function hubOf(url: string): string {
 }
 
 /**
- * What's on at this track for the log-run event list, from LiveRC's events page.
+ * What's on at this track for the log-run event list, from LiveRC's events page: today, the next
+ * week and the last two weeks (`offeredLiveRcMeetings`), never a placeholder row spanning years.
  *
  * Also where a hand-made event meets the LiveRC meeting that was posted after it. Most clubs only
  * put a meeting on LiveRC once the race director sets it up, so a driver's first run of the day is

@@ -1,6 +1,6 @@
 import { eventDateToYmd } from "@/lib/eventDateParse";
 import { addDaysToYmd } from "@/lib/events/joinableTeamEventLogic";
-import { shortDayLabel, TRACK_EVENTS_AHEAD_DAYS } from "@/lib/events/liveRcMeetingMatch";
+import { isLiveRcPlaceholder, shortDayLabel, TRACK_EVENTS_AHEAD_DAYS } from "@/lib/events/liveRcMeetingMatch";
 import { normalizeLiveRcEventHubUrl } from "@/lib/lapWatch/resolveEventFromLiveRcMeeting";
 
 /**
@@ -88,10 +88,15 @@ export const TRACK_EVENTS_STATUS_VALUE = {
   unavailable: "status:liverc-unavailable",
 } as const;
 
-/** "Sat 26 Sep", "Fri 25 – Sun 27 Sep", "Fri 30 Oct – Sun 1 Nov". */
+/** "Sat 26 Sep", "Fri 25 – Sun 27 Sep", "Fri 30 Oct – Sun 1 Nov", "Thu 31 Dec 2026 – Fri 1 Jan 2027". */
 export function formatDayRange(startYmd: string, endYmd: string): string {
   if (startYmd >= endYmd) return shortDayLabel(startYmd);
   const [start, end] = [shortDayLabel(startYmd), shortDayLabel(endYmd)];
+  // Across a new year both halves carry theirs: without them LiveRC's 2022-to-2030 placeholder
+  // read "Tue 11 Jan – Fri 11 Jan" (W3-04).
+  if (startYmd.slice(0, 4) !== endYmd.slice(0, 4)) {
+    return `${start} ${startYmd.slice(0, 4)} – ${end} ${endYmd.slice(0, 4)}`;
+  }
   const sameMonth = startYmd.slice(0, 7) === endYmd.slice(0, 7);
   return `${sameMonth ? start.replace(/ \w+$/, "") : start} – ${end}`;
 }
@@ -169,13 +174,16 @@ export function buildTrackEventGroups(input: {
   const mineHubs = new Set(mine.map((e) => e.hub).filter((h): h is string => Boolean(h)));
   const joinable = input.joinable.filter((j) => !mineIds.has(j.id));
   const joinableIds = new Set(joinable.map((j) => j.id));
-  const live = input.liveRc.meetings.filter((m) => {
+  // The server already leaves placeholder rows out; a list read before that still must not show
+  // an eight-year "meeting" as on today.
+  const liveMeetings = input.liveRc.meetings.filter((m) => !isLiveRcPlaceholder(m));
+  const live = liveMeetings.filter((m) => {
     if (m.eventId && (mineIds.has(m.eventId) || joinableIds.has(m.eventId))) return false;
     const hub = normalizedHub(m.hubUrl);
     return !(hub && mineHubs.has(hub));
   });
   /** Teammates' events that are LiveRC meetings, so their rows can say so. */
-  const liveEventIds = new Set(input.liveRc.meetings.map((m) => m.eventId).filter(Boolean));
+  const liveEventIds = new Set(liveMeetings.map((m) => m.eventId).filter(Boolean));
 
   const placed: Placed[] = [];
   for (const e of mine) {
@@ -231,7 +239,7 @@ export function buildTrackEventGroups(input: {
 
   const todayOptions = pick("today").sort(byStart).map((p) => p.option);
   const liveTodayShown =
-    input.liveRc.meetings.some((m) => m.startYmd <= today && m.endYmd >= today) ||
+    liveMeetings.some((m) => m.startYmd <= today && m.endYmd >= today) ||
     mine.some((e) => e.hub && e.startYmd <= today && e.endYmd >= today);
   const status: TrackEventOption | null =
     input.liveRc.status === "loading"

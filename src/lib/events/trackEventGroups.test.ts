@@ -188,9 +188,45 @@ test("only this track's events, in On today / Coming up / Later / Earlier here, 
   ]);
 });
 
+test("a LiveRC placeholder spanning years is never on today, and a meeting from Thursday is earlier here", () => {
+  // Indoor Raceway, Saturday 26 Sep 2026 (test drive W3-04).
+  const template: TrackListLiveRcMeeting = {
+    hubUrl: HUB("template"),
+    name: "Template Event Copy Only Do Not Use",
+    startYmd: "2022-01-11",
+    endYmd: "2030-01-11",
+    entries: null,
+    eventId: null,
+  };
+  const thursday: TrackListLiveRcMeeting = {
+    hubUrl: HUB("222"),
+    name: "Indoor Raceway - On Road Event 222",
+    startYmd: "2026-09-24",
+    endYmd: "2026-09-24",
+    entries: 37,
+    eventId: null,
+  };
+  const groups = buildTrackEventGroups({
+    trackId: "emcc",
+    todayYmd: "2026-09-26",
+    events: [],
+    joinable: [],
+    liveRc: { status: "ok", meetings: [template, thursday] },
+  });
+  assert.deepEqual(labels(groups), [
+    ["On today", ["Nothing on LiveRC here today yet"]],
+    ["Earlier here", ["Indoor Raceway - On Road Event 222"]],
+  ]);
+  assert.equal(groups[1]!.options[0]!.detail, "Thu 24 Sep · 2 days ago · on LiveRC · 37 entries");
+  assert.equal(groups[1]!.options[0]!.value, liveRcOptionValue(HUB("222")));
+});
+
 test("labels for the dates and the day", () => {
   assert.equal(formatDayRange("2026-09-26", "2026-09-26"), "Sat 26 Sep");
   assert.equal(formatDayRange("2026-10-30", "2026-11-01"), "Fri 30 Oct – Sun 1 Nov");
+  // Across a new year both halves say which (W3-04 printed "Tue 11 Jan – Fri 11 Jan").
+  assert.equal(formatDayRange("2026-12-31", "2027-01-01"), "Thu 31 Dec 2026 – Fri 1 Jan 2027");
+  assert.equal(formatDayRange("2022-01-11", "2030-01-11"), "Tue 11 Jan 2022 – Fri 11 Jan 2030");
   assert.equal(relativeDayLabel("2026-09-26", "2026-09-26", "2026-09-26"), "on today");
   assert.equal(relativeDayLabel("2026-09-27", "2026-09-27", "2026-09-26"), "tomorrow");
   assert.equal(relativeDayLabel("2026-09-13", "2026-09-13", "2026-09-26"), "13 days ago");
