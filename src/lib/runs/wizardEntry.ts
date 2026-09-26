@@ -22,8 +22,8 @@ export type NewRunWizardEntry = {
   /** Copy the candidate run (continue is the contextual default). */
   continuing: boolean;
   sessionType: "TESTING" | "RACE_MEETING";
-  meetingSessionType: "PRACTICE" | "QUALIFYING" | "RACE" | null;
-  /** "Main" when the session is a main; null otherwise. */
+  meetingSessionType: "PRACTICE" | "SEEDING" | "QUALIFYING" | "RACE" | null;
+  /** A race's own label ("A Main"), carried from the run it copies; null otherwise. */
   sessionLabel: string | null;
   /** Event day: the event this run attaches to (track derives from it). */
   eventId: string | null;
@@ -68,11 +68,14 @@ export function deriveContinueEntry(
   const race = (evId: string | null): NewRunWizardEntry => {
     const d = defaultUiSession(candidate, true, true);
     const ui: UiSessionType = d.type === "TESTING" ? "PRACTICE" : d.type;
-    const meeting = uiSessionToMeeting(ui);
+    // The copy says what its run said: a race stays "Race" and keeps its own label. It used to
+    // become "Main" and save a "Main" label, so two races logged alike read "Race" and
+    // "Race · Main" (test drive 2026-09-26).
+    const meeting = uiSessionToMeeting(ui, candidate.sessionLabel);
     return {
       ...base,
       sessionType: "RACE_MEETING",
-      meetingSessionType: meeting.meetingSessionType as "PRACTICE" | "QUALIFYING" | "RACE" | null,
+      meetingSessionType: meeting.meetingSessionType as NewRunWizardEntry["meetingSessionType"],
       sessionLabel: meeting.sessionLabel,
       eventId: evId,
       trackId: evId ? null : (candidate.trackId ?? null),

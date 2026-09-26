@@ -64,7 +64,8 @@ import {
   formatTirePrepLine,
   type TirePrepStep,
 } from "@/lib/runs/tirePrep";
-import { formatEventDate, formatEventRelativeLabel, formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { eventDateToYmd } from "@/lib/eventDateParse";
 import { type MeetingSessionType } from "@/lib/runSession";
 import { setActiveSetupData, migrateLegacyLoadedSetup } from "@/lib/activeSetupContext";
 import type { RunPickerRun } from "@/lib/runPickerFormat";
@@ -93,6 +94,14 @@ import {
   type InlineNewTrackRowHandle,
 } from "@/components/runs/InlineNewTrackRow";
 import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEntry";
+import {
+  followDateEventName,
+  linkedMeetingNotice,
+  meetingSessionKind,
+  pastMeetingRunAt,
+  saveFailureMessage,
+} from "@/lib/runs/logRunSession";
+import { RunWhenField } from "@/components/runs/RunWhenField";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
 import {
   resolveSetupSourceDefault,
@@ -136,7 +145,7 @@ import {
   type LapIngestFormValue,
 } from "@/components/runs/LapTimesIngestPanel";
 import { TrackTimingSourceNotice } from "@/components/runs/TrackTimingSourceNotice";
-import { EventDateRangeField } from "@/components/events/EventDateRangeField";
+import { EventDateRangeField, formatEventDateRange } from "@/components/events/EventDateRangeField";
 import { ImportedFieldSessionCard } from "@/components/runs/ImportedFieldSessionCard";
 import { HandlingAssessmentFields } from "@/components/runs/HandlingAssessmentFields";
 import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQuickPick";
@@ -145,6 +154,7 @@ import { TrackNearbySuggestions } from "@/components/runs/TrackNearbySuggestions
 import {
   buildTrackEventGroups,
   hubUrlFromOptionValue,
+  relativeDayLabel,
   type JoinableTeamEvent,
   type TrackListLiveRcMeeting,
   type TrackLiveRcStatus,
@@ -528,6 +538,10 @@ type NewRunDraftSnapshot = {
    * would POST a twin of a run that already exists on the server.
    */
   savedRunId?: string | null;
+  /** A copied race's own label ("A Main"). Optional: older drafts don't have it. */
+  sessionLabel?: string | null;
+  /** When the car ran, if the driver picked it (ISO). Optional: older drafts don't have it. */
+  runAtIso?: string | null;
 };
 
 /**
@@ -698,6 +712,8 @@ export function NewRunForm(props: {
   );
   /** "A Main" etc. for main-event sessions (wizard page 1 / LiveRC detection); persisted on save. */
   const [sessionLabel, setSessionLabel] = useState<string | null>(wizard?.sessionLabel ?? null);
+  /** When the car ran, once the driver moves it off "now" (a run typed in after the fact). */
+  const [runAt, setRunAt] = useState<Date | null>(null);
   const [meetingSessionCustom, setMeetingSessionCustom] = useState<string>(""); // when type is OTHER
   /**
    * Legacy run field; lap import uses track LiveRC URL. Kept for edit-run hydrate only.
@@ -744,6 +760,9 @@ export function NewRunForm(props: {
     Record<string, { id: string; displayName: string }>
   >({});
   const [events, setEvents] = useState<EventOption[]>([]);
+  /** The list as the driver last saw it, to name a meeting the server has since merged away. */
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
   const [eventId, setEventId] = useState<string>(wizard?.eventId ?? "");
   const [showNewEventPanel, setShowNewEventPanel] = useState(false);
   const [newEventName, setNewEventName] = useState("");
@@ -978,6 +997,8 @@ export function NewRunForm(props: {
   const [, startCopyTransition] = useTransition();
   const [status, setStatus] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
+  /** A save that didn't go through, said once at the wizard's Complete button. */
+  const [wizardSaveError, setWizardSaveError] = useState<string | null>(null);
   const [completeValidation, setCompleteValidation] = useState<{
     show: boolean;
     carRating: boolean;
@@ -1218,6 +1239,8 @@ export function NewRunForm(props: {
   } | null>(null);
   /** The LiveRC meeting whose event is being made (or joined) after a tap in the list. */
   const [addingLiveRcEvent, setAddingLiveRcEvent] = useState<string | null>(null);
+  /** Said once when a track pick tied one of the driver's own meetings to LiveRC's. */
+  const [meetingLinkNotice, setMeetingLinkNotice] = useState<string | null>(null);
   /**
    * My team's events at the selected track that I am not on yet. Fills a "Your team" group in the
    * event picker, so a meeting a teammate booked for Saturday is selectable on Wednesday rather
@@ -1643,10 +1666,25 @@ export function NewRunForm(props: {
    * Silent draft autosave (issue: leaving `/runs/new` mid-log lost everything).
    * Only the plain new-run flow — edit/draft runs and deep-linked prefills own
    * their own state and must not be clobbered by a stale local snapshot.
+   *
+   * The Log run wizard keeps it too since 2026-09-26: a same-tab link off the form ("Add timing
+   * details" to Settings) threw the whole run away, with no warning (test drive). Leaving on
+   * purpose — a save, Exit › Discard, Undo on the prefill card — closes it (`closeLocalDraft`).
    */
   const draftAutosaveEnabled =
-    !isEditing && !dashboardPrefill && !initialEventId && !labSetupPrefill && !wizardActive;
+    !isEditing && !dashboardPrefill && !initialEventId && !labSetupPrefill;
   const draftHydratedRef = useRef(false);
+  /** Set once the run is saved or thrown away, so no late write brings it back. */
+  const localDraftClosedRef = useRef(false);
+  const closeLocalDraft = () => {
+    localDraftClosedRef.current = true;
+    if (!draftAutosaveEnabled) return;
+    try {
+      window.localStorage.removeItem(NEW_RUN_DRAFT_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
 
   // Restore once on mount. Runs after the default/prefill effects above so the
   // saved snapshot wins over the empty starting form.
@@ -1701,6 +1739,11 @@ export function NewRunForm(props: {
         if (s.conditions) setConditions(s.conditions);
         // A stay-save already banked this content — later saves must update that run.
         if (typeof s.savedRunId === "string" && s.savedRunId) setCreatedRunId(s.savedRunId);
+        if (typeof s.sessionLabel === "string") setSessionLabel(s.sessionLabel);
+        const savedRunAt = typeof s.runAtIso === "string" ? new Date(s.runAtIso) : null;
+        if (savedRunAt && !Number.isNaN(savedRunAt.getTime())) setRunAt(savedRunAt);
+        // The wizard's blank entry must not overwrite the restored day (effect further down).
+        wizardSessionAppliedRef.current = true;
       }
     } catch {
       // Corrupt/unavailable storage — start fresh, never block the form.
@@ -1712,7 +1755,7 @@ export function NewRunForm(props: {
   // Debounced persist. Guarded on hydration so the initial empty render can't
   // overwrite a saved snapshot before restore runs.
   useEffect(() => {
-    if (!draftAutosaveEnabled || !draftHydratedRef.current) return;
+    if (!draftAutosaveEnabled || !draftHydratedRef.current || localDraftClosedRef.current) return;
     const snapshot: NewRunDraftSnapshot = {
       sessionType,
       meetingSessionType,
@@ -1742,6 +1785,8 @@ export function NewRunForm(props: {
       shareWithTeam,
       conditions,
       savedRunId: createdRunId,
+      sessionLabel,
+      runAtIso: runAt ? runAt.toISOString() : null,
     };
     if (!newRunDraftHasContent(snapshot)) {
       try {
@@ -1752,6 +1797,8 @@ export function NewRunForm(props: {
       return;
     }
     const t = setTimeout(() => {
+      // A save or a discard landed while this write waited: the run is no longer a draft here.
+      if (localDraftClosedRef.current) return;
       try {
         window.localStorage.setItem(NEW_RUN_DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
       } catch {
@@ -1789,6 +1836,8 @@ export function NewRunForm(props: {
     shareWithTeam,
     conditions,
     createdRunId,
+    sessionLabel,
+    runAt,
   ]);
 
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
@@ -2111,26 +2160,24 @@ export function NewRunForm(props: {
       liveRc: read ? { status: read.status, meetings: read.meetings } : { status: "none", meetings: [] },
     });
   }, [trackId, trackEvents, eventListTodayYmd, events, joinableEvents]);
-  const allEventGroups = useMemo(
-    () =>
-      [
-        {
-          label: "Upcoming",
-          options: eventSelectGroups.upcoming.map((ev) => ({
-            value: ev.id,
-            label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
-          })),
-        },
-        {
-          label: "Past",
-          options: eventSelectGroups.past.map((ev) => ({
-            value: ev.id,
-            label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
-          })),
-        },
-      ].filter((g) => g.options.length > 0),
-    [eventSelectGroups]
-  );
+  const allEventGroups = useMemo(() => {
+    // Calendar days, as the track's list and the meeting's own page print them. The stored dates
+    // are days at UTC noon, which the phone's zone read a day late in New Zealand.
+    const label = (ev: EventOption) => {
+      const [startYmd, endYmd] = [eventDateToYmd(ev.startDate), eventDateToYmd(ev.endDate)];
+      return `${ev.name} · ${formatEventDateRange(startYmd, startYmd)} · ${relativeDayLabel(startYmd, endYmd, eventListTodayYmd)}`;
+    };
+    return [
+      {
+        label: "Upcoming",
+        options: eventSelectGroups.upcoming.map((ev) => ({ value: ev.id, label: label(ev) })),
+      },
+      {
+        label: "Past",
+        options: eventSelectGroups.past.map((ev) => ({ value: ev.id, label: label(ev) })),
+      },
+    ].filter((g) => g.options.length > 0);
+  }, [eventSelectGroups, eventListTodayYmd]);
   /**
    * Log Run with no track yet: the Event box reads "Select the track first" and doesn't open, and
    * "+ New event" waits too (founder 2026-09-26). Without a track the list could only be every
@@ -2144,6 +2191,20 @@ export function NewRunForm(props: {
     () => (needsEvent && eventId ? events.find((e) => e.id === eventId) ?? null : null),
     [needsEvent, eventId, events]
   );
+  /** A meeting that is already over: the run defaults to its day, not to now. */
+  const runAtMeetingDefault = useMemo(
+    () => (selectedEventForRun ? pastMeetingRunAt(selectedEventForRun.endDate, eventListTodayYmd) : null),
+    [selectedEventForRun, eventListTodayYmd]
+  );
+  /**
+   * When the car ran, as a new run will be saved: the racer's pick, else a finished meeting's day
+   * (which the server applies itself, so only a pick is sent), else null for now.
+   */
+  const runAtForSave = isEditing ? null : (runAt ?? runAtMeetingDefault);
+  /** Laps off a timing sheet with an on-track time: that time is the run's, and a pick is ignored. */
+  const whenFromTimingSheet =
+    lapIngest.sourceKind === "url" &&
+    (lapIngest.urlImportBlocks ?? []).some((b) => Boolean(b.sessionCompletedAtIso || b.sessionCompletedAtDbIso));
   /** The run's own track row — name + timing URLs for the lap-discovery panel. */
   const selectedRunTrack = useMemo(
     () => (trackId ? tracksList.find((t) => t.id === trackId) ?? null : null),
@@ -2544,7 +2605,8 @@ export function NewRunForm(props: {
    * pop-up made.
    *
    * The same read links a hand-made event of ours to the LiveRC meeting posted after it. When it
-   * did, our events reload, and a selected event that was folded into the meeting's own follows it.
+   * did, our events reload, a selected event that was folded into the meeting's own follows it,
+   * and a toast says so: done silently, the driver's meeting just vanished (test drive 2026-09-26).
    */
   useEffect(() => {
     const tid = trackId.trim();
@@ -2568,7 +2630,16 @@ export function NewRunForm(props: {
           const data = (await res.json().catch(() => ({}))) as {
             todayYmd?: string;
             liveRc?: { status?: TrackLiveRcStatus; meetings?: TrackListLiveRcMeeting[] };
-            linked?: Array<{ eventId: string; intoEventId: string }>;
+            // `EventsAtTrackLink` once the meetings batch lands; its extra fields are optional here.
+            linked?: Array<{
+              eventId: string;
+              intoEventId: string;
+              renamedTo?: string | null;
+              name?: string | null;
+              intoName?: string | null;
+              liveRcName?: string | null;
+              merged?: boolean;
+            }>;
           };
           if (!alive) return;
           if (!res.ok) {
@@ -2583,12 +2654,31 @@ export function NewRunForm(props: {
           });
           const linked = Array.isArray(data.linked) ? data.linked : [];
           if (linked.length === 0) return;
+          const before = eventsRef.current;
           const list = await jsonFetch<{ events: EventOption[] }>("/api/events", { cache: "no-store" }).catch(
             () => null
           );
-          if (!alive || !list) return;
-          setEvents(list.events ?? []);
-          setEventId((current) => linked.find((l) => l.eventId === current)?.intoEventId ?? current);
+          if (!alive) return;
+          if (list) {
+            setEvents(list.events ?? []);
+            setEventId((current) => linked.find((l) => l.eventId === current)?.intoEventId ?? current);
+          }
+          // Names as the server sends them, else from what the form holds: ours from the list the
+          // driver saw; LiveRC's from the meeting ours was merged into, or LiveRC's own row.
+          setMeetingLinkNotice(
+            linkedMeetingNotice(
+              linked.map((l) => {
+                const meetingRow = data.liveRc?.meetings?.find((m) => m.eventId === l.intoEventId)?.name;
+                const merged = l.merged ?? l.intoEventId !== l.eventId;
+                return {
+                  fromName: l.name ?? before.find((e) => e.id === l.eventId)?.name ?? null,
+                  intoName: merged
+                    ? (l.intoName ?? list?.events?.find((e) => e.id === l.intoEventId)?.name ?? meetingRow ?? null)
+                    : (l.liveRcName ?? meetingRow ?? l.renamedTo ?? null),
+                };
+              })
+            )
+          );
         } catch {
           if (alive) failed();
         }
@@ -3413,7 +3503,8 @@ export function NewRunForm(props: {
       setNewEventName(name);
       newEventNameAutoRef.current = null;
     } else if (!keptTyped) {
-      const filled = trackName ? defaultEventName(trackName, today) : "";
+      // The dates already picked, if any, name it: reopening must not put today back.
+      const filled = trackName ? defaultEventName(trackName, newEventStartDate || today) : "";
       setNewEventName(filled);
       newEventNameAutoRef.current = filled || null;
     }
@@ -3667,6 +3758,7 @@ export function NewRunForm(props: {
     if (saving) return;
     setInlineError(null);
     setStatus(null);
+    setWizardSaveError(null);
     if (!carId) {
       setInlineError("Select a car.");
       return;
@@ -3763,10 +3855,12 @@ export function NewRunForm(props: {
         const sets = buildImportedLapSetsFromIngest(lapIngest);
         // Imported session times are track wall clock stored as-if-UTC; convert in the
         // device zone or the lookup reads the wrong side of the planet's clock.
-        const atIso = importedSessionWeatherInstantIso(
-          sets.find((s) => s.isPrimaryUser) ?? sets[0],
-          Intl.DateTimeFormat().resolvedOptions().timeZone
-        );
+        // No timing-sheet time: the time the driver gave the run, else now.
+        const atIso =
+          importedSessionWeatherInstantIso(
+            sets.find((s) => s.isPrimaryUser) ?? sets[0],
+            Intl.DateTimeFormat().resolvedOptions().timeZone
+          ) ?? runAtForSave?.toISOString();
         const params = new URLSearchParams({
           lat: String(weatherTrack.latitude),
           lon: String(weatherTrack.longitude),
@@ -3971,6 +4065,9 @@ export function NewRunForm(props: {
           conditions: isConditionsEmpty(conditionsForSave) ? null : conditionsForSave,
           sessionLabel:
             sessionType === "RACE_MEETING" && sessionLabel?.trim() ? sessionLabel.trim() : null,
+          // When the car ran, sent only when the racer picked it: absent means now, or the day
+          // of a meeting that is over (the server's default). A timing session's time wins.
+          runAtIso: isEditing ? undefined : runAt?.toISOString(),
           importedLapSets,
           // Every attached import, earliest on track first — the server takes the
           // first as the run's primary. Always sent, so removing one detaches it.
@@ -3997,6 +4094,10 @@ export function NewRunForm(props: {
       // Same move for the run itself — see `createdRunId`. Adopted on every create,
       // stay or not: it can only make a later save MORE correct.
       if (!editRun?.id) setCreatedRunId(run.id);
+      // The run is persisted (draft or complete) and the page is leaving — drop the local
+      // autosave so returning to /runs/new starts clean, and before the tyre toast below can
+      // hold the departure: a copy written late would reopen as this run and save over it.
+      if (!opts?.stay) closeLocalDraft();
 
       const cascadedRuns = tireRunNumberCascade?.updatedRuns ?? 0;
       const backfilledRuns = backfilled?.created ?? 0;
@@ -4055,14 +4156,6 @@ export function NewRunForm(props: {
         return;
       }
 
-      // The run is persisted (draft or complete) — drop the local autosave so
-      // returning to /runs/new starts clean instead of restoring this run.
-      try {
-        window.localStorage.removeItem(NEW_RUN_DRAFT_STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
-
       // Every OTHER successful save leaves the log-run flow for the dashboard.
       // Completing also carries ?suggestRun so the dashboard can offer
       // Engineer suggestions for the session they just saved. Draft saves
@@ -4079,9 +4172,22 @@ export function NewRunForm(props: {
         navigateAway(returnHref ?? "/");
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save run";
-      setStatus(msg);
-      setInlineError(msg);
+      // Said once, where the driver tapped, in words: with no signal the browser's own "Failed
+      // to fetch" used to sit twice under the setup sheet, out of sight (test drive 2026-09-26).
+      const msg = saveFailureMessage(err, {
+        online: typeof navigator === "undefined" || navigator.onLine !== false,
+        retryLabel: opts?.stay
+          ? "Save to this run"
+          : intent === "draft"
+            ? "Save draft"
+            : editingCompletedRun
+              ? confirmingRun
+                ? "Confirm run"
+                : "Save edits"
+              : "Complete",
+      });
+      if (wizardActive) setWizardSaveError(msg);
+      else setInlineError(msg);
     } finally {
       if (!(intent === "completed" && pendingCompleteNavigationRef.current)) {
         if (!(intent === "draft" && pendingDraftNavigationRef.current)) {
@@ -4449,13 +4555,13 @@ export function NewRunForm(props: {
     };
   })();
   /** Session identity pieces — shared by the map-sheet Session row and the
-   *  slim top recap line (F2: the recap is state-only, never nav). */
+   *  slim top recap line (F2: the recap is state-only, never nav). The ticked
+   *  button's word leads, so a race never reads "Main" (meetingSessionKind). */
   const wizardSessionKind =
     sessionType === "RACE_MEETING"
-      ? sessionLabel ||
-        (meetingSessionType === "OTHER"
-          ? meetingSessionCustom.trim() || "Event"
-          : meetingSessionType.charAt(0) + meetingSessionType.slice(1).toLowerCase())
+      ? meetingSessionType === "OTHER"
+        ? meetingSessionCustom.trim() || "Event"
+        : meetingSessionKind(meetingSessionType, sessionLabel)
       : "Testing";
   const wizardTrackName = tracksList.find((t) => t.id === trackId)?.name ?? null;
   const wizardCarName = carsList.find((c) => c.id === carId)?.name ?? null;
@@ -4543,17 +4649,14 @@ export function NewRunForm(props: {
   // the derived plan); APPLIED = the same five rows reading LIVE state, so
   // car swaps and manual edits stay truthful. Locked round 3: the card keeps
   // all five rows in both states and only gains ✓s.
-  const titleCaseSession = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
   const wizardPrefillKindLabel = lastRun
-    ? lastRun.sessionLabel?.trim() ||
-      (lastRun.sessionType === "TESTING" || !lastRun.meetingSessionType
-        ? "Testing"
-        : titleCaseSession(lastRun.meetingSessionType))
-    : props.wizardCandidate?.sessionLabel?.trim() ||
-      (props.wizardCandidate?.meetingSessionType &&
-      props.wizardCandidate.meetingSessionType !== "TESTING"
-        ? titleCaseSession(props.wizardCandidate.meetingSessionType)
-        : "Testing");
+    ? lastRun.sessionType === "TESTING" || !lastRun.meetingSessionType
+      ? lastRun.sessionLabel?.trim() || "Testing"
+      : meetingSessionKind(lastRun.meetingSessionType, lastRun.sessionLabel)
+    : props.wizardCandidate?.meetingSessionType &&
+        props.wizardCandidate.meetingSessionType !== "TESTING"
+      ? meetingSessionKind(props.wizardCandidate.meetingSessionType, props.wizardCandidate.sessionLabel)
+      : props.wizardCandidate?.sessionLabel?.trim() || "Testing";
   const wizardPrefillWhenIso = lastRun?.createdAt ?? props.wizardCandidate?.whenIso ?? "";
   const wizardPrefillRows: WizardPrefillRow[] = wizardActive
     ? wizardPrefillApplied
@@ -4564,10 +4667,9 @@ export function NewRunForm(props: {
             value:
               sessionType === "RACE_MEETING"
                 ? `Event · ${
-                    sessionLabel ||
-                    (meetingSessionType === "OTHER"
+                    meetingSessionType === "OTHER"
                       ? meetingSessionCustom.trim() || "Other"
-                      : titleCaseSession(meetingSessionType))
+                      : meetingSessionKind(meetingSessionType, sessionLabel)
                   }`
                 : "Testing",
           },
@@ -4623,10 +4725,7 @@ export function NewRunForm(props: {
             label: "Session",
             value: wizardPrefillPlan
               ? wizardPrefillPlan.sessionType === "RACE_MEETING"
-                ? `Event · ${
-                    wizardPrefillPlan.sessionLabel ||
-                    titleCaseSession(wizardPrefillPlan.meetingSessionType ?? "PRACTICE")
-                  }`
+                ? `Event · ${meetingSessionKind(wizardPrefillPlan.meetingSessionType, wizardPrefillPlan.sessionLabel)}`
                 : "Testing"
               : "…",
           },
@@ -4879,6 +4978,11 @@ export function NewRunForm(props: {
         if (runId) navigateAfterRunComplete(runId);
       }}
     />
+    <ActionToast
+      raised={wizardActive}
+      message={tireCascadeNotice ? null : meetingLinkNotice}
+      onDismiss={() => setMeetingLinkNotice(null)}
+    />
     <form
       className={cn(
         // No clamp of its own: the wizard fills the page column like every other
@@ -5007,7 +5111,15 @@ export function NewRunForm(props: {
               note={wizardVenueSwapNote}
               subNote={wizardCarSwapNote}
               onPrefill={applyWizardPrefill}
-              onStartBlank={props.onWizardRestart}
+              onStartBlank={
+                props.onWizardRestart
+                  ? () => {
+                      // A clean slate: the local copy would otherwise restore into the remount.
+                      closeLocalDraft();
+                      props.onWizardRestart?.();
+                    }
+                  : undefined
+              }
               onJump={goToWizardStep}
             />
           ) : null}
@@ -5243,6 +5355,18 @@ export function NewRunForm(props: {
                     setNewEventStartDate(next.startYmd);
                     setNewEventEndDate(next.endYmd);
                     setEventError(null);
+                    // The filled-in name follows the first day; a name the driver typed stays.
+                    const followed = followDateEventName({
+                      name: newEventName,
+                      autoName: newEventNameAutoRef.current,
+                      trackName:
+                        tracksList.find((t) => t.id === (trackId.trim() || newEventTrackId))?.name ?? "",
+                      startYmd: next.startYmd,
+                    });
+                    if (followed) {
+                      setNewEventName(followed);
+                      newEventNameAutoRef.current = followed;
+                    }
                   }}
                 />
                 {/* Only when the chosen track points at nothing: laps are found from the track,
@@ -5353,6 +5477,8 @@ export function NewRunForm(props: {
               size="sm"
               value={meetingSessionType === "OTHER" ? "PRACTICE" : meetingSessionType}
               onChange={(next) => {
+                // A label names a race ("A Main"); it doesn't follow the session to another type.
+                if (next !== meetingSessionType) setSessionLabel(null);
                 setMeetingSessionType(next);
                 setMeetingSessionCustom("");
               }}
@@ -5365,6 +5491,18 @@ export function NewRunForm(props: {
             />
           </div>
         </SurfaceCard>
+      ) : null}
+      {/* When the car ran: a run typed in after the fact used to be dated by its save (test
+          drive 2026-09-26). New runs only; a saved run's time moves on its run page. */}
+      {wizardActive && !isEditing ? (
+        <div className="border-t border-border/60 pt-4">
+          <RunWhenField
+            value={runAt}
+            fallback={runAtMeetingDefault}
+            fromTimingSheet={whenFromTimingSheet}
+            onChange={setRunAt}
+          />
+        </div>
       ) : null}
       {/* Wizard: say out loud that the weather logs itself, and carry the one
           reading no lookup can know (probe track temp). The band's own reading
@@ -5379,6 +5517,7 @@ export function NewRunForm(props: {
               setConditions((prev) => ({ ...prev, trackTempC: next }))
             }
             storedConditions={conditions.source != null ? conditions : null}
+            atIso={whenFromTimingSheet ? null : (runAtForSave?.toISOString() ?? null)}
           />
         </div>
       ) : null}
@@ -6208,6 +6347,7 @@ export function NewRunForm(props: {
           canSave={canSave}
           saving={saving}
           saveSuccess={saveSuccess}
+          saveError={wizardSaveError}
           hasContent={wizardHasContent}
           exitOpen={wizardExitPromptOpen}
           onExitOpenChange={setWizardExitPromptOpen}
@@ -6231,6 +6371,7 @@ export function NewRunForm(props: {
           onExitDiscard={() => {
             wizardExitingRef.current = true;
             setWizardExitPromptOpen(false);
+            closeLocalDraft();
             // Throwing the edits away still returns whoever sent them here — leaving is
             // the point of this button, not being relocated.
             router.push(returnHref ?? "/");
