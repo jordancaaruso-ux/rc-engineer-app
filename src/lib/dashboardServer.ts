@@ -39,6 +39,8 @@ import {
 import { resolveEventTrackLabel } from "@/lib/tracks/legacyTrackSnapshot";
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
+import { loadSheetWordsByCarId } from "@/lib/setup/loadSheetWords";
+import type { SheetWords } from "@/lib/setup/sheetWords";
 import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
 import type { SetupSnapshotData } from "@/lib/runSetup";
 import {
@@ -1039,6 +1041,21 @@ export async function loadDashboardHomeModel(
     }
   }
 
+  /**
+   * A car's own sheet words, so a change reads "Anti Roll Bar (Front) 1.3 → 1.4" rather than the
+   * stored "anti roll bar front f_1_3 → f_1_4" (test drive, 2026-09-26). Read once per car, and
+   * only for a car with a run to diff.
+   */
+  const sheetWordsByCarId = new Map<string, SheetWords | null>();
+  const sheetWordsForCar = async (carId: string | null | undefined): Promise<SheetWords | null> => {
+    if (!carId) return null;
+    if (!sheetWordsByCarId.has(carId)) {
+      const loaded = await loadSheetWordsByCarId(userId, [carId]);
+      sheetWordsByCarId.set(carId, loaded.get(carId) ?? null);
+    }
+    return sheetWordsByCarId.get(carId) ?? null;
+  };
+
   const todaysChanges: DashboardHomeModel["todaysChanges"] = [];
   {
     /**
@@ -1062,7 +1079,7 @@ export async function loadDashboardHomeModel(
         prevCarId = r.car?.id;
       }
       if (prevSnapshot) {
-        const diffRows = buildSetupDiffRows(cur, prevSnapshot).filter(
+        const diffRows = buildSetupDiffRows(cur, prevSnapshot, await sheetWordsForCar(r.car?.id)).filter(
           // Tires, additive and prep are picked on the run's Tires tab and mirrored into
           // the sheet; RUN_CONTEXT_SETUP_KEYS says no "what changed" list may count them.
           (row) => row.changed && !isRunContextSetupKey(row.key),
@@ -1185,7 +1202,11 @@ export async function loadDashboardHomeModel(
       const previousSnapshot =
         (runBefore?.setupSnapshot?.data as SetupSnapshotData | undefined) ?? null;
       if (previousSnapshot) {
-        setupChanges = buildSetupDiffRows(currentSnapshot, previousSnapshot)
+        setupChanges = buildSetupDiffRows(
+          currentSnapshot,
+          previousSnapshot,
+          await sheetWordsForCar(recentRun.car?.id)
+        )
           .filter((row) => row.changed && !isRunContextSetupKey(row.key))
           .map((row) => ({
             key: row.key,

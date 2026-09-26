@@ -14,6 +14,8 @@ import { teamsIndexSkipsTo } from "@/lib/teams/teamInviteRules";
 import { loadBlockedPeerIds } from "@/lib/moderation/blocks";
 import { applyCommentVisibility } from "@/lib/moderation/visibilityRules";
 import type { UnitSystem } from "@/lib/units/unitSystem";
+import { loadSheetWordsByCarId } from "@/lib/setup/loadSheetWords";
+import { inSheetWords } from "@/lib/setup/sheetWords";
 
 /** One page of the feed. Small on purpose — this is a glanceable surface, not an archive. */
 export const TEAM_FEED_PAGE_SIZE = 20;
@@ -378,14 +380,19 @@ async function buildEntriesForRuns(args: {
     toFeedInput(r, r.setupSnapshotId ? dataBySnapshotId.get(r.setupSnapshotId) ?? null : null)
   );
 
-  const commentsByRunId = await loadCommentsForRuns({
-    teamId,
-    runIds: focusRuns.map((r) => r.id),
-    viewerId,
-    viewerIsAdmin,
-    displays,
-    blockedPeerIds,
-  });
+  const [commentsByRunId, sheetWordsByCarId] = await Promise.all([
+    loadCommentsForRuns({
+      teamId,
+      runIds: focusRuns.map((r) => r.id),
+      viewerId,
+      viewerIsAdmin,
+      displays,
+      blockedPeerIds,
+    }),
+    // Each car's own sheet words, so a change reads "Anti Roll Bar (Front) 1.3 → 1.4" and not
+    // "anti roll bar front f_1_3 → f_1_4" (test drive, 2026-09-26).
+    loadSheetWordsByCarId(viewerId, focusRuns.map((r) => r.carId)),
+  ]);
 
   const out = new Map<string, TeamFeedEntryView>();
   for (const run of focusRuns) {
@@ -416,7 +423,7 @@ async function buildEntriesForRuns(args: {
       bestLapSeconds: entry.bestLapSeconds,
       paceDeltaSeconds: entry.paceDeltaSeconds,
       baselineRunId: entry.baselineRunId,
-      changed: entry.changed,
+      changed: inSheetWords(entry.changed, sheetWordsByCarId.get(run.carId ?? "")),
       changedOverflow: entry.changedOverflow,
       alsoMoved: entry.alsoMoved,
       alsoMovedOverflow: entry.alsoMovedOverflow,

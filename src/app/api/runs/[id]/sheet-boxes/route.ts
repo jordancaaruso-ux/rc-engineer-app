@@ -6,6 +6,9 @@ import { viewerMayAccessRun } from "@/lib/teams/teamRunAccess";
 import { chassisFillsAsSheet, parseStoredBoxes } from "@/lib/setupSheetModels/sheetPlan";
 import { pickSheetBlankForData } from "@/lib/setupSheetModels/sheetBlankResolve";
 import { changedBoxCrops } from "@/lib/setupCompare/changedBoxRegion";
+import { resolveSetupSheetModelForCar } from "@/lib/setupSheetModels/resolveModelForCar";
+import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import { sheetWordsFromFields } from "@/lib/setup/sheetWords";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +43,12 @@ const MAX_KEYS = 120;
  * So the question moves to the run, which is the object the viewer's access was actually decided
  * on. Exactly the move `buildSheetContext` in `setup-snapshot/route.ts` already made when the same
  * owner-only lookup made a teammate's sheet open as the legacy field list.
+ *
+ * ============================== AND WHAT THOSE BOXES ARE CALLED ==============================
+ *
+ * `words` rides along for every chassis, sheet or form: the sheet's own name for each asked box and
+ * the printed word for each stored choice (`sheetWords.ts`). The change list prints names either
+ * way, and without them a Mi10 read "anti roll bar front f_1_4 f_1_3" (test drive, 2026-09-26).
  */
 export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse> {
   if (!hasDatabaseUrl()) {
@@ -54,7 +63,7 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
     select: {
       userId: true,
       shareWithTeam: true,
-      car: { select: { setupSheetModelId: true } },
+      car: { select: { setupSheetModelId: true, setupSheetTemplate: true } },
       // Not returned — read only to choose which of the chassis's sheets these boxes are on.
       setupSnapshot: { select: { data: true, sheetBlankId: true } },
     },
@@ -78,20 +87,33 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
    * `buildSheetContext` picks the blank the same way. See `sheetBlankResolve`.
    */
   const snapshotData = run.setupSnapshot?.data;
-  const blank = run.car?.setupSheetModelId
-    ? await pickSheetBlankForData(
-        run.car.setupSheetModelId,
-        snapshotData && typeof snapshotData === "object" && !Array.isArray(snapshotData)
-          ? (snapshotData as Record<string, unknown>)
-          : null,
-        { sheetBlankId: run.setupSnapshot?.sheetBlankId }
-      )
-    : null;
+  const [blank, model] = await Promise.all([
+    run.car?.setupSheetModelId
+      ? pickSheetBlankForData(
+          run.car.setupSheetModelId,
+          snapshotData && typeof snapshotData === "object" && !Array.isArray(snapshotData)
+            ? (snapshotData as Record<string, unknown>)
+            : null,
+          { sheetBlankId: run.setupSnapshot?.sheetBlankId }
+        )
+      : null,
+    // For the words below, read alongside the blank. A failed read costs the names, not the crops.
+    run.car ? resolveSetupSheetModelForCar(userId, run.car).catch(() => null) : null,
+  ]);
+
+  // The chassis's field list, then an EDITION's own after it: an edition's keys are its own and
+  // are not in the chassis schema (see `sheet-plan`), so its names win for them.
+  const editionFields =
+    blank?.isEdition && Array.isArray(blank.schemaFieldsJson)
+      ? (parseSetupSheetModelSchema({ version: 1, label: "", structuredSections: [], fields: blank.schemaFieldsJson })
+          ?.fields ?? [])
+      : [];
+  const words = sheetWordsFromFields([...(model?.schema.fields ?? []), ...editionFields], new Set(keys));
 
   // Not a mistake and not an error: most chassis fill as an ordinary form and have no sheet to
   // draw. The caller shows its list instead.
   if (!chassisFillsAsSheet(blank) || !run.car?.setupSheetModelId) {
-    return NextResponse.json({ sheetMode: false, setupSheetModelId: null, crops: [] });
+    return NextResponse.json({ sheetMode: false, setupSheetModelId: null, crops: [], words });
   }
 
   return NextResponse.json({
@@ -100,5 +122,6 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
     // The crop images come from the same sheet the boxes do. Null = the primary blank.
     editionBlankId: blank?.isEdition ? blank.id : null,
     crops: changedBoxCrops(parseStoredBoxes(blank?.boxesJson), keys),
+    words,
   });
 }
