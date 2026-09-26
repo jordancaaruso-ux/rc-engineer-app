@@ -30,6 +30,26 @@ import { normalizeLiveRcTrackOrigin } from "@/lib/lapWatch/liveRcTrackUrl";
 const MAX_HUB_PAGES = 4;
 /** A meeting page that is slow to answer is skipped: the page's own date still stands. */
 const HUB_FETCH_TIMEOUT_MS = 8_000;
+/**
+ * The whole look-up, however many pages it reads. On a race weekend LiveRC can be slow for
+ * everyone; the laps are already in hand and must not wait on the race's clock for long.
+ */
+const LOOKUP_BUDGET_MS = 15_000;
+
+/** `work`'s answer, or `fallback` once the deadline passes (the work is left to finish unread). */
+async function beforeDeadline<T>(work: Promise<T>, deadline: number, fallback: T): Promise<T> {
+  const left = deadline - Date.now();
+  if (left <= 0) return fallback;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), left);
+  });
+  try {
+    return await Promise.race([work, late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export type LiveRcRaceMeeting = {
   /** The meeting's name, as the page's breadcrumb prints it. */
@@ -149,17 +169,19 @@ export async function findLiveRcRaceListedTime(raceUrl: string, raceHtml: string
   }
   const origin = normalizeLiveRcTrackOrigin(raceUrl);
   if (!raceId || !origin) return null;
+  const deadline = Date.now() + LOOKUP_BUDGET_MS;
 
   const meeting = extractLiveRcRaceMeeting(raceHtml);
-  const list = await fetchLiveRcEventList(origin);
+  const list = await beforeDeadline(fetchLiveRcEventList(origin), deadline, { ok: false as const });
   const hubs = list.ok ? liveRcHubsForRaceMeeting(list.events, meeting) : [];
 
   const tried = new Set<string>();
   const tryHub = async (hubUrl: string): Promise<string | null> => {
     const key = eventIdOf(hubUrl) ?? hubUrl;
-    if (tried.has(key) || tried.size >= MAX_HUB_PAGES) return null;
+    const left = deadline - Date.now();
+    if (tried.has(key) || tried.size >= MAX_HUB_PAGES || left <= 0) return null;
     tried.add(key);
-    const hub = await fetchUrlText(hubUrl, { timeoutMs: HUB_FETCH_TIMEOUT_MS });
+    const hub = await fetchUrlText(hubUrl, { timeoutMs: Math.min(HUB_FETCH_TIMEOUT_MS, left) });
     return hub.ok ? listedTimeOfLiveRcRace(hub.text, hubUrl, raceId!) : null;
   };
 
@@ -169,8 +191,8 @@ export async function findLiveRcRaceListedTime(raceUrl: string, raceHtml: string
   }
   // A meeting running today can be missing from the events page; the front page links it.
   if (tried.size < MAX_HUB_PAGES) {
-    const current = await resolveRaceEventHubUrl(origin);
-    if (current.ok) return tryHub(current.indexUrl);
+    const current = await beforeDeadline(resolveRaceEventHubUrl(origin), deadline, null);
+    if (current?.ok) return tryHub(current.indexUrl);
   }
   return null;
 }
