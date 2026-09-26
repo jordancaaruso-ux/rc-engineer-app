@@ -24,6 +24,7 @@ export function SetupChangedSincePreviousList({
   onEditValue,
   maxRows,
   against = "previous",
+  ownRun = true,
 }: {
   rows: SetupChangedRow[] | null;
   className?: string;
@@ -57,6 +58,12 @@ export function SetupChangedSincePreviousList({
    * struck through: nothing was replaced, they are two cars.
    */
   against?: "previous" | "other";
+  /**
+   * False on somebody else's run — a teammate's. The empty list then says "their previous run":
+   * "your previous run on this car" was untrue on a run and a car that are not yours (test drive
+   * 2026-09-26).
+   */
+  ownRun?: boolean;
 }) {
   // Called before the early returns below, because a hook cannot be skipped on some renders.
   // The whole list, not the visible slice, so opening the rest does not fetch again.
@@ -74,7 +81,9 @@ export function SetupChangedSincePreviousList({
   if (rows.length === 0) {
     return (
       <p className={cn("text-muted-foreground text-xs", className)}>
-        {against === "other" ? "No differences." : "No setup changes since your previous run on this car."}
+        {against === "other"
+          ? "No differences."
+          : `No setup changes since ${ownRun ? "your" : "their"} previous run on this car.`}
       </p>
     );
   }

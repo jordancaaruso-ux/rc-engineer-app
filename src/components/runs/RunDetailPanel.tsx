@@ -1399,6 +1399,8 @@ export function RunDetailPanel({
           <SetupChangedSincePreviousList
             rows={setupPreview.mode === "no_baseline" ? null : setupPreview.rows}
             runId={run.id}
+            // Owner-only, like every mutation here — so false means a teammate's run.
+            ownRun={allowRunMutations}
           />
         )}
         {/*
