@@ -4,7 +4,6 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { suggestModelCodeFromDisplayName } from "@/lib/tires/matchTireType";
 import { ensureSeedAdditiveTypes } from "@/lib/additives/ensureSeedAdditiveTypes";
-import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
 
 const ADDITIVE_TYPE_SELECT = {
   id: true,
@@ -59,8 +58,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   try {
-    // Open create (any signed-in user). New rows land unverified → surfaced in /admin/review
-    // and the founder is pinged. See docs/ASSET_ACCESS_NORTH_STAR.md.
+    // Open create (any signed-in user), trusted on arrival: no review, no ping (founder ruling
+    // 2026-09-26). Verified gates nothing for an additive but a tag and the list order, and a typo
+    // only makes a duplicate. See docs/ASSET_ACCESS_NORTH_STAR.md.
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const body = (await request.json()) as {
@@ -95,14 +95,9 @@ export async function POST(request: Request) {
         displayName,
         modelCode,
         createdByUserId: user.id,
+        verifiedAt: new Date(),
       },
       select: ADDITIVE_TYPE_SELECT,
-    });
-
-    await notifyAdminsOfUnverifiedAsset({
-      kind: "Additive type",
-      label: additiveType.displayName,
-      createdByEmail: user.email,
     });
 
     return NextResponse.json({ additiveType }, { status: 201 });

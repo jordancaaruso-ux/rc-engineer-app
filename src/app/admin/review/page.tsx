@@ -5,7 +5,6 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { prisma } from "@/lib/prisma";
-import { trackCatalogScopeWhere } from "@/lib/tracks/communityTrackAccess";
 import { formatRunDateOnly } from "@/lib/formatDate";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { listPendingChassisTypeRequests } from "@/lib/setupSheetModels/chassisTypeRequests";
@@ -20,19 +19,22 @@ import { CatalogDeleteButton } from "@/components/admin/CatalogDeleteButton";
 import { CatalogMergeControl } from "@/components/admin/CatalogMergeControl";
 import { BlankReviewedButton } from "@/components/admin/BlankReviewedButton";
 import { loadBlankReviewQueue } from "@/lib/setupSheetModels/blankReviewQueue";
-import {
-  tireTypeIdsInUse,
-  additiveTypeIdsInUse,
-  trackIdsInUse,
-} from "@/lib/assets/catalogUsageBulk";
+import { tireTypeIdsInUse } from "@/lib/assets/catalogUsageBulk";
+import { tireLookalikeFinder } from "@/lib/tires/tireLookalike";
 
 const TAKE = 50;
 
 /**
- * Founder review queue — every unverified global-catalog row + pending chassis-type requests in
- * one surface. One-tap Approve (verify); Open drills into the row for edit/merge/delete. Keeping
- * this loop cheap is what lets a solo founder stay the sole verifier at open signup.
- * See docs/ASSET_ACCESS_NORTH_STAR.md.
+ * Founder review queue: only what still needs his eyes, plus the chassis asks and refused sheets.
+ *
+ * Founder ruling 2026-09-26: two things wait for him — a chassis a driver made by uploading a
+ * sheet (approving it lets it into the community numbers, and approves its sheet readings in the
+ * same tap), and a tire a driver typed by hand. Everything else is trusted on arrival: our own
+ * bulk lists, anything he adds himself, every track, every additive. Before that this page listed
+ * every unverified row of every kind, and 717 of the 731 tires on it were our own imports.
+ *
+ * A hand-typed tire that is plainly one of ours spelled another way carries a one-tap merge
+ * (`tireLookalikeFinder`); nothing merges until he taps. See docs/ASSET_ACCESS_NORTH_STAR.md.
  */
 export default async function AdminReviewPage(): Promise<ReactNode> {
   if (!hasDatabaseUrl()) {
@@ -60,55 +62,35 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
   if (!isAuthAdminEmail(user.email)) notFound();
 
   const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
-  const [tireTypes, additiveTypes, tracks, calibrations, chassisTypes, chassisRequests, blanks] =
-    await Promise.all([
+  const [typedTires, trustedTires, handBuiltChassis, chassisRequests, blanks] = await Promise.all([
+    // Tires a driver typed. Ours, the founder's own and anything a list vouched for are verified on
+    // arrival, so `createdByUserId` is not what keeps them out — it keeps out any of ours an older
+    // import left unverified, which is the flood this page used to be.
     prisma.tireType.findMany({
-      where: { verifiedAt: null },
+      where: { verifiedAt: null, createdByUserId: { not: null } },
       orderBy: { createdAt: "desc" },
       take: TAKE,
       select: {
         id: true,
         displayName: true,
-        modelCode: true,
         createdAt: true,
-        brand: true,
-        compound: true,
-        surface: true,
         productUrl: true,
         sourceUrl: true,
+        createdBy: { select: { email: true } },
       },
     }),
-    prisma.additiveType.findMany({
-      where: { verifiedAt: null },
-      orderBy: { createdAt: "desc" },
-      take: TAKE,
-      select: { id: true, displayName: true, modelCode: true, createdAt: true },
+    // What a typed tire is checked against: the trusted catalog, never another driver's guess.
+    prisma.tireType.findMany({
+      where: { verifiedAt: { not: null } },
+      orderBy: { displayName: "asc" },
+      select: { id: true, displayName: true },
     }),
-    prisma.track.findMany({
-      // Demo clones are unverified by construction — they are not review candidates.
-      where: { ...trackCatalogScopeWhere(user), verifiedAt: null },
-      orderBy: { createdAt: "desc" },
-      take: TAKE,
-      select: {
-        id: true,
-        name: true,
-        location: true,
-        latitude: true,
-        longitude: true,
-        createdAt: true,
-      },
-    }),
-    prisma.setupSheetCalibration.findMany({
-      where: { verifiedAt: null },
-      orderBy: { createdAt: "desc" },
-      take: TAKE,
-      select: { id: true, name: true, sourceType: true, createdAt: true },
-    }),
-    // Chassis types a driver built. They go live for everyone the moment they are created, so
-    // without this queue they stay flagged "unreviewed" forever with no way to promote them.
-    // `userId: not null` keeps seeded catalog rows out — those are curated by construction.
+    // Chassis built box by box, with no uploaded sheet behind them at all. Every chassis that came
+    // from a sheet is in the uploaded-sheets section instead, however old — this list used to take
+    // the rest of the unapproved chassis, and misfiled drivers' uploads here once 25 newer sheets
+    // had arrived.
     prisma.setupSheetModel.findMany({
-      where: { isAuthorized: false, userId: { not: null } },
+      where: { isAuthorized: false, userId: { not: null }, sheetBlanks: { none: {} } },
       orderBy: { createdAt: "desc" },
       take: TAKE,
       select: {
@@ -125,22 +107,13 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
     loadBlankReviewQueue(),
   ]);
 
-  // A chassis that came from an uploaded sheet gets the richer section below, which knows how much
-  // of it is still unnamed. Without this it would be listed twice on the same page.
-  const handBuiltChassis = chassisTypes.filter((m) => !blanks.modelIdsShown.has(m.id));
+  const lookalikeOf = tireLookalikeFinder(trustedTires);
 
   // Delete is offered only for rows nothing references; anything in use must be merged.
-  const [tireInUse, additiveInUse, trackInUse] = await Promise.all([
-    tireTypeIdsInUse(tireTypes.map((t) => t.id)),
-    additiveTypeIdsInUse(additiveTypes.map((a) => a.id)),
-    trackIdsInUse(tracks.map((t) => t.id)),
-  ]);
+  const tireInUse = await tireTypeIdsInUse(typedTires.map((t) => t.id));
 
   const total =
-    tireTypes.length +
-    additiveTypes.length +
-    tracks.length +
-    calibrations.length +
+    typedTires.length +
     handBuiltChassis.length +
     chassisRequests.length +
     blanks.waiting.length +
@@ -173,71 +146,9 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
       <section className="page-body max-w-2xl space-y-4">
         {total === 0 ? (
           <CardPanel contentClassName="text-sm text-muted-foreground">
-            No unverified catalog rows or open chassis requests. Newly created tires, tracks,
-            additives, and calibrations will appear here for one-tap approval.
+            New chassis and tires drivers type land here.
           </CardPanel>
         ) : null}
-
-        <ReviewSection eyebrow="Tire types" empty={tireTypes.length === 0}>
-          {tireTypes.map((t) => {
-            const attrs = [t.brand, t.compound, t.surface].filter(Boolean).join(" · ");
-            return (
-              <ReviewRow
-                key={t.id}
-                title={t.displayName}
-                meta={`${attrs || t.modelCode} · ${fmt(t.createdAt)}`}
-                sourceUrl={t.productUrl ?? t.sourceUrl ?? undefined}
-                endpoint={`/api/tire-types/${t.id}`}
-                openHref="/tires"
-                deletable={!tireInUse.has(t.id)}
-                merge={{ type: "tire", label: t.displayName }}
-              />
-            );
-          })}
-        </ReviewSection>
-
-        <ReviewSection eyebrow="Additive types" empty={additiveTypes.length === 0}>
-          {additiveTypes.map((a) => (
-            <ReviewRow
-              key={a.id}
-              title={a.displayName}
-              meta={`${a.modelCode} · ${fmt(a.createdAt)}`}
-              endpoint={`/api/additive-types/${a.id}`}
-              openHref="/additives"
-              deletable={!additiveInUse.has(a.id)}
-            />
-          ))}
-        </ReviewSection>
-
-        <ReviewSection eyebrow="Tracks" empty={tracks.length === 0}>
-          {tracks.map((t) => {
-            const hasGps = t.latitude != null && t.longitude != null;
-            const metaParts = [t.location?.trim() || "no location", hasGps ? "GPS" : "no GPS", fmt(t.createdAt)];
-            return (
-              <ReviewRow
-                key={t.id}
-                title={t.name}
-                meta={metaParts.join(" · ")}
-                endpoint={`/api/tracks/${t.id}`}
-                openHref={`/tracks/${t.id}`}
-                deletable={!trackInUse.has(t.id)}
-                merge={{ type: "track", label: t.name }}
-              />
-            );
-          })}
-        </ReviewSection>
-
-        <ReviewSection eyebrow="Calibrations" empty={calibrations.length === 0}>
-          {calibrations.map((c) => (
-            <ReviewRow
-              key={c.id}
-              title={c.name}
-              meta={`${c.sourceType} · ${fmt(c.createdAt)}`}
-              endpoint={`/api/setup-calibrations/${c.id}`}
-              openHref={`/setup-calibrations/${c.id}`}
-            />
-          ))}
-        </ReviewSection>
 
         <ReviewSection eyebrow="Setup sheets drivers uploaded" empty={blanks.waiting.length === 0}>
           {blanks.waiting.map((b) => (
@@ -254,6 +165,7 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
                   {b.namedCount > 0 ? `, ${b.namedCount} described` : ""}
                   {b.carCount > 0 ? ` · ${b.carCount} car(s)` : ""}
                   {b.pageCount > 1 ? ` · ${b.pageCount} pages` : ""}
+                  {b.sheetCount > 1 ? ` · ${b.sheetCount} sheets` : ""}
                 </div>
                 {b.typedNameIfDifferent ? (
                   <div className="text-[10px] text-faint">
@@ -308,6 +220,31 @@ export default async function AdminReviewPage(): Promise<ReactNode> {
             </SurfaceCard>
           </div>
         ) : null}
+
+        <ReviewSection eyebrow="Tires drivers typed" empty={typedTires.length === 0}>
+          {typedTires.map((t) => {
+            const lookalike = lookalikeOf(t.displayName);
+            return (
+              <ReviewRow
+                key={t.id}
+                title={t.displayName}
+                meta={`${t.createdBy?.email ?? "unknown"} · ${fmt(t.createdAt)}`}
+                sourceUrl={t.productUrl ?? t.sourceUrl ?? undefined}
+                endpoint={`/api/tire-types/${t.id}`}
+                openHref="/tires"
+                deletable={!tireInUse.has(t.id)}
+                merge={{
+                  type: "tire",
+                  label: t.displayName,
+                  suggested:
+                    lookalike && lookalike.id !== t.id
+                      ? { id: lookalike.id, label: lookalike.displayName }
+                      : undefined,
+                }}
+              />
+            );
+          })}
+        </ReviewSection>
 
         <ReviewSection eyebrow="Sheets nothing could be read from" empty={blanks.refusals.length === 0}>
           {blanks.refusals.map((r) => (
@@ -431,7 +368,12 @@ function ReviewRow({
   endpoint: string;
   openHref: string;
   deletable?: boolean;
-  merge?: { type: "tire" | "track"; label: string };
+  merge?: {
+    type: "tire" | "track";
+    label: string;
+    /** The trusted row this one plainly is — offered as a one-tap merge. */
+    suggested?: { id: string; label: string };
+  };
   sourceUrl?: string;
 }): ReactNode {
   return (
@@ -463,7 +405,12 @@ function ReviewRow({
         </div>
       </div>
       {merge ? (
-        <CatalogMergeControl type={merge.type} loserId={endpoint.split("/").pop()!} loserLabel={merge.label} />
+        <CatalogMergeControl
+          type={merge.type}
+          loserId={endpoint.split("/").pop()!}
+          loserLabel={merge.label}
+          suggested={merge.suggested}
+        />
       ) : null}
     </li>
   );

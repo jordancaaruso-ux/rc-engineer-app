@@ -8,6 +8,7 @@ import { isDisciplineValue, isKnownDisciplineClass } from "@/lib/cars/carClasses
 import { normalizeSetupSheetModelName } from "@/lib/setupSheetModels/normalizeModelName";
 import { headSetupDocumentUpload, StorageConfigurationError } from "@/lib/setupDocuments/storage";
 import { recordChassisTypeRequest } from "@/lib/setupSheetModels/chassisTypeRequests";
+import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
 import {
   createModelFromBlank,
   type BlankUploadSource,
@@ -199,6 +200,18 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
       { status: 422 }
     );
+  }
+
+  // A new chassis from a driver's sheet is one of the two things that wait for the founder, so it
+  // pings him like a hand-typed tire (ruling 2026-09-26). It never did, and he found drivers'
+  // chassis by chance. Joining a sheet already in the catalog is not new, and his own rows are
+  // skipped inside.
+  if (!result.merged) {
+    await notifyAdminsOfUnverifiedAsset({
+      kind: "Chassis",
+      label: result.model.name,
+      createdByEmail: user.email,
+    });
   }
 
   revalidatePath("/cars");

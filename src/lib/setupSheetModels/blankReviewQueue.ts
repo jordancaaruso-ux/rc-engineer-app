@@ -48,6 +48,10 @@ export type BlankQueueChassis = {
   namedCount: number;
   carCount: number;
   isAuthorized: boolean;
+  /** A later sheet for a chassis that already had one — not the upload that made it. */
+  isEdition: boolean;
+  /** Sheets behind this chassis on the list: the upload that made it plus any editions. */
+  sheetCount: number;
 };
 
 export type BlankQueueRefusal = {
@@ -67,11 +71,10 @@ export type BlankQueueNameClash = {
 };
 
 export type BlankReviewQueue = {
+  /** One row per chassis still waiting for approval, however old its upload. */
   waiting: BlankQueueChassis[];
   nameClashes: BlankQueueNameClash[];
   refusals: BlankQueueRefusal[];
-  /** Chassis in `waiting`, so the older by-model list can leave them out and not show them twice. */
-  modelIdsShown: Set<string>;
 };
 
 type BlankRow = {
@@ -79,6 +82,7 @@ type BlankRow = {
   createdAt: Date;
   chassisNameTyped: string;
   pageCount: number;
+  isEdition: boolean;
   statsJson: unknown;
   setupSheetModel: {
     id: string;
@@ -118,7 +122,40 @@ function toChassis(row: BlankRow): BlankQueueChassis | null {
     namedCount,
     carCount: model._count.cars,
     isAuthorized: model.isAuthorized,
+    isEdition: row.isEdition,
+    sheetCount: 1,
   };
+}
+
+/**
+ * One row per chassis, spoken for by the upload that made it.
+ *
+ * A chassis with a second sheet (an edition) has two uploads behind it. Listed per upload, it
+ * appeared twice with two Approve buttons, and "clashed" with itself by name as though two
+ * different chassis shared it. The first sheet is the one to show: its uploader is who made the
+ * chassis. Order is kept, so a list that came in newest first stays that way.
+ */
+export function oneRowPerChassis(rows: BlankQueueChassis[]): BlankQueueChassis[] {
+  const madeIt = (r: BlankQueueChassis) => !r.isEdition;
+  const byModel = new Map<string, BlankQueueChassis>();
+  const count = new Map<string, number>();
+  for (const row of rows) {
+    count.set(row.modelId, (count.get(row.modelId) ?? 0) + 1);
+    const kept = byModel.get(row.modelId);
+    const better =
+      !kept ||
+      (madeIt(row) && !madeIt(kept)) ||
+      (madeIt(row) === madeIt(kept) && row.uploadedAt.getTime() < kept.uploadedAt.getTime());
+    if (better) byModel.set(row.modelId, row);
+  }
+  const seen = new Set<string>();
+  const out: BlankQueueChassis[] = [];
+  for (const row of rows) {
+    if (seen.has(row.modelId)) continue;
+    seen.add(row.modelId);
+    out.push({ ...byModel.get(row.modelId)!, sheetCount: count.get(row.modelId) ?? 1 });
+  }
+  return out;
 }
 
 /**
@@ -158,6 +195,7 @@ const BLANK_ROW_SELECT = {
   createdAt: true,
   chassisNameTyped: true,
   pageCount: true,
+  isEdition: true,
   statsJson: true,
   setupSheetModel: {
     select: {
@@ -172,6 +210,12 @@ const BLANK_ROW_SELECT = {
 } as const;
 
 /**
+ * Ceiling on sheets behind chassis still waiting. Approving is what empties it, so it holds only
+ * what the founder has not got to yet; this only stops a runaway backlog loading megabytes.
+ */
+const WAITING_SHEETS_CAP = 100;
+
+/**
  * Read the queue.
  *
  * `schemaJson` is pulled per row because how many boxes are described is the number that says
@@ -179,13 +223,24 @@ const BLANK_ROW_SELECT = {
  * schema knows it — the derivation stats were true the day the file arrived and never move again.
  * That makes each row a few tens of kilobytes, which is why `take` is small: this is a founder's
  * working list, not a catalog.
+ *
+ * WAITING IS READ ON ITS OWN, not cut from the recent sheets. It used to be the unapproved share of
+ * the newest 25 uploads, so once 25 newer sheets arrived — the founder's own bulk loads, 226 of
+ * them — a driver's chassis fell off this list and turned up lower on the page under "built by
+ * hand", which it never was (Chris Sturdy's Cat PB and LD3, 2026-09-26).
  */
 export async function loadBlankReviewQueue(take = 25): Promise<BlankReviewQueue> {
-  const [fillable, refused] = await Promise.all([
+  const [fillable, waitingSheets, refused] = await Promise.all([
     prisma.setupSheetBlank.findMany({
       where: { status: "FILLABLE", setupSheetModelId: { not: null } },
       orderBy: { createdAt: "desc" },
       take,
+      select: BLANK_ROW_SELECT,
+    }),
+    prisma.setupSheetBlank.findMany({
+      where: { status: "FILLABLE", setupSheetModel: { is: { isAuthorized: false } } },
+      orderBy: { createdAt: "desc" },
+      take: WAITING_SHEETS_CAP,
       select: BLANK_ROW_SELECT,
     }),
     prisma.setupSheetBlank.findMany({
@@ -203,15 +258,22 @@ export async function loadBlankReviewQueue(take = 25): Promise<BlankReviewQueue>
     }),
   ]);
 
-  const all = fillable.map(toChassis).filter((r): r is BlankQueueChassis => r !== null);
+  const chassisOf = (rows: BlankRow[]) =>
+    rows.map(toChassis).filter((r): r is BlankQueueChassis => r !== null);
+  const waiting = oneRowPerChassis(chassisOf(waitingSheets));
+  const seenSheets = new Set(fillable.map((r) => r.id));
+  const recentAndWaiting = oneRowPerChassis(
+    chassisOf([...fillable, ...waitingSheets.filter((r) => !seenSheets.has(r.id))])
+  );
 
   return {
     // Authorizing is what finishes a chassis, so that — not a reviewed-at stamp — is what takes it
     // off the list. A chassis stays here while it is still outside the community numbers.
-    waiting: all.filter((r) => !r.isAuthorized),
-    // Clashes are computed over ALL of them, authorized included: a second sheet arriving under the
-    // name of a chassis already curated is exactly the case worth seeing.
-    nameClashes: groupNameClashes(all),
+    waiting,
+    // Clashes are computed over the recent sheets AND everything waiting, authorized included: a
+    // second sheet arriving under the name of a chassis already curated is exactly the case worth
+    // seeing. One row per chassis, or a chassis with an edition clashes with itself.
+    nameClashes: groupNameClashes(recentAndWaiting),
     refusals: refused.map((r) => ({
       blankId: r.id,
       status: r.status,
@@ -221,6 +283,5 @@ export async function loadBlankReviewQueue(take = 25): Promise<BlankReviewQueue>
       uploaderEmail: r.uploadedBy?.email ?? null,
       uploadedAt: r.createdAt,
     })),
-    modelIdsShown: new Set(all.filter((r) => !r.isAuthorized).map((r) => r.modelId)),
   };
 }

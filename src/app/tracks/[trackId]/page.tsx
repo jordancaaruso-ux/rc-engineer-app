@@ -21,6 +21,7 @@ import { canManageCommunityTrack } from "@/lib/tracks/trackAccess";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { UnverifiedBadge } from "@/components/assets/CatalogVerifyControl";
 import { CatalogVerifyToggleButton } from "@/components/assets/CatalogVerifyToggleButton";
+import { CatalogMergeControl } from "@/components/admin/CatalogMergeControl";
 
 export default async function TrackDetailPage(props: {
   params: Promise<{ trackId: string }>;
@@ -136,8 +137,17 @@ export default async function TrackDetailPage(props: {
           {/* Admin verify toggle. Was an in-flow sibling of the `<h1>` in the header,
               which centres the title and the button as a PAIR — so the track name sat
               off-centre for an admin and centred for everyone else. */}
+          {/* Merge lives here since tracks left the review queue (every track is trusted on
+              arrival, founder ruling 2026-09-26): a second copy of a venue is found by looking at
+              the track, and this is where the founder looks. */}
           {isAdmin ? (
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-start justify-end gap-2">
+              <CatalogMergeControl
+                type="track"
+                loserId={track.id}
+                loserLabel={track.name}
+                afterMergeHref="/tracks/"
+              />
               <CatalogVerifyToggleButton
                 endpoint={`/api/tracks/${track.id}`}
                 verified={!!track.verifiedAt}

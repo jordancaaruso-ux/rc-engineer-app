@@ -12,8 +12,9 @@ export async function ensureSeedTireTypes(): Promise<number> {
     if (!displayName || !modelCode) continue;
     const existing = await prisma.tireType.findUnique({ where: { modelCode }, select: { id: true } });
     if (existing) continue;
+    // Our own list, so trusted on arrival (founder ruling 2026-09-26).
     await prisma.tireType.create({
-      data: { displayName, modelCode },
+      data: { displayName, modelCode, verifiedAt: new Date() },
     });
     created++;
   }

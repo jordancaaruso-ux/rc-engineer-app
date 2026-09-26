@@ -12,7 +12,6 @@ import {
   DOMINANT_TRACK_ORDER_BY,
   dominantTrackByNameWhere,
 } from "@/lib/tracks/trackCatalogDominance";
-import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
 import { parseCoordinates } from "@/lib/location/coordinates";
 import { timeZoneForCoordinates } from "@/lib/tracks/trackTimeZone";
 import { fillTrackLocation } from "@/lib/tracks/trackLocationFill";
@@ -221,6 +220,9 @@ export async function POST(request: Request) {
         location: body.location?.trim() || null,
         liveRcUrl,
         speedhiveUrl,
+        // Trusted on arrival, no review and no ping (founder ruling 2026-09-26): a track is a real
+        // place, and the checks above already turn back the same name or timing link.
+        verifiedAt: new Date(),
         ...(coordinates
           ? {
               latitude: coordinates.latitude,
@@ -250,11 +252,6 @@ export async function POST(request: Request) {
     // a geocode takes seconds and the driver is mid-run (founder 2026-09-17).
     if (!coordinates) after(() => fillTrackLocation(track.id).then(() => undefined));
     revalidateAfterTrackMutation(user.id);
-    await notifyAdminsOfUnverifiedAsset({
-      kind: "Track",
-      label: track.name,
-      createdByEmail: user.email,
-    });
     return NextResponse.json({ track }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create track";

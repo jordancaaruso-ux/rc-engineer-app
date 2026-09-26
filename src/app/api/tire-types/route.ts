@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { matchTireTypes, suggestModelCodeFromDisplayName } from "@/lib/tires/matchTireType";
 import { ensureSeedTireTypes } from "@/lib/tires/ensureSeedTireTypes";
 import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
+import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { parseTireBucket } from "@/lib/tires/tireCatalogFilter";
 import { TIRE_CATALOG_MAX, tireCatalogScopeWhere } from "@/lib/tires/tireCatalogScope";
 
@@ -91,10 +92,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
   }
   try {
-    // Open create (any signed-in user). New rows land unverified → surfaced in /admin/review
-    // and the founder is pinged. See docs/ASSET_ACCESS_NORTH_STAR.md.
+    // Open create (any signed-in user). A tire a DRIVER types is the one catalog row that still
+    // waits for the founder (ruling 2026-09-26): it lands unverified, sits in /admin/review with a
+    // merge suggestion when it is one of ours spelled another way, and pings him. One the founder
+    // adds himself is trusted on arrival. See docs/ASSET_ACCESS_NORTH_STAR.md.
     const user = await getAuthenticatedApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const byAdmin = isAuthAdminEmail(user.email);
     const body = (await request.json()) as {
       displayName?: string;
       modelCode?: string;
@@ -140,10 +144,12 @@ export async function POST(request: Request) {
         // row simply shows in every list. `position` is deliberately left unset — stamping the
         // end it was added from would bury it when the same driver opens the other end.
         discipline: parseTireBucket(body.discipline),
+        verifiedAt: byAdmin ? new Date() : null,
       },
       select: TIRE_TYPE_SELECT,
     });
 
+    // Skips the founder's own rows by itself; they are verified above and never wait.
     await notifyAdminsOfUnverifiedAsset({
       kind: "Tire type",
       label: tireType.displayName,

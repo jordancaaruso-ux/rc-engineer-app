@@ -10,15 +10,18 @@ import { validateLiveRcTrackUrl } from "@/lib/lapWatch/liveRcTrackUrl";
 import { validateSpeedhiveTrackUrl } from "@/lib/speedhive/speedhiveUrl";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { canEditLiveRcUrl } from "@/lib/tracks/trackAccess";
-import { canManageCatalogRow } from "@/lib/assets/catalogAccessLogic";
 import { trackUsedByOthers } from "@/lib/assets/catalogUsage";
 import { archiveTrackLegacyDataBeforeDelete } from "@/lib/tracks/legacyTrackSnapshot";
 import { timeZoneForCoordinates } from "@/lib/tracks/trackTimeZone";
 import { fillTrackLocation } from "@/lib/tracks/trackLocationFill";
 
 /**
- * Unified catalog rule for DELETING a track: admin always; else the creator only while the
- * track is unverified AND unused by others.
+ * Who may DELETE a track: an admin always; else its creator, while no other driver uses it.
+ *
+ * Verification no longer enters into it. Every track is trusted on arrival since 2026-09-26
+ * (founder ruling), so `verifiedAt` stopped meaning "the founder looked at this" — keyed on it, the
+ * rule would take a driver's own Delete away the moment they made the track, typo and all. Whether
+ * anyone else depends on the row is the protection that matters, and it is the one kept.
  *
  * Editing no longer passes through here. Grip/layout tags were locked by this rule until
  * 2026-09-18 on the reasoning that they keyed community condition buckets — they no longer do
@@ -30,18 +33,11 @@ import { fillTrackLocation } from "@/lib/tracks/trackLocationFill";
  */
 async function canManageTrackIdentity(
   user: { id: string; email: string | null },
-  track: { id: string; userId: string; verifiedAt: Date | null }
+  track: { id: string; userId: string }
 ): Promise<boolean> {
   if (isAuthAdminEmail(user.email)) return true;
-  const verified = track.verifiedAt != null;
-  const isCreator = track.userId === user.id;
-  if (verified || !isCreator) return false;
-  const usedByOthers = await trackUsedByOthers(track.id, user.id);
-  return canManageCatalogRow(user, {
-    creatorUserId: track.userId,
-    verified,
-    usedByOthers,
-  });
+  if (track.userId !== user.id) return false;
+  return !(await trackUsedByOthers(track.id, user.id));
 }
 
 export async function GET(
@@ -247,7 +243,7 @@ export async function DELETE(
     return NextResponse.json(
       {
         error:
-          "Only the creator (while unverified and unused) or an admin can delete this track.",
+          "Only the driver who added this track, while nobody else uses it, or an admin can delete it.",
       },
       { status: 403 }
     );

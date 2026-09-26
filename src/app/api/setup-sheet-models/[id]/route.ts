@@ -19,6 +19,7 @@ import {
   suppressCatalogSlug,
 } from "@/lib/setupSheetModels/catalogSuppression";
 import { parseSetupSheetModelSchema, type SetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import { verifyChassisSheetReadings } from "@/lib/setupSheetModels/verifyChassisSheetReadings";
 
 function normalizeSchema(schema: SetupSheetModelSchema | null): SetupSheetModelSchema | null {
   if (!schema) return null;
@@ -214,6 +215,11 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
       updatedAt: true,
     },
   });
+
+  // One tap approves the chassis and the readings of its uploaded sheets (ruling 2026-09-26).
+  if (data.isAuthorized === true && !existing.isAuthorized) {
+    await verifyChassisSheetReadings(id);
+  }
 
   const schema = normalizeSchema(parseSetupSheetModelSchema(model.schemaJson));
   revalidatePath("/cars");

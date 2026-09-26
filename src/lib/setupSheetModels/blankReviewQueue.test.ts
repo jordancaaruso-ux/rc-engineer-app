@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   compareNameClashRows,
   groupNameClashes,
+  oneRowPerChassis,
   type BlankQueueChassis,
 } from "@/lib/setupSheetModels/blankReviewQueue";
 
@@ -17,6 +18,8 @@ function chassis(p: Partial<BlankQueueChassis> & { modelId: string }): BlankQueu
     namedCount: 0,
     carCount: 0,
     isAuthorized: false,
+    isEdition: false,
+    sheetCount: 1,
     ...p,
   };
 }
@@ -76,6 +79,47 @@ function chassis(p: Partial<BlankQueueChassis> & { modelId: string }): BlankQueu
   ]);
   assert.equal(clashes.length, 1);
   assert.equal(clashes[0]!.rows[0]!.modelId, "curated");
+}
+
+// --- A chassis with a second sheet is one row, spoken for by the upload that made it -----------
+// Schumacher Cat PB, 2026-09-18: Chris uploaded the sheet that made it, the founder added an
+// edition two hours later. Per upload it was listed twice and "clashed" with itself.
+{
+  const made = chassis({
+    modelId: "catpb",
+    blankId: "chris",
+    chassisName: "Schumacher Cat PB",
+    uploaderEmail: "chris@example.com",
+    uploadedAt: new Date("2026-09-18T10:46:00Z"),
+  });
+  const edition = chassis({
+    modelId: "catpb",
+    blankId: "founder",
+    chassisName: "Schumacher Cat PB",
+    uploaderEmail: "founder@example.com",
+    uploadedAt: new Date("2026-09-18T12:08:00Z"),
+    isEdition: true,
+  });
+  const other = chassis({ modelId: "ld3", chassisName: "Schumacher LD3" });
+
+  // Newest first, as the loader reads them: the edition comes before the upload that made it.
+  const rows = oneRowPerChassis([edition, other, made]);
+  assert.deepEqual(
+    rows.map((r) => [r.modelId, r.blankId, r.sheetCount]),
+    [
+      ["catpb", "chris", 2],
+      ["ld3", "blank-ld3", 1],
+    ]
+  );
+  assert.equal(rows[0]!.uploaderEmail, "chris@example.com");
+  assert.deepEqual(groupNameClashes(rows), []);
+}
+
+// --- With only editions left, the earliest speaks for the chassis ------------------------------
+{
+  const later = chassis({ modelId: "x", blankId: "later", isEdition: true, uploadedAt: new Date("2026-09-20T00:00:00Z") });
+  const earlier = chassis({ modelId: "x", blankId: "earlier", isEdition: true, uploadedAt: new Date("2026-09-19T00:00:00Z") });
+  assert.equal(oneRowPerChassis([later, earlier])[0]!.blankId, "earlier");
 }
 
 console.log("blankReviewQueue.test.ts ok");

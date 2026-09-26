@@ -26,7 +26,7 @@ function normalizeRow(row: SeedRow) {
 
 
 
-/** Insert canonical catalog rows when the table is empty (page load / API list). */
+/** Insert canonical catalog rows when the table is empty (page load / API list). Our own list, so trusted on arrival (founder ruling 2026-09-26). */
 
 export async function ensureSeedAdditiveTypes(): Promise<number> {
 
@@ -44,7 +44,7 @@ export async function ensureSeedAdditiveTypes(): Promise<number> {
 
     await prisma.additiveType.create({
 
-      data: { displayName, modelCode },
+      data: { displayName, modelCode, verifiedAt: new Date() },
 
     });
 
@@ -82,7 +82,7 @@ export async function syncCanonicalAdditiveTypes(): Promise<{ deleted: number; u
 
       where: { modelCode },
 
-      create: { displayName, modelCode },
+      create: { displayName, modelCode, verifiedAt: new Date() },
 
       update: { displayName },
 

@@ -1,11 +1,14 @@
 /**
- * Import the grounded touring-tire pre-seed (seeds/tires_touring.json) into TireType as UNVERIFIED
- * rows (verifiedAt = null) so they surface in /admin/review for founder approval — the Phase-3
- * AI-catalog-preseed flow in docs/ASSET_ACCESS_NORTH_STAR.md ("approved rows land verified").
+ * Import the grounded touring-tire pre-seed (seeds/tires_touring.json) into TireType as VERIFIED
+ * rows. Founder ruling 2026-09-26: a tire from our own list is trusted on arrival; only a tire a
+ * driver types waits in /admin/review. (They landed unverified for review until then, and nobody
+ * reviewed 700-odd rows.) An existing row this list matches by modelCode is verified too.
  *
- * Idempotent: upsert by modelCode. Never touches verifiedAt or createdBy — re-running won't
- * un-verify an approved row. It DOES overwrite catalog attributes from the seed, so treat the seed
- * file as the source of truth for unapproved rows.
+ * Idempotent: upsert by modelCode. Never touches createdBy and never moves an existing
+ * verification date. It DOES overwrite catalog attributes from the seed, so treat the seed file as
+ * the source of truth for these rows.
+ *
+ * `--reset` deletes only rows nobody created that nothing references (see the off-road script).
  *
  * Run against the dev Neon branch (never prod):
  *   npx dotenv-cli -e .env.local -- npx tsx scripts/import-touring-tires.ts                 # all brands
@@ -44,12 +47,17 @@ async function main(): Promise<void> {
     const del = await prisma.tireType.deleteMany({
       where: {
         discipline: "touring",
-        verifiedAt: null, // never delete a founder-approved row
+        createdByUserId: null, // this list's own rows, never a driver's
+        runs: { none: {} },
+        frontRuns: { none: {} },
+        tireSets: { none: {} },
+        eventParticipations: { none: {} },
         ...(brandArg ? { brand: { equals: brandArg, mode: "insensitive" } } : {}),
       },
     });
-    console.log(`--reset: deleted ${del.count} unverified touring row(s)${brandArg ? ` for ${brandArg}` : ""}`);
+    console.log(`--reset: deleted ${del.count} unused touring row(s) of our own${brandArg ? ` for ${brandArg}` : ""}`);
   }
+  const now = new Date();
 
   const perBrand = new Map<string, number>();
   let created = 0;
@@ -87,13 +95,16 @@ async function main(): Promise<void> {
 
     const existing = await prisma.tireType.findUnique({
       where: { modelCode },
-      select: { id: true },
+      select: { id: true, verifiedAt: true },
     });
     if (existing) {
-      await prisma.tireType.update({ where: { modelCode }, data }); // never touches verifiedAt
+      await prisma.tireType.update({
+        where: { modelCode },
+        data: { ...data, ...(existing.verifiedAt ? {} : { verifiedAt: now }) },
+      });
       updated++;
     } else {
-      await prisma.tireType.create({ data: { modelCode, ...data } }); // verifiedAt defaults null
+      await prisma.tireType.create({ data: { modelCode, ...data, verifiedAt: now } });
       created++;
     }
     perBrand.set(brand, (perBrand.get(brand) ?? 0) + 1);

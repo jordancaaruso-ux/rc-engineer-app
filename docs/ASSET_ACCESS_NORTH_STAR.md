@@ -38,6 +38,26 @@ Two asset scopes, one rule each:
 | Calibrations (special) | Anyone may create a calibration to unblock their own uploads; **auto-pick offers it to *other* users only once verified.** A wrong calibration silently mis-parses every reuser's setups — it needs the flag more than any catalog row. |
 | Engineer | May hedge on unverified identities if it ever cites them; never treats unverified community context as ground truth (moot while they're excluded from buckets). |
 
+### What waits for the founder (ruling 2026-09-26)
+
+The review queue had become 731 tires, 717 of them our own imports, because every bulk load landed
+unverified. Measured that day: for tires, additives and tracks, `verifiedAt` gates nothing but a
+badge, picker order and creator edit rights; no aggregation reads it. Only a chassis
+(`isAuthorized` → community numbers) and a calibration (→ other drivers' auto-read) carry weight.
+Founder ruling, from an interview:
+
+| Arrives as | Rule |
+|---|---|
+| Anything from our own bulk lists (import scripts, built-in seeds) | **Verified on arrival.** An existing row a list matches by modelCode is verified too. |
+| Anything the founder adds himself | **Verified on arrival.** |
+| Any track, any additive, from anyone | **Verified on arrival**, no review, no ping. A track with a LiveRC/Speedhive link is a real place; the rest was his call too. |
+| A tire a driver types | **Waits.** Pings him. The queue shows "Looks like X — merge" when it is plainly one of ours spelled another way (`tireLookalikeFinder`: same words, any order); nothing merges until he taps. |
+| A chassis made from a driver's uploaded sheet | **Waits.** Pings him (it never did). Approving it also verifies the readings of its own uploaded sheets (`verifyChassisSheetReadings`); a later edition of an approved chassis is read as trusted. |
+
+A calibration a driver draws by hand stays theirs until verified on the calibrations page; it is
+not in the queue. Tracks left the queue, so merging two copies of a track moved to the track page
+(admin only). The one-off backfill of existing rows ran on production 2026-09-26.
+
 ### Unified edit/delete rule (all global catalog rows)
 
 > **Creator may edit and delete their row while it is unverified AND unused by others. Once verified, or once another user depends on it → admin-only.**
@@ -45,6 +65,10 @@ Two asset scopes, one rule each:
 "Used by others" per type: track → another user's run/event on it; tire type → another user's tire set/run; additive type → another user's run/event spec; chassis type → another user's car; calibration → another user's parsed document; event → another participant.
 
 This replaces today's per-type patchwork (tracks creator-forever, tire types admin-only-edit, additives undeletable-by-anyone, events undeletable-by-design). Chassis types already follow it.
+
+**Tracks, since 2026-09-26:** the creator may delete while nobody else uses it, verified or not.
+Every track is verified on arrival now, so keying on `verifiedAt` would take a driver's own Delete
+away the moment they made the track.
 
 ---
 
@@ -55,7 +79,7 @@ This replaces today's per-type patchwork (tracks creator-forever, tire types adm
 | **Track + layouts** | Any user | Unified rule | ✅ | Grip moves off the track entirely (below), making track edits low-stakes. DB case-insensitive unique on name. |
 | **Tire type** | Any user | Unified rule (creators gain edit-while-unverified; admins keep full) | ✅ | `modelCode` unique stays the identity. AI pre-seed first (TC). |
 | **Additive type** | Any user | Unified rule — **fixes**: admin delete parity with tires; pass `isAdmin` to `AdditiveGaragePanel` | ✅ | AI pre-seed. |
-| **Chassis type** | **Admin-only** — the one exception | Existing `isAuthorized` rule (= unified rule) | ✅ (`isAuthorized`) | Missing chassis never blocks logging (pending-car flow). Type implies schema + calibration work users can't finish. Highest-stakes aggregation key. **Pending car creation pings the founder** (push/email) so the request loop actually closes. AI pre-seed expands coverage. Founder may open create later by removing the gate — the flag machinery already fits. |
+| **Chassis type** | **Admin-only** by name or box by box. **Any driver by uploading a fillable PDF sheet since 2026-08-11** (`POST /api/setup-sheet-models/blank?derive=1`), live for everyone, badged Unreviewed until approved | Existing `isAuthorized` rule (= unified rule) | ✅ (`isAuthorized`) | Missing chassis never blocks logging (pending-car flow). Type implies schema + calibration work users can't finish. Highest-stakes aggregation key. **Pending car creation pings the founder** (push/email) so the request loop actually closes. AI pre-seed expands coverage. Founder may open create later by removing the gate — the flag machinery already fits. |
 | **Event** | Any user | Unified rule + **creator may delete while sole participant** (new endpoint; merge remains for the rest) | ⬜ none | Scoped by participation, no aggregation feed — verification adds nothing. Harden dedupe: land the deferred `(trackId, resultsSourceUrl)` unique constraint; warn on same-track overlapping-dates creates without a results URL. |
 | **Calibration** | Any user (own use) | Unified rule | ✅ | Auto-pick cross-user only when verified. Refile on the hub under **Global assets** (shared infrastructure, not "My assets"). |
 | **Car / tire set / battery / setup doc** | Owner | Owner | — | Unchanged. Keep atomic `where: { id, userId }` updates; fix the guard-then-unscoped-update patterns in `cars/[carId]` + `setup-sheet-models/[id]` PATCH. |
@@ -124,7 +148,7 @@ Pipeline, review tool and the rights reasoning: `seeds/track-catalog/README.md`.
 
 ## Admin review surface
 
-**A `/admin/review` queue page + web-push nudge** (infra from `docs/PWA_NORTH_STAR.md`): all unverified assets across types, newest first — per row: approve / edit-then-approve / merge-into-existing / reject. Pending-car chassis requests appear in the same queue. Without the nudge an approval queue silently rots; at open signup that means a growing unverified backlog.
+**A `/admin/review` queue page + web-push nudge** (infra from `docs/PWA_NORTH_STAR.md`). Since 2026-09-26 it holds only what waits for the founder (see "What waits for the founder"): chassis from drivers' uploaded sheets (one row per chassis, however old the upload), same-name clashes, tires drivers typed (with a suggested merge), sheets nothing could be read from, chassis built by hand, and chassis requests. The push fires once per waiting item, collapsed by tag. Without the nudge an approval queue silently rots; at open signup that means a growing unverified backlog.
 
 ---
 
@@ -183,3 +207,4 @@ Update `ACCESS_TIERS.md` as each phase lands (rules become enforced, not aspirat
 
 - 2026-07-13 — Initial draft from access audit + founder interview: model A (open create + verified flag) adopted; chassis stays admin-only with request ping; unified edit/delete rule; unverified excluded from community aggregations; grip → per-run; AI pre-seed approved; subtle-badge UX; queue+push review surface; 4-phase rollout.
 - 2026-07-13 — **Phase 1 built** (founder said "build"): schema flags + migration, unified authz helper + routes, community aggregation exclusion of unverified chassis, calibration auto-pick gating, admin verify action + unverified badges, additive-panel parity, hub relabel. tsc + `next build` + unit tests green; migration not applied to prod. See "Phase 1 as-built".
+- 2026-09-26 — **Review queue narrowed** (founder interview): only hand-typed driver tires and chassis from drivers' uploaded sheets wait; our bulk lists, the founder's own rows, every track and every additive are verified on arrival; one ping per waiting item; look-alike tires get a one-tap merge he confirms; approving a chassis verifies its sheet readings. Track delete no longer keys on `verifiedAt`. Existing rows backfilled on production the same day. See "What waits for the founder".

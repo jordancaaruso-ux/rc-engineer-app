@@ -109,6 +109,14 @@ export async function createSheetEditionForModel(input: {
     }
   }
 
+  // A new sheet for a chassis the founder already approved is read as trusted with it: approving a
+  // chassis approves its sheet readings (ruling 2026-09-26), and this reading is off the file's
+  // own form layer like the rest. For an unapproved chassis it waits for that approval.
+  const chassis = await prisma.setupSheetModel.findUnique({
+    where: { id: input.model.id },
+    select: { isAuthorized: true },
+  });
+
   const calibration = await prisma.setupSheetCalibration.create({
     data: {
       userId: input.user.id,
@@ -124,8 +132,8 @@ export async function createSheetEditionForModel(input: {
       } as object,
       exampleDocumentId: input.documentId,
       setupSheetModelId: input.model.id,
-      // NOT the model default — the primary sheet keeps that. Verification keeps its usual rule.
-      verifiedAt: verifiedAtForNewCalibration(input.user),
+      // NOT the model default — the primary sheet keeps that.
+      verifiedAt: verifiedAtForNewCalibration(input.user) ?? (chassis?.isAuthorized ? new Date() : null),
     },
     select: { id: true },
   });

@@ -1,9 +1,11 @@
 /**
  * Import the 1/10 off-road tire sweep (seeds/tires_offroad_10th.json) into TireType.
  *
- * Same shape as `import-touring-tires.ts` — rows land UNVERIFIED (verifiedAt = null), which is
- * where every touring row already sits, so the picker's verified-first sort stays a no-op and
- * nothing in the catalog is ranked above anything else by accident.
+ * Same shape as `import-touring-tires.ts`. Rows land VERIFIED (founder ruling 2026-09-26: a tire
+ * from our own list is trusted on arrival; only a tire a driver types waits for review). They
+ * landed unverified until then, which filled /admin/review with 717 of our own rows. An existing
+ * row this list matches by modelCode — typically a driver's — is verified too: the list vouches
+ * for that exact tire.
  *
  * Founder call 2026-09-18: import EVERY tire the sweep found — all 584 rows, including the 107
  * the review flagged as likely drops (dirt oval, vintage, Kyosho kit spares) and the 57 marked
@@ -20,7 +22,12 @@
  * can lead with front tires. Re-running this over an already-imported catalog is how existing
  * rows pick the tag up.
  *
- * Idempotent: upsert by modelCode, never touches verifiedAt or createdBy.
+ * Idempotent: upsert by modelCode, never touches createdBy, and never moves an existing
+ * verification date.
+ *
+ * `--reset` deletes only rows nobody created (this list's own) that nothing references. It used to
+ * key on `verifiedAt: null`, which now selects drivers' rows instead — and a referenced row's
+ * delete would null the tire off every run that carried it.
  *
  *   npx dotenv-cli -e .env.local -- npx tsx scripts/import-offroad-tires.ts
  *   npx dotenv-cli -e .env.local -- npx tsx scripts/import-offroad-tires.ts --brand=JConcepts
@@ -63,12 +70,17 @@ async function main(): Promise<void> {
     const del = await prisma.tireType.deleteMany({
       where: {
         discipline: OFFROAD_10TH_DISCIPLINE,
-        verifiedAt: null, // never delete a founder-approved row
+        createdByUserId: null, // this list's own rows, never a driver's
+        runs: { none: {} },
+        frontRuns: { none: {} },
+        tireSets: { none: {} },
+        eventParticipations: { none: {} },
         ...(brandArg ? { brand: { equals: brandArg, mode: "insensitive" } } : {}),
       },
     });
-    console.log(`--reset: deleted ${del.count} unverified off-road row(s)`);
+    console.log(`--reset: deleted ${del.count} unused off-road row(s) of our own`);
   }
+  const now = new Date();
 
   const perBrand = new Map<string, number>();
   const perPosition = new Map<string, number>();
@@ -104,7 +116,7 @@ async function main(): Promise<void> {
 
     const existing = await prisma.tireType.findUnique({
       where: { modelCode },
-      select: { id: true, discipline: true },
+      select: { id: true, discipline: true, verifiedAt: true },
     });
     // A code already held by a row from another catalog is a real identity clash, not an update.
     if (existing && existing.discipline && existing.discipline !== data.discipline) {
@@ -116,10 +128,13 @@ async function main(): Promise<void> {
       if (existing) updated++;
       else created++;
     } else if (existing) {
-      await prisma.tireType.update({ where: { modelCode }, data }); // never touches verifiedAt
+      await prisma.tireType.update({
+        where: { modelCode },
+        data: { ...data, ...(existing.verifiedAt ? {} : { verifiedAt: now }) },
+      });
       updated++;
     } else {
-      await prisma.tireType.create({ data: { modelCode, ...data } }); // verifiedAt defaults null
+      await prisma.tireType.create({ data: { modelCode, ...data, verifiedAt: now } });
       created++;
     }
     perBrand.set(brand, (perBrand.get(brand) ?? 0) + 1);

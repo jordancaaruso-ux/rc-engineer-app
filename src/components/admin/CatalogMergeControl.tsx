@@ -36,15 +36,25 @@ const SEARCH: Record<
  * Collapse a duplicate catalog row into the canonical one: search for the target (the row to
  * keep), then merge this row into it — all its history repoints and this row is deleted.
  * See docs/ASSET_ACCESS_NORTH_STAR.md.
+ *
+ * `suggested` is a row this one plainly IS, spelled another way (`tireLookalikeFinder`): offered
+ * as one tap, still behind the same confirm, never merged by itself (founder ruling 2026-09-26).
+ * `afterMergeHref` is for a page that shows THIS row, which the merge deletes: it goes on to the
+ * row that was kept instead of refreshing into a 404.
  */
 export function CatalogMergeControl({
   type,
   loserId,
   loserLabel,
+  suggested,
+  afterMergeHref,
 }: {
   type: MergeType;
   loserId: string;
   loserLabel: string;
+  suggested?: Candidate;
+  /** Path prefix the kept row's id is appended to, e.g. "/tracks/". */
+  afterMergeHref?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -99,25 +109,38 @@ export function CatalogMergeControl({
           window.alert(data.error?.trim() || `Merge failed (${res.status})`);
           return;
         }
-        router.refresh();
+        if (afterMergeHref) router.push(`${afterMergeHref}${target.id}`);
+        else router.refresh();
       } catch {
         window.alert("Merge failed");
       } finally {
         setBusy(false);
       }
     },
-    [type, loserId, loserLabel, router]
+    [type, loserId, loserLabel, afterMergeHref, router]
   );
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted/50"
-      >
-        Merge…
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        {suggested ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => merge(suggested)}
+            className="max-w-full truncate rounded-md border border-border px-2 py-1 text-left text-[11px] text-foreground hover:bg-muted/50 disabled:opacity-50"
+          >
+            Looks like {suggested.label} — merge
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted/50"
+        >
+          Merge…
+        </button>
+      </div>
     );
   }
 

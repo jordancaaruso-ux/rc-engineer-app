@@ -5,8 +5,10 @@ import { parseAuthAdminEmails, isAuthAdminEmail } from "@/lib/authAdmin";
 import { sendPushToUser } from "@/lib/webPush/server";
 
 /**
- * Best-effort push to every admin when a user creates an unverified global-catalog row, so the
- * founder's review queue (/admin/review) doesn't rot silently at open signup. One shared `tag`
+ * Best-effort push to every admin when a driver adds something that waits for review, so the
+ * founder's review queue (/admin/review) doesn't rot silently at open signup. Since the 2026-09-26
+ * ruling that is two things only: a tire a driver typed, and a chassis made from a driver's sheet.
+ * Tracks and additives are trusted on arrival and no longer ping. One shared `tag`
  * so a busy race day collapses into a single lock-screen notification instead of a stack.
  * Skips admin-created rows (deliberate, no point self-pinging). Never throws — the create
  * response must not depend on the ping landing. See docs/ASSET_ACCESS_NORTH_STAR.md.
