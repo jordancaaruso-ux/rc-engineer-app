@@ -2093,8 +2093,9 @@ export function NewRunForm(props: {
       : localTodayYmd();
   /**
    * The event list for the picked track: On today · Coming up · Later · Earlier here, from our own
-   * events, the team's and LiveRC's (`buildTrackEventGroups`). Null with no track yet, when the list
-   * falls back to every event (below) and picking one sets the track, as it always has.
+   * events, the team's and LiveRC's (`buildTrackEventGroups`). Null with no track yet: the wizard's
+   * box then waits for one (`eventWaitsForTrack`), and the classic form, whose Track sits below and
+   * follows the event, falls back to every event (below).
    */
   const trackEventGroups = useMemo(() => {
     const tid = trackId.trim();
@@ -2128,6 +2129,14 @@ export function NewRunForm(props: {
       ].filter((g) => g.options.length > 0),
     [eventSelectGroups]
   );
+  /**
+   * Log Run with no track yet: the Event box reads "Select the track first" and doesn't open, and
+   * "+ New event" waits too (founder 2026-09-26). Without a track the list could only be every
+   * event the driver ever made or joined: one club day under "Upcoming", the rest under "Past", and
+   * none of LiveRC's meetings, which are read one track at a time. An event already chosen (an old
+   * one with no track) still shows.
+   */
+  const eventWaitsForTrack = wizardActive && !trackId.trim() && !eventId;
 
   const selectedEventForRun = useMemo(
     () => (needsEvent && eventId ? events.find((e) => e.id === eventId) ?? null : null),
@@ -2219,9 +2228,20 @@ export function NewRunForm(props: {
   /**
    * A track picked by hand in the wizard: an event selected at a different track no longer applies.
    * Without this the "keep the track following the event" effect would put the old track back.
+   * An open New event form closes when the track is cleared (the Event box then waits for one), or
+   * when it still wears the old track's filled-in name ("Knox · Sat 26 Sep"); reopening fills in
+   * the new one. A name the driver typed keeps it open.
    */
   const releaseEventForTrack = (nextTrackId: string) => {
-    if (!wizardActive || !eventId) return;
+    if (!wizardActive) return;
+    if (
+      showNewEventPanel &&
+      (!nextTrackId ||
+        (nextTrackId !== trackId.trim() && newEventName === newEventNameAutoRef.current))
+    ) {
+      setShowNewEventPanel(false);
+    }
+    if (!eventId) return;
     const ev = events.find((e) => e.id === eventId);
     if (ev?.trackId && ev.trackId !== nextTrackId) setEventId("");
   };
@@ -5093,9 +5113,10 @@ export function NewRunForm(props: {
           <div className="space-y-2">
             <SearchableSelect
               aria-label="Event"
-              placeholder="— Select event"
+              placeholder={eventWaitsForTrack ? "Select the track first" : "— Select event"}
               clearable
-              clearLabel="— Select event"
+              clearLabel={eventWaitsForTrack ? "Select the track first" : "— Select event"}
+              disabled={eventWaitsForTrack}
               createRow={{ label: "New event", onAction: openNewEventPanel }}
               value={eventId}
               onChange={(next) => {
@@ -5119,10 +5140,10 @@ export function NewRunForm(props: {
               }}
               groups={trackEventGroups ?? allEventGroups}
             />
-            {showNewEventPanel ? (
+            {eventWaitsForTrack ? null : showNewEventPanel ? (
               <div className="inset-panel p-3 space-y-2">
                 {/* The event is at the run's track, picked above; the form asks only when there is
-                    none yet (the classic form, or Event tapped before Track). */}
+                    none yet, which is the classic form alone (the wizard's box waits for a track). */}
                 {trackId.trim() ? null : (
                 <div className="inset-panel-deep p-2">
                   <Eyebrow dot="muted" className="mb-1">Track (required)</Eyebrow>
@@ -5260,7 +5281,7 @@ export function NewRunForm(props: {
           {addingLiveRcEvent ? (
             <p className="text-[11px] text-muted-foreground">Adding event…</p>
           ) : null}
-          {eventsLoading ? (
+          {eventsLoading && !eventWaitsForTrack ? (
             <p className="text-[11px] text-muted-foreground">Loading events…</p>
           ) : null}
           {eventsLoadError ? (

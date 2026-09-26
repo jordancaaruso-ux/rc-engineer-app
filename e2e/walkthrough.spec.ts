@@ -132,6 +132,12 @@ test("log a complete run from scratch, capturing every step", async ({ page }) =
 
   await page.getByRole("combobox", { name: "Car" }).selectOption({ label: "A800RR" });
   await beat(700);
+  // Track before the event: the Event box reads "Select the track first" until one is picked, and
+  // its list is that track's meetings (2026-09-26).
+  await page.getByRole("button", { name: "Track", exact: true }).click();
+  await page.getByRole("textbox", { name: "Search tracks or towns…" }).fill("TFTR");
+  await page.getByRole("option", { name: /^TFTR/ }).first().click();
+  await beat(700);
   await page.getByRole("radio", { name: "Event" }).click();
   await beat(800);
 
