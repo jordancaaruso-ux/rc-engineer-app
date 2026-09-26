@@ -100,3 +100,22 @@ export function followDateEventName(input: {
   const next = defaultEventName(track, input.startYmd);
   return next === input.name ? null : next;
 }
+
+// ---- Lines for things that happened out of sight ----
+
+/**
+ * What the step says when picking a track tied one of the driver's own meetings to the LiveRC
+ * meeting posted after it. Tying them is the approved rule; doing it without a word made the
+ * driver's meeting look like it had vanished. A name not known falls back to plain words.
+ */
+export function linkedMeetingNotice(
+  links: ReadonlyArray<{ fromName: string | null; intoName: string | null }>,
+): string | null {
+  if (links.length === 0) return null;
+  if (links.length > 1) return `${links.length} of your meetings joined their LiveRC meetings.`;
+  const from = links[0]!.fromName?.trim();
+  const into = links[0]!.intoName?.trim();
+  return `${from ? `Your meeting “${from}”` : "Your meeting"} joined ${
+    into ? `LiveRC’s “${into}”` : "its LiveRC meeting"
+  }.`;
+}

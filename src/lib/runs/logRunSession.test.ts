@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   defaultUiSession,
   followDateEventName,
+  linkedMeetingNotice,
   meetingSessionKind,
   uiSessionToMeeting,
 } from "./logRunSession";
@@ -71,4 +72,27 @@ test("followDateEventName: the filled-in name follows the first day, a typed one
     null
   );
   assert.equal(followDateEventName({ name: auto, autoName: auto, trackName: " ", startYmd: "2026-09-20" }), null);
+});
+
+test("linkedMeetingNotice names both meetings, and falls back when a name isn't known", () => {
+  assert.equal(
+    linkedMeetingNotice([{ fromName: "EMCC Cup", intoName: "EMCC CUP 25-27 Sept 2026" }]),
+    "Your meeting “EMCC Cup” joined LiveRC’s “EMCC CUP 25-27 Sept 2026”."
+  );
+  assert.equal(
+    linkedMeetingNotice([{ fromName: null, intoName: "EMCC CUP 25-27 Sept 2026" }]),
+    "Your meeting joined LiveRC’s “EMCC CUP 25-27 Sept 2026”."
+  );
+  assert.equal(
+    linkedMeetingNotice([{ fromName: "EMCC Cup", intoName: null }]),
+    "Your meeting “EMCC Cup” joined its LiveRC meeting."
+  );
+  assert.equal(
+    linkedMeetingNotice([
+      { fromName: "A", intoName: "B" },
+      { fromName: "C", intoName: "D" },
+    ]),
+    "2 of your meetings joined their LiveRC meetings."
+  );
+  assert.equal(linkedMeetingNotice([]), null);
 });

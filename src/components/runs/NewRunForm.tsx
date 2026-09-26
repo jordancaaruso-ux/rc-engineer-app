@@ -95,6 +95,7 @@ import {
 import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEntry";
 import {
   followDateEventName,
+  linkedMeetingNotice,
   meetingSessionKind,
 } from "@/lib/runs/logRunSession";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
@@ -745,6 +746,9 @@ export function NewRunForm(props: {
     Record<string, { id: string; displayName: string }>
   >({});
   const [events, setEvents] = useState<EventOption[]>([]);
+  /** The list as the driver last saw it, to name a meeting the server has since merged away. */
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
   const [eventId, setEventId] = useState<string>(wizard?.eventId ?? "");
   const [showNewEventPanel, setShowNewEventPanel] = useState(false);
   const [newEventName, setNewEventName] = useState("");
@@ -1222,6 +1226,8 @@ export function NewRunForm(props: {
   } | null>(null);
   /** The LiveRC meeting whose event is being made (or joined) after a tap in the list. */
   const [addingLiveRcEvent, setAddingLiveRcEvent] = useState<string | null>(null);
+  /** Said once when a track pick tied one of the driver's own meetings to LiveRC's. */
+  const [meetingLinkNotice, setMeetingLinkNotice] = useState<string | null>(null);
   /**
    * My team's events at the selected track that I am not on yet. Fills a "Your team" group in the
    * event picker, so a meeting a teammate booked for Saturday is selectable on Wednesday rather
@@ -2546,7 +2552,8 @@ export function NewRunForm(props: {
    * pop-up made.
    *
    * The same read links a hand-made event of ours to the LiveRC meeting posted after it. When it
-   * did, our events reload, and a selected event that was folded into the meeting's own follows it.
+   * did, our events reload, a selected event that was folded into the meeting's own follows it,
+   * and a toast says so: done silently, the driver's meeting just vanished (test drive 2026-09-26).
    */
   useEffect(() => {
     const tid = trackId.trim();
@@ -2570,7 +2577,7 @@ export function NewRunForm(props: {
           const data = (await res.json().catch(() => ({}))) as {
             todayYmd?: string;
             liveRc?: { status?: TrackLiveRcStatus; meetings?: TrackListLiveRcMeeting[] };
-            linked?: Array<{ eventId: string; intoEventId: string }>;
+            linked?: Array<{ eventId: string; intoEventId: string; renamedTo?: string | null }>;
           };
           if (!alive) return;
           if (!res.ok) {
@@ -2585,12 +2592,30 @@ export function NewRunForm(props: {
           });
           const linked = Array.isArray(data.linked) ? data.linked : [];
           if (linked.length === 0) return;
+          const before = eventsRef.current;
           const list = await jsonFetch<{ events: EventOption[] }>("/api/events", { cache: "no-store" }).catch(
             () => null
           );
-          if (!alive || !list) return;
-          setEvents(list.events ?? []);
-          setEventId((current) => linked.find((l) => l.eventId === current)?.intoEventId ?? current);
+          if (!alive) return;
+          if (list) {
+            setEvents(list.events ?? []);
+            setEventId((current) => linked.find((l) => l.eventId === current)?.intoEventId ?? current);
+          }
+          // Names: ours from the list the driver saw; LiveRC's from its meeting, a rename, or the
+          // event ours was merged into.
+          setMeetingLinkNotice(
+            linkedMeetingNotice(
+              linked.map((l) => ({
+                fromName: before.find((e) => e.id === l.eventId)?.name ?? null,
+                intoName:
+                  data.liveRc?.meetings?.find((m) => m.eventId === l.intoEventId)?.name ??
+                  l.renamedTo ??
+                  (l.intoEventId !== l.eventId
+                    ? (list?.events?.find((e) => e.id === l.intoEventId)?.name ?? null)
+                    : null),
+              }))
+            )
+          );
         } catch {
           if (alive) failed();
         }
@@ -4852,6 +4877,11 @@ export function NewRunForm(props: {
         setTireCascadeNotice(null);
         if (runId) navigateAfterRunComplete(runId);
       }}
+    />
+    <ActionToast
+      raised={wizardActive}
+      message={tireCascadeNotice ? null : meetingLinkNotice}
+      onDismiss={() => setMeetingLinkNotice(null)}
     />
     <form
       className={cn(
