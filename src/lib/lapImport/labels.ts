@@ -201,8 +201,8 @@ export function importedSessionTimeIsTrackClock(
 
 /**
  * The ISO to PRINT for an imported session, and the zone to print it in — separated from any
- * one screen's date style, so the library's "12 Sept, 2:27 PM" and a picker's "12/09/2026,
- * 02:27 pm" can stay different while never disagreeing about the moment.
+ * one screen's date style, so the library's "12 Sept, 2:27 PM" and a picker's "12 Sept 2026,
+ * 2:27 PM" can stay different while never disagreeing about the moment.
  *
  * `timeZone: "UTC"` means the digits ARE the track's clock and must be read literally.
  */
@@ -228,6 +228,9 @@ export function importedSessionTimeForDisplay(
  * that was — what the timing screen read when the car was on track, not what the viewer's phone
  * said at that moment. A session with no on-track time at all (the ISO is then an import-row
  * `createdAt`) renders in the viewer's zone, because that is genuinely the viewer's event.
+ *
+ * The month is spelled ("25 Sept 2026, 9:24 PM") so no racer reads it the wrong way round
+ * (`formatRunCreatedAtDateTime`).
  */
 export function formatImportedSessionTime(
   sessionTimeIso: string,
