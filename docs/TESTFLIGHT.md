@@ -42,6 +42,16 @@ the app on "Take Video"); `ITSAppUsesNonExemptEncryption = NO`, so uploads skip 
 question. Xcode registers the bundle id on the first build to a plugged-in phone. Build to a device or
 archive for TestFlight.
 
+**Scenes (build 3, 2026-09-26).** The Mac archives with Xcode 27, and iOS 27 refuses to launch an app
+built with that SDK unless it uses the scene life cycle (Apple TN3187): build 2 crashed the instant it
+opened once Jordan's iPhone updated past iOS 26.6.1, where build 1 had run fine with the same launch
+code. Since Capacitor 8.5 `SceneDelegate.swift` makes the window, and the
+Info.plist scene manifest deliberately names no storyboard (naming one too would build a second
+bridge). Links the app is opened with (Google's sign-in answer, universal links) arrive in
+`SceneDelegate`, not `AppDelegate`. Every upload needs a higher `CURRENT_PROJECT_VERSION`; keep
+`MARKETING_VERSION` equal to the App Store version the build is for. Test each build on the newest iOS
+before submitting, because that is what App Review uses.
+
 ### Owed before submitting for review (found 2026-09-23)
 
 - ~~Google sign-in inside the shell~~ **built 2026-09-24**, then replaced 2026-09-25 by the phone's

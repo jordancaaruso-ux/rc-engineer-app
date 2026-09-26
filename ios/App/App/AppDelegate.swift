@@ -1,8 +1,5 @@
 import UIKit
 import Capacitor
-#if canImport(GoogleSignIn)
-import GoogleSignIn
-#endif
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -49,25 +46,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
     }
 
-    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Google's sign-in sheet (`@capgo/capacitor-social-login`) can come back through the app's
-        // Google URL scheme (Info.plist). Current iOS hands the answer straight to the sheet; this
-        // catches the rest. Guarded so the app still builds if the module isn't visible here.
-        #if canImport(GoogleSignIn)
-        if GIDSignIn.sharedInstance.handle(url) {
-            return true
-        }
-        #endif
-        // Called when the app was launched with a url. Feel free to add additional processing here,
-        // but if you want the App API to support tracking app url opens, make sure to keep this call
-        return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
-    }
+    // MARK: - Scenes
+    // iOS 27 won't launch an app built with Xcode 27 without the scene life cycle. Links the app is
+    // opened with (Google's sign-in answer, universal links) now arrive in SceneDelegate.swift:
+    // with scenes, iOS no longer calls application(_:open:options:) or application(_:continue:).
 
-    func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
-        // Called when the app was launched with an activity, including Universal Links.
-        // Feel free to add additional processing here, but if you want the App API to support
-        // tracking app url opens, make sure to keep this call
-        return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
+    func application(_ application: UIApplication,
+                     configurationForConnecting connectingSceneSession: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let config = UISceneConfiguration(name: "Default Configuration",
+                                          sessionRole: connectingSceneSession.role)
+        config.delegateClass = SceneDelegate.self
+        return config
     }
-
 }
