@@ -257,7 +257,35 @@ export type ExtractedRaceSession = {
   sessionCompletedAtIso: string | null;
   sessionId: string;
   sessionUrl: string;
+  /**
+   * The round the race is listed under — "Qualifier Round 1", "Main Events" — from the heading row
+   * above it. For display only (see `withLiveRcRound`); null where the page has no heading.
+   */
+  roundName: string | null;
 };
+
+/**
+ * Which round each race row is listed under. A meeting's results page heads every round with a
+ * row of its own — `<tr><th>Qualifier Round 1</th><th>Time Completed</th></tr>` — and numbers its
+ * races from 1 again in each round, so a class's three qualifiers are all "Race 4: …" and only the
+ * heading tells them apart. One pass per table section, top to bottom.
+ */
+function raceRoundHeadingsByRow($: CheerioAPI): Map<unknown, string> {
+  const byRow = new Map<unknown, string>();
+  $("tr")
+    .parent()
+    .each((_, section) => {
+      let heading: string | null = null;
+      $(section)
+        .children("tr")
+        .each((_, tr) => {
+          const th = $(tr).children("th");
+          if (th.length > 0) heading = normalizeWhitespace(th.first().text()) || null;
+          else if (heading) byRow.set(tr, heading);
+        });
+    });
+  return byRow;
+}
 
 /**
  * LiveRC practice list page:
@@ -354,6 +382,7 @@ export function extractRaceSessions(html: string, pageUrl: string): ExtractedRac
   if (!isLiveRcResultsDiscoveryUrl(pageUrl)) return [];
   const $ = load(html);
   const out: ExtractedRaceSession[] = [];
+  const roundByRow = raceRoundHeadingsByRow($);
 
   const anchors = $("a[href*='p=view_race_result'][href*='id=']").toArray().slice(0, LIST_ANCHOR_GUARD);
   for (const a of anchors) {
@@ -387,6 +416,7 @@ export function extractRaceSessions(html: string, pageUrl: string): ExtractedRac
       sessionCompletedAtIso,
       sessionId,
       sessionUrl,
+      roundName: tr.length ? roundByRow.get(tr.get(0)) ?? null : null,
     });
   }
 

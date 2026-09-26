@@ -7,6 +7,7 @@ import {
   isWallClockAsUtcTimingSource,
   timingSourceFromParserId,
   timingSourceFromSourceUrl,
+  withLiveRcRound,
 } from "./labels";
 
 // LiveRC wall clock "4:36 PM" stored as-if-UTC by the parsers.
@@ -51,6 +52,19 @@ test("a driver and a time read 'name · time'; a name that IS the time says it o
     "19 Jul 2026, 4:52 PM · 19 Jul 2026, 4:36 PM"
   );
   assert.equal(formatDriverSessionLabel("  ", WALL_CLOCK_AS_UTC_ISO, opts), "Driver · 19 Jul 2026, 4:36 PM");
+});
+
+test("a LiveRC race carries its round in front, so a class's qualifiers stop reading the same", () => {
+  // West Coast, 13 Sept 2026: "Race 4: ISTC - 21.5T (Heat 2/2)" in each of three qualifying rounds.
+  const race = "Race 4: ISTC - 21.5T (Heat 2/2)";
+  assert.equal(withLiveRcRound(race, "Qualifier Round 1"), "Qualifier 1 · Race 4: ISTC - 21.5T (Heat 2/2)");
+  assert.equal(withLiveRcRound(race, "Qualifier  Round 3"), "Qualifier 3 · Race 4: ISTC - 21.5T (Heat 2/2)");
+  assert.equal(withLiveRcRound("Race 2: VTA (Heat 1/1)", "Seeding Round 2"), "Seeding 2 · Race 2: VTA (Heat 1/1)");
+  assert.equal(withLiveRcRound("Race 1: Mod", "Round 1"), "Round 1 · Race 1: Mod");
+  // A main names itself; no heading, nothing to add; a title that already says it is left alone.
+  assert.equal(withLiveRcRound("Race 12: ISTC - 13.5T A3-Main", "Main Events"), "Race 12: ISTC - 13.5T A3-Main");
+  assert.equal(withLiveRcRound(race, null), race);
+  assert.equal(withLiveRcRound("Qualifier 1: ISTC 13.5", "Qualifier Round 1"), "Qualifier 1: ISTC 13.5");
 });
 
 test("timing source detection", () => {

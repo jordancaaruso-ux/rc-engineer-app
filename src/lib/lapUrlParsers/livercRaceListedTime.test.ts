@@ -16,7 +16,9 @@ import {
 } from "./livercRaceListedTime";
 import { importLiveRcRaceResult } from "./livercRaceResult";
 import { parseLiveRcEventListHtml } from "@/lib/lapWatch/liveRcIndexHtmlParse";
+import { extractRaceSessions } from "@/lib/lapWatch/livercSessionIndexParsers";
 import { isDateOnlyTrackTime } from "@/lib/lapImport/trackClock";
+import { withLiveRcRound } from "@/lib/lapImport/labels";
 
 function racePage(opts: { meeting: string; calendar: string }): string {
   return `<html><head><title>Team JOYBOX :: ${opts.meeting} :: EP-T STOCK A1-Main :: LiveRC</title></head><body>
@@ -124,6 +126,63 @@ test("the race's own time is read off the meeting's list, and a bare date is not
   assert.equal(listedTimeOfLiveRcRace(HUB, hubUrl, "7055577"), "2026-09-13T11:47:00.000Z");
   assert.equal(listedTimeOfLiveRcRace(HUB, hubUrl, "7055001"), null, "listed with no clock");
   assert.equal(listedTimeOfLiveRcRace(HUB, hubUrl, "9999999"), null, "not on this meeting");
+});
+
+/**
+ * West Coast Model RC's Spring Cup (13 Sept 2026), its race list cut to one class, as fetched on
+ * 2026-09-26: LiveRC heads each round with its own row and starts every round at Race 1 again.
+ */
+const ROUNDS_HUB = `<table class="table table-hover entry_list_data">
+<thead><tr><th colspan="2"><span class="class_header">Race Results</span></th></tr></thead>
+<tbody>
+<tr><th>Main Events</th><th>Time Completed</th></tr>
+<tr>
+  <td><a href="/results/?p=view_race_result&id=7055964" class="block"><i class="fa fa-trophy"></i> Race 11: ISTC - 21.5T A3-Main</a></td>
+  <td>Sep 13, 2026 at 4:16pm</td>
+</tr>
+<tr><th>Qualifier Round 3</th><th>Time Completed</th></tr>
+<tr>
+  <td><a href="/results/?p=view_race_result&id=7055728" class="block"><i class="fa fa-trophy"></i> Race 4: ISTC - 21.5T  (Heat 2/2)</a></td>
+  <td>Sep 13, 2026 at 1:06pm</td>
+</tr>
+<tr><th>Qualifier Round 2</th><th>Time Completed</th></tr>
+<tr>
+  <td><a href="/results/?p=view_race_result&id=7055607" class="block"><i class="fa fa-trophy"></i> Race 4: ISTC - 21.5T  (Heat 2/2)</a></td>
+  <td>Sep 13, 2026 at 12:04pm</td>
+</tr>
+<tr><th>Qualifier Round 1</th><th>Time Completed</th></tr>
+<tr>
+  <td><a href="/results/?p=view_race_result&id=7054994" class="block"><i class="fa fa-trophy"></i> Race 4: ISTC - 21.5T  (Heat 2/2)</a></td>
+  <td>Sep 13, 2026 at 11:03am</td>
+</tr>
+</tbody></table>`;
+
+test("each race on a meeting's list knows the round it is listed under", () => {
+  const rows = extractRaceSessions(ROUNDS_HUB, "https://westcoast.liverc.com/results/?p=view_event&id=518166");
+  assert.deepEqual(
+    rows.map((r) => [r.sessionId, r.roundName, r.listLinkText]),
+    [
+      ["7055964", "Main Events", "Race 11: ISTC - 21.5T A3-Main"],
+      ["7055728", "Qualifier Round 3", "Race 4: ISTC - 21.5T (Heat 2/2)"],
+      ["7055607", "Qualifier Round 2", "Race 4: ISTC - 21.5T (Heat 2/2)"],
+      ["7054994", "Qualifier Round 1", "Race 4: ISTC - 21.5T (Heat 2/2)"],
+    ]
+  );
+  // The three qualifiers the picker listed as one title three times now read apart.
+  assert.deepEqual(
+    rows.slice(1).map((r) => withLiveRcRound(r.listLinkText!, r.roundName)),
+    [
+      "Qualifier 3 · Race 4: ISTC - 21.5T (Heat 2/2)",
+      "Qualifier 2 · Race 4: ISTC - 21.5T (Heat 2/2)",
+      "Qualifier 1 · Race 4: ISTC - 21.5T (Heat 2/2)",
+    ]
+  );
+});
+
+test("a race list with no round headings has no round", () => {
+  const rows = extractRaceSessions(HUB, "https://teamjoybox.liverc.com/results/?p=view_event&id=517813");
+  assert.ok(rows.length > 0);
+  assert.ok(rows.every((r) => r.roundName === null));
 });
 
 const realFetch = globalThis.fetch;

@@ -45,6 +45,7 @@ import {
   resolveImportedSessionDisplayTimeIso,
   resolveImportedSessionHasWallClockTime,
   timingSourceFromParserId,
+  withLiveRcRound,
   type ImportedSessionTimeFormatOptions,
   type LapTimingSource,
 } from "@/lib/lapImport/labels";
@@ -807,6 +808,8 @@ function ScanStatusActionButton({
 type EventRaceSessionRow = {
   sessionUrl: string;
   listLinkText: string | null;
+  /** "Qualifier Round 1" — the round LiveRC lists it under. */
+  roundName?: string | null;
   sessionTime: string | null;
   sessionCompletedAtIso: string | null;
   alreadyImported: boolean;
@@ -1091,7 +1094,8 @@ export function LapTimesIngestPanel({
       byUrl.set(url, {
         key: `event:${url}`,
         sessionUrl: c.sessionUrl,
-        title: c.listLinkText?.trim() || "Race session",
+        // With its round: LiveRC starts every round at Race 1 again (see `withLiveRcRound`).
+        title: withLiveRcRound(c.listLinkText?.trim() || "Race session", c.roundName),
         when: formatSessionWhen(c.sessionCompletedAtIso, c.sessionTime, "liverc"),
         bestLapSeconds: null,
         lapCount: null,

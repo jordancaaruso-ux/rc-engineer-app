@@ -28,6 +28,8 @@ const FETCH_CONCURRENCY = 5;
 export type MyRaceSessionRow = {
   sessionUrl: string;
   listLinkText: string | null;
+  /** The round the results page lists it under ("Qualifier Round 1") — see `withLiveRcRound`. */
+  roundName: string | null;
   sessionTime: string | null;
   sessionCompletedAtIso: string | null;
   /** Import row exists; user can still attach laps to this run. */
@@ -208,7 +210,12 @@ export async function listMyPendingRaceSessionsForEvent(
 
   const metaByUrl = new Map<
     string,
-    { listLinkText: string | null; sessionTime: string | null; sessionCompletedAtIso: string | null }
+    {
+      listLinkText: string | null;
+      roundName: string | null;
+      sessionTime: string | null;
+      sessionCompletedAtIso: string | null;
+    }
   >();
   const uniqueUrls: string[] = [];
   const seen = new Set<string>();
@@ -219,6 +226,7 @@ export async function listMyPendingRaceSessionsForEvent(
     uniqueUrls.push(u);
     metaByUrl.set(u, {
       listLinkText: r.listLinkText?.trim() ? r.listLinkText.trim() : null,
+      roundName: r.roundName,
       sessionTime: r.sessionTime ?? null,
       sessionCompletedAtIso: r.sessionCompletedAtIso,
     });
@@ -325,6 +333,7 @@ export async function listMyPendingRaceSessionsForEvent(
     out.push({
       sessionUrl: u,
       listLinkText: meta.listLinkText,
+      roundName: meta.roundName,
       sessionTime: meta.sessionTime,
       sessionCompletedAtIso: meta.sessionCompletedAtIso,
       alreadyImported,
