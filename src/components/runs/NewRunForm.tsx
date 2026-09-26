@@ -165,7 +165,8 @@ import { getCurrentPosition, GeolocationRequestError } from "@/lib/location/getC
 import { RunConditionsSection } from "@/components/runs/RunConditionsSection";
 import { WizardConditionsBand } from "@/components/runs/WizardConditionsBand";
 import { EMPTY_RUN_CONDITIONS, isConditionsEmpty, type RunConditions } from "@/lib/weather/conditions";
-import { findTracksNearPosition } from "@/lib/location/trackProximity";
+import { NEARBY_TRACK_RADIUS_M, findTracksNearPosition } from "@/lib/location/trackProximity";
+import { formatRadius } from "@/lib/units/unitSystem";
 import { sendTrackSighting } from "@/lib/location/sendTrackSighting";
 import {
   emptyHandlingAssessmentUiState,
@@ -2336,7 +2337,9 @@ export function NewRunForm(props: {
           near.map((n) => ({ trackId: n.track.id, trackName: n.track.name, distanceM: n.distanceM }))
         );
         if (!silent) setNearbyAsked(near.length > 0);
-        if (near.length === 0 && !silent) setTrackAutoDetectMessage("No tracks within 25 km.");
+        if (near.length === 0 && !silent) {
+          setTrackAutoDetectMessage(`No tracks within ${formatRadius(NEARBY_TRACK_RADIUS_M, units)}.`);
+        }
       } catch (e) {
         if (silent) return;
         if (e instanceof GeolocationRequestError) {
@@ -2350,7 +2353,7 @@ export function NewRunForm(props: {
         setTrackAutoDetectLoading(false);
       }
     },
-    [isEditing, trackLockedToEvent, tracksList]
+    [isEditing, trackLockedToEvent, tracksList, units]
   );
 
   /**

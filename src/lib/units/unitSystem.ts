@@ -150,6 +150,34 @@ export function formatWind(kph: number | null | undefined, units: UnitSystem): s
   return `${Math.round(windIn(units, kph))} ${windUnit(units)}`;
 }
 
+const METERS_PER_MILE = 1609.344;
+const METERS_PER_FOOT = 0.3048;
+
+/**
+ * How far away a track is: "5.5 km" (under a kilometre "450 m"), or on imperial "3.4 mi" (under a
+ * tenth of a mile "400 ft"), the way a map app says it. A racer in San Diego on mph read
+ * "Mini-RC San Diego (5.5 km)" (test drive, 2026-09-26).
+ */
+export function formatDistance(meters: number, units: UnitSystem): string {
+  if (units === "imperial") {
+    const miles = meters / METERS_PER_MILE;
+    if (miles < 0.1) return `${Math.round(meters / METERS_PER_FOOT)} ft`;
+    return `${miles.toFixed(1)} mi`;
+  }
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(1)} km`;
+}
+
+/**
+ * A search radius in whole units, rounded down so "No tracks within …" stays true: 25 km reads
+ * "25 km", or "15 mi" (it is 15.5).
+ */
+export function formatRadius(meters: number, units: UnitSystem): string {
+  return units === "imperial"
+    ? `${Math.floor(meters / METERS_PER_MILE)} mi`
+    : `${Math.floor(meters / 1000)} km`;
+}
+
 /**
  * The figure alone, at most one decimal, for an input box or a stat cell that prints its own
  * unit. "" when there is no reading. Converting back and forth leaves float dust (93.99999…),

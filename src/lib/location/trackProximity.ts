@@ -4,6 +4,9 @@ import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 /** Rough pins (a geocoded address or town) can sit a few km out, so "near" is town-sized. */
 export const NEARBY_TRACK_RADIUS_M = 25_000;
 
+/** "Find tracks near me" on the Tracks page: a browse radius, what you could race this weekend. */
+export const NEARBY_BROWSE_RADIUS_M = 50_000;
+
 export type TrackWithCoordinates = {
   id: string;
   name: string;
@@ -65,9 +68,4 @@ export function sortNearbyTracks(
     if (aFav !== bFav) return aFav ? -1 : 1;
     return a.distanceM - b.distanceM;
   });
-}
-
-export function formatDistanceMeters(m: number): string {
-  if (m < 1000) return `${Math.round(m)} m`;
-  return `${(m / 1000).toFixed(1)} km`;
 }

@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { HubRowTitle } from "@/components/ui/panel";
-import { formatDistanceMeters } from "@/lib/location/trackProximity";
+import { useUnits } from "@/components/providers/UnitsProvider";
+import { NEARBY_BROWSE_RADIUS_M } from "@/lib/location/trackProximity";
+import { formatDistance, formatRadius } from "@/lib/units/unitSystem";
 
 type NearbyTrack = {
   id: string;
@@ -31,6 +33,7 @@ export function TrackNearbyBrowse() {
   const [state, setState] = useState<"idle" | "locating" | "done" | "error">("idle");
   const [tracks, setTracks] = useState<NearbyTrack[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const units = useUnits();
 
   function findNearby() {
     haptic("light");
@@ -111,7 +114,7 @@ export function TrackNearbyBrowse() {
   if (tracks.length === 0) {
     return (
       <p className="px-1 text-sm text-muted-foreground" role="status">
-        No tracks within 50 km. Search by name, or add yours below.
+        No tracks within {formatRadius(NEARBY_BROWSE_RADIUS_M, units)}. Search by name, or add yours below.
       </p>
     );
   }
@@ -135,7 +138,7 @@ export function TrackNearbyBrowse() {
                 ) : null}
               </span>
               <span className="shrink-0 fig-stat text-xs text-muted-foreground">
-                {formatDistanceMeters(t.distanceM)}
+                {formatDistance(t.distanceM, units)}
               </span>
             </Link>
           </li>
