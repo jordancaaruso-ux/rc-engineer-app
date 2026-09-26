@@ -8,7 +8,6 @@ import {
   classifyTrackTimingUrl,
   type TrackTimingUrls,
 } from "@/lib/tracks/trackTimingUrl";
-import { SpeedhiveTrackFinder } from "@/components/tracks/SpeedhiveTrackFinder";
 import { tidyName } from "@/lib/tracks/tidyTrackName";
 
 /**
@@ -32,6 +31,11 @@ export type TrackTimingUrlsFieldHandle = {
    * Returns the value to send, or the error to show instead of saving.
    */
   commit: () => { ok: true; value: TrackTimingUrls } | { ok: false; error: string };
+  /**
+   * Take the club picked in the form's "Find on Speedhive" (`speedhiveLookup`): fills the Speedhive
+   * slot, and renames the track to Speedhive's name.
+   */
+  pickSpeedhive: (speedhiveUrl: string, pickedName: string) => void;
 };
 
 const PROVIDER_LABEL: Record<keyof TrackTimingUrls, string> = {
@@ -62,16 +66,17 @@ export const TrackTimingUrlsField = forwardRef<
     labelClassName?: string;
     className?: string;
     /**
-     * The name and town typed into the add-track form. Given, the field offers "Find on Speedhive"
-     * for the track being added — so the Speedhive link goes in with the track, instead of saving
-     * the track, opening it and finding the link there (founder 2026-09-16).
+     * The name typed into an add-track form that offers "Find on Speedhive" for the track being
+     * added — so the Speedhive link goes in with the track, instead of saving the track, opening it
+     * and finding the link there (founder 2026-09-16). The form draws the finder itself, right
+     * under its name box (founder pick 2026-09-26), and hands the pick to `pickSpeedhive`.
      *
      * Picking a club also hands its Speedhive name back to replace what was typed: the timing
-     * site's name is the track's name, same rule as LiveRC's (founder 2026-09-16).
+     * site's name is the track's name, same rule as LiveRC's (founder 2026-09-16). Taking the
+     * Speedhive chip off puts the typed name back.
      */
     speedhiveLookup?: {
       name: string;
-      location: string | null;
       onNameChange: (name: string) => void;
     };
   }
@@ -114,6 +119,17 @@ export const TrackTimingUrlsField = forwardRef<
 
   useImperativeHandle(ref, () => ({
     commit: () => (draft.trim() ? addDraft() : { ok: true, value }),
+    pickSpeedhive: (speedhiveUrl, pickedName) => {
+      // "PEAKHURST PARKWAY" goes in as "Peakhurst Parkway" — the same tidy LiveRC names get.
+      const name = tidyName(pickedName);
+      setPickedNames((cur) => ({ ...cur, [speedhiveUrl]: name }));
+      onChange({ ...value, speedhiveUrl });
+      if (speedhiveLookup && name && name !== speedhiveLookup.name) {
+        setRenamedFrom({ typed: speedhiveLookup.name, picked: name });
+        speedhiveLookup.onNameChange(name);
+      }
+      onError(null);
+    },
   }));
 
   return (
@@ -224,23 +240,6 @@ export const TrackTimingUrlsField = forwardRef<
         </p>
       )}
 
-      {speedhiveLookup && !value.speedhiveUrl ? (
-        <SpeedhiveTrackFinder
-          source={{ name: speedhiveLookup.name, location: speedhiveLookup.location }}
-          onPick={async (speedhiveUrl, pickedName) => {
-            // "PEAKHURST PARKWAY" goes in as "Peakhurst Parkway" — the same tidy LiveRC names get.
-            const name = tidyName(pickedName);
-            setPickedNames((cur) => ({ ...cur, [speedhiveUrl]: name }));
-            onChange({ ...value, speedhiveUrl });
-            if (name && name !== speedhiveLookup.name) {
-              setRenamedFrom({ typed: speedhiveLookup.name, picked: name });
-              speedhiveLookup.onNameChange(name);
-            }
-            onError(null);
-            return null;
-          }}
-        />
-      ) : null}
     </div>
   );
 });

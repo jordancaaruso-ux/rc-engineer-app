@@ -51,11 +51,18 @@ export function SpeedhiveTrackFinder({
   source,
   onPick,
   size = "md",
+  block = false,
 }: {
   source: SpeedhiveFinderSource;
   /** Use the picked practice page. Resolve to an error message, or null when done. */
   onPick: (speedhiveUrl: string, name: string) => Promise<string | null>;
   size?: "sm" | "md";
+  /**
+   * The add-track forms: a full-width button right under the name box that says the name back
+   * ("Find “Knox” on Speedhive"), founder pick 2026-09-26. It sat at the foot of the form, under
+   * the timing pages, where a driver who had just typed the name never looked.
+   */
+  block?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   // Results belong to the name and town they were searched for. Typing in either box closes them
@@ -77,6 +84,7 @@ export function SpeedhiveTrackFinder({
 
   const text = size === "sm" ? "text-[12px]" : "text-[13px]";
   const nothingTyped = !("trackId" in source) && !source.name.trim();
+  const typedName = "trackId" in source ? "" : source.name.trim();
 
   async function search(q: string | null) {
     // Only the newest search may land — a slow answer for an old name must not replace a new one.
@@ -125,13 +133,24 @@ export function SpeedhiveTrackFinder({
           setQuery("");
           void search(null);
         }}
+        // Said whole: the name sits in its own box so it can shorten, which splits the words.
+        aria-label={block && typedName ? `Find “${typedName}” on Speedhive` : undefined}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 transition-colors hover:bg-muted disabled:opacity-50",
+          block
+            ? "flex w-full min-h-10 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            : "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 transition-colors hover:bg-muted disabled:opacity-50",
           text
         )}
       >
-        <Search aria-hidden className="size-3.5" />
-        Find on Speedhive
+        <Search aria-hidden className="size-3.5 shrink-0" />
+        {block && typedName ? (
+          // A long name gives way, never the words around it.
+          <span className="flex min-w-0 whitespace-nowrap">
+            Find “<span className="min-w-0 truncate">{typedName}</span>” on Speedhive
+          </span>
+        ) : (
+          "Find on Speedhive"
+        )}
       </button>
     );
   }

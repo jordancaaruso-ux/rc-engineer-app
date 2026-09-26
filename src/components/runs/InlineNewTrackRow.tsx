@@ -8,6 +8,7 @@ import {
   TrackTimingUrlsField,
   type TrackTimingUrlsFieldHandle,
 } from "@/components/tracks/TrackTimingUrlsField";
+import { SpeedhiveTrackFinder } from "@/components/tracks/SpeedhiveTrackFinder";
 
 const NO_TIMING_URLS: TrackTimingUrls = { liveRcUrl: null, speedhiveUrl: null };
 
@@ -166,7 +167,9 @@ export const InlineNewTrackRow = forwardRef<
   }
 
   return (
-    <div className={cn("inset-panel-deep space-y-2 px-3 py-2.5", className)}>
+    // Full width on purpose: on Log run it opens inside the Near me row, where a flex item is only
+    // as wide as its widest box, and "Find on Speedhive" under the name no longer stretches it.
+    <div className={cn("inset-panel-deep w-full basis-full space-y-2 px-3 py-2.5", className)}>
       <input
         autoFocus
         className="ui-control w-full rounded-lg border border-border bg-input px-2.5 py-2 text-sm text-foreground"
@@ -186,6 +189,18 @@ export const InlineNewTrackRow = forwardRef<
           }
         }}
       />
+      {/* Right under the name it searches for (founder pick 2026-09-26), not at the foot of the
+          form. Gone once a Speedhive page is in, whether picked here or pasted below. */}
+      {timingUrls.speedhiveUrl ? null : (
+        <SpeedhiveTrackFinder
+          block
+          source={{ name, location }}
+          onPick={async (speedhiveUrl, pickedName) => {
+            timingFieldRef.current?.pickSpeedhive(speedhiveUrl, pickedName);
+            return null;
+          }}
+        />
+      )}
       <input
         className="ui-control w-full rounded-lg border border-border bg-input px-2.5 py-2 text-sm text-foreground"
         placeholder="Town or suburb — optional"
@@ -198,7 +213,7 @@ export const InlineNewTrackRow = forwardRef<
         value={timingUrls}
         onChange={setTimingUrls}
         onError={setError}
-        speedhiveLookup={{ name, location, onNameChange: setName }}
+        speedhiveLookup={{ name, onNameChange: setName }}
         labelClassName="block text-[11px] font-semibold text-muted-foreground"
         inputClassName="ui-control w-full rounded-lg border border-border bg-input px-2.5 py-2 text-sm text-foreground"
       />

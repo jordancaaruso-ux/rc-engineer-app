@@ -18,6 +18,7 @@ import {
   TrackTimingUrlsField,
   type TrackTimingUrlsFieldHandle,
 } from "@/components/tracks/TrackTimingUrlsField";
+import { SpeedhiveTrackFinder } from "@/components/tracks/SpeedhiveTrackFinder";
 
 const NO_TIMING_URLS: TrackTimingUrls = { liveRcUrl: null, speedhiveUrl: null };
 
@@ -366,6 +367,19 @@ export function TrackList({
                     placeholder="e.g. Silverstone National"
                     required
                   />
+                  {/* Right under the name it searches for (founder pick 2026-09-26). */}
+                  {timingUrls.speedhiveUrl ? null : (
+                    <div className="mt-2">
+                      <SpeedhiveTrackFinder
+                        block
+                        source={{ name, location }}
+                        onPick={async (speedhiveUrl, pickedName) => {
+                          timingFieldRef.current?.pickSpeedhive(speedhiveUrl, pickedName);
+                          return null;
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[11px] text-muted-foreground mb-1">Town or state (optional)</label>
@@ -382,7 +396,7 @@ export function TrackList({
                 value={timingUrls}
                 onChange={setTimingUrls}
                 onError={setMessage}
-                speedhiveLookup={{ name, location, onNameChange: setName }}
+                speedhiveLookup={{ name, onNameChange: setName }}
                 labelClassName="block text-[11px] text-muted-foreground"
                 inputClassName="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               />
