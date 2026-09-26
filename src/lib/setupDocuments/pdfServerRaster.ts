@@ -5,23 +5,41 @@ import path from "node:path";
 import { pdf } from "pdf-to-img";
 
 /**
- * pdfjs can't fetch its standard fonts over HTTP in Node, so point it at the on-disk copy that
- * ships with pdfjs-dist. Without this, sheets that rely on non-embedded standard fonts render with
- * blank/fallback glyphs, which costs OCR reads. Resolved once; the trailing slash is required.
+ * pdfjs can't fetch its data files over HTTP in Node, so point it at the on-disk copies that ship
+ * with pdfjs-dist. Resolved once; the trailing slash is required.
+ *
+ * - `standard_fonts/`: without it, sheets that rely on non-embedded standard fonts render with
+ *   blank/fallback glyphs, which costs OCR reads.
+ * - `cmaps/`: the character maps a CJK font needs to turn its codes into glyphs. Without them the
+ *   whole font fails to load ("Unable to load CMap data at: cmaps/Adobe-Japan1-UCS2.bcmap") and
+ *   every word set in it is dropped — English too, on a bilingual sheet. The Yokomo MS2.0 page
+ *   picture came out as drawings and empty boxes with no captions (found 2026-09-24; four more
+ *   sheets the same: Destiny RX-10FF, Yokomo MS1.0FWD, Mugen MTC2 FWD, G-Force Genova).
+ *
+ * These are the top-level pdfjs-dist's copies, not the copy nested under `pdf-to-img` that does
+ * the drawing; both folders are byte-identical data files. The build must ship them: see
+ * `RASTER_NATIVE_FILES` in next.config.mjs.
  */
-function standardFontDataUrl(): string | undefined {
+function pdfjsDataDir(name: "standard_fonts" | "cmaps"): string | undefined {
   try {
     const require = createRequire(import.meta.url);
     const pkg = require.resolve("pdfjs-dist/package.json");
-    // pdfjs's Node font loader reads this with fs — pass a plain path (forward slashes, trailing
+    // pdfjs's Node loaders read these with fs — pass a plain path (forward slashes, trailing
     // slash), not a file:// URL (Node's fetch rejects file://).
-    return path.join(path.dirname(pkg), "standard_fonts/").replace(/\\/g, "/");
+    return path.join(path.dirname(pkg), `${name}/`).replace(/\\/g, "/");
   } catch {
     return undefined;
   }
 }
 
-const STANDARD_FONT_DATA_URL = standardFontDataUrl();
+const STANDARD_FONT_DATA_URL = pdfjsDataDir("standard_fonts");
+const CMAP_URL = pdfjsDataDir("cmaps");
+
+/** What every document opened here passes to pdfjs so it can find its fonts and character maps. */
+const DOC_INIT_PARAMS = {
+  ...(STANDARD_FONT_DATA_URL ? { standardFontDataUrl: STANDARD_FONT_DATA_URL } : {}),
+  ...(CMAP_URL ? { cMapUrl: CMAP_URL, cMapPacked: true } : {}),
+};
 
 /**
  * pdfjs's `AnnotationMode.ENABLE`, as the number it is: importing the enum would load a second
@@ -67,9 +85,7 @@ export async function renderPdfFirstPageToPng(
  */
 /** How many pages the file has — parse only, no rasterising. */
 export async function pdfPageCount(bytes: Uint8Array): Promise<number> {
-  const doc = await pdf(Buffer.from(bytes), {
-    ...(STANDARD_FONT_DATA_URL ? { docInitParams: { standardFontDataUrl: STANDARD_FONT_DATA_URL } } : {}),
-  });
+  const doc = await pdf(Buffer.from(bytes), { docInitParams: DOC_INIT_PARAMS });
   try {
     return doc.length;
   } finally {
@@ -101,7 +117,7 @@ export async function renderPdfPageToPng(
     // (used for storage) stay intact.
     const doc = await pdf(Buffer.from(bytes), {
       scale,
-      ...(STANDARD_FONT_DATA_URL ? { docInitParams: { standardFontDataUrl: STANDARD_FONT_DATA_URL } } : {}),
+      docInitParams: DOC_INIT_PARAMS,
       ...(opts?.withFormValues ? { renderParams: { annotationMode: PDFJS_ANNOTATION_MODE_ENABLE } } : {}),
     });
     try {

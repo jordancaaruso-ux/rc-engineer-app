@@ -7,12 +7,14 @@ import { withSentryConfig } from "@sentry/nextjs";
  * polyfill DOMMatrix" and importing the module throws. The platform glob is deliberately wide: only
  * the build machine's own platform package is ever installed, so it resolves to one directory.
  *
- * The standard fonts are read by path at runtime too (see `pdfServerRaster.standardFontDataUrl`).
+ * The standard fonts and the CJK character maps are read by path at runtime too (see
+ * `pdfServerRaster.pdfjsDataDir`). Without the maps a Japanese sheet's picture loses every caption.
  */
 const RASTER_NATIVE_FILES = [
   "./node_modules/@napi-rs/canvas/**/*",
   "./node_modules/@napi-rs/canvas-*/**/*",
   "./node_modules/pdfjs-dist/standard_fonts/**/*",
+  "./node_modules/pdfjs-dist/cmaps/**/*",
   // `pdf-to-img` pins its OWN pdfjs-dist (nested, a different version to the top-level one) and
   // starts it "workerless" — which still `import()`s `legacy/build/pdf.worker.mjs` by computed
   // path at runtime. A dynamic import of a computed path is invisible to the file tracer, so the
