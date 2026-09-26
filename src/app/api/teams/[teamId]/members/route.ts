@@ -6,6 +6,7 @@ import { assertTeamAdmin, assertUserInTeam } from "@/lib/teamAccess";
 import { isEmailAuthAllowed } from "@/lib/authAllowlist";
 import { checkInviteCreate } from "@/lib/teams/teamInviteRules";
 import { notifyUserOfTeamInvite } from "@/lib/teams/notifyTeamInvite";
+import { loadTeamMemberName } from "@/lib/teams/teamMemberDisplay";
 import { isBlockedPair } from "@/lib/moderation/blocks";
 import { removeTeamMember } from "@/lib/teams/removeTeamMember";
 
@@ -78,28 +79,33 @@ export async function POST(request: Request, ctx: Ctx) {
 
   // `mode: "reset"` reuses the row a previous decline/revoke left behind — the table is unique per
   // (team, user) for all time, so a re-invite is an update rather than a second row.
-  const invite = await prisma.teamInvite.upsert({
-    where: { teamId_invitedUserId: { teamId, invitedUserId: peer.id } },
-    create: {
-      teamId,
-      invitedUserId: peer.id,
-      invitedByUserId: user.id,
-      role: "member",
-      status: "pending",
-    },
-    update: {
-      invitedByUserId: user.id,
-      role: "member",
-      status: "pending",
-      respondedAt: null,
-    },
-    select: { id: true, status: true, createdAt: true, team: { select: { name: true } } },
-  });
+  const [invite, inviterName] = await Promise.all([
+    prisma.teamInvite.upsert({
+      where: { teamId_invitedUserId: { teamId, invitedUserId: peer.id } },
+      create: {
+        teamId,
+        invitedUserId: peer.id,
+        invitedByUserId: user.id,
+        role: "member",
+        status: "pending",
+      },
+      update: {
+        invitedByUserId: user.id,
+        role: "member",
+        status: "pending",
+        respondedAt: null,
+      },
+      select: { id: true, status: true, createdAt: true, team: { select: { name: true } } },
+    }),
+    // The name the team shows for the admin, not their email. Best effort: a failed read must not
+    // turn a sent invite into an error, so the push falls back to not naming anyone.
+    loadTeamMemberName(user.id).catch(() => null),
+  ]);
 
   await notifyUserOfTeamInvite({
     invitedUserId: peer.id,
     teamName: invite.team.name,
-    invitedByLabel: user.name?.trim() || user.email?.trim() || null,
+    invitedByLabel: inviterName,
   });
 
   return NextResponse.json({

@@ -8,12 +8,18 @@ import { Eyebrow } from "@/components/ui/panel";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { ModerationSheet, MoreButton } from "@/components/moderation/ModerationSheet";
 
+/**
+ * Names are the ones the team page prints (`loadTeamMemberDisplays`): "My name", else the account
+ * name, else the email. So an email shows only for a driver who set no name, and only once.
+ */
 type MemberRow = {
   userId: string;
   role: string;
   joinedAt: string;
-  name: string | null;
-  email: string | null;
+  /** The row's name. The viewer's own reads `You (Noah)`, as on the team page. */
+  label: string;
+  /** The bare name, for the More sheet. */
+  name: string;
   /** The viewer blocked this teammate: their runs and comments are out of the viewer's feed. */
   blockedByViewer?: boolean;
 };
@@ -22,8 +28,7 @@ type MemberRow = {
 type PendingInviteRow = {
   id: string;
   createdAt: string;
-  name: string | null;
-  email: string | null;
+  name: string;
 };
 
 type TeamDetail = {
@@ -252,11 +257,10 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="ui-title truncate text-[13px] font-semibold text-foreground">
-                      {invite.name ?? invite.email ?? "—"}
+                      {invite.name}
                     </p>
                     <p className="type-timestamp truncate">
-                      {invite.email ? `${invite.email} · ` : ""}sent{" "}
-                      <RelativeTime iso={invite.createdAt} fallback="recently" />
+                      Sent <RelativeTime iso={invite.createdAt} fallback="recently" />
                     </p>
                   </div>
                   {isAdmin ? (
@@ -310,13 +314,11 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="ui-title truncate text-[13px] font-semibold text-foreground">
-                      {member.name ?? member.email ?? "—"}
-                      {isSelf ? " (you)" : ""}
+                      {member.label}
                     </p>
                     <p className="type-timestamp truncate">
-                      {/* First, so a long email can't truncate it away. */}
                       {member.blockedByViewer ? "Blocked · " : ""}
-                      {member.email ?? "—"} · {member.role}
+                      {member.role === "admin" ? "Admin" : "Member"}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -342,7 +344,7 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
                     ) : null}
                     {!isSelf && pendingRemoval !== member.userId ? (
                       <MoreButton
-                        label={`More for ${member.name ?? member.email ?? "this teammate"}`}
+                        label={`More for ${member.name}`}
                         onClick={() => setMoreFor(member)}
                       />
                     ) : null}
@@ -362,14 +364,14 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
       <ModerationSheet
         open={moreFor !== null}
         onClose={() => setMoreFor(null)}
-        title={moreFor?.name ?? moreFor?.email ?? "Teammate"}
+        title={moreFor?.name ?? "Teammate"}
         report={
           moreFor
             ? {
                 kind: "driver",
                 targetId: moreFor.userId,
                 teamId: detail.id,
-                label: `Report ${moreFor.name ?? moreFor.email ?? "teammate"}`,
+                label: `Report ${moreFor.name}`,
               }
             : undefined
         }
@@ -377,7 +379,7 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
           moreFor
             ? {
                 userId: moreFor.userId,
-                name: moreFor.name ?? moreFor.email ?? "this teammate",
+                name: moreFor.name,
                 blocked: Boolean(moreFor.blockedByViewer),
               }
             : undefined

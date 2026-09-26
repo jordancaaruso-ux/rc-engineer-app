@@ -5,6 +5,7 @@ import { getAuthenticatedApiUser } from "@/lib/currentUser";
 import { assertTeamAdmin, assertUserInTeam } from "@/lib/teamAccess";
 import { objectionableTextError } from "@/lib/moderation/wordFilter";
 import { loadBlocksMadeBy } from "@/lib/moderation/blocks";
+import { loadTeamMemberDisplays } from "@/lib/teams/teamMemberDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,6 @@ export async function GET(_request: Request, ctx: Ctx) {
           userId: true,
           role: true,
           joinedAt: true,
-          user: { select: { name: true, email: true } },
         },
       },
       invites: {
@@ -43,7 +43,7 @@ export async function GET(_request: Request, ctx: Ctx) {
         select: {
           id: true,
           createdAt: true,
-          invitedUser: { select: { name: true, email: true } },
+          invitedUserId: true,
         },
       },
     },
@@ -52,8 +52,16 @@ export async function GET(_request: Request, ctx: Ctx) {
 
   const viewerMembership = team.memberships.find((m) => m.userId === user.id);
   const viewerRole = viewerMembership?.role ?? "member";
-  // Only the viewer's own blocks: whether someone blocked the viewer is never shown to them.
-  const blockedByViewer = await loadBlocksMadeBy(user.id);
+  const memberUserIds = team.memberships.map((m) => m.userId);
+
+  const [blockedByViewer, displays] = await Promise.all([
+    // Only the viewer's own blocks: whether someone blocked the viewer is never shown to them.
+    loadBlocksMadeBy(user.id),
+    // The names the team page prints: "My name", else the account name, else the email. So an
+    // email shows only for a driver who set no name, and the viewer's row reads "You (Noah)".
+    loadTeamMemberDisplays([...memberUserIds, ...team.invites.map((i) => i.invitedUserId)], user.id),
+  ]);
+  const nameOf = (userId: string) => displays.get(userId)?.name ?? "Teammate";
 
   return NextResponse.json({
     team: {
@@ -66,16 +74,15 @@ export async function GET(_request: Request, ctx: Ctx) {
         userId: m.userId,
         role: m.role,
         joinedAt: m.joinedAt.toISOString(),
-        name: m.user.name?.trim() || null,
-        email: m.user.email?.trim() || null,
+        label: displays.get(m.userId)?.label ?? nameOf(m.userId),
+        name: nameOf(m.userId),
         blockedByViewer: blockedByViewer.has(m.userId),
       })),
       /** Invited but not yet answered — visible to every member, revocable only by an admin. */
       pendingInvites: team.invites.map((i) => ({
         id: i.id,
         createdAt: i.createdAt.toISOString(),
-        name: i.invitedUser.name?.trim() || null,
-        email: i.invitedUser.email?.trim() || null,
+        name: nameOf(i.invitedUserId),
       })),
     },
   });
