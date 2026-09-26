@@ -26,11 +26,19 @@ type SetupDocListItem = {
   parserType: string | null;
   createdAt: string;
   updatedAt: string;
-  /** Deterministic server-rendered timestamp label to avoid hydration mismatch. */
+  /**
+   * Deterministic server-rendered timestamp label to avoid hydration mismatch: the racer's own
+   * time ("26 Sept 2026, 6:33 PM"), or a UTC stamp for an admin.
+   */
   createdAtLabel?: string;
   createdSetupId: string | null;
   carId: string | null;
   setupSheetTemplate?: string | null;
+  /** The state in plain words for a racer (`uploadedSheetStatusWords`): "Read · setup saved". */
+  statusWords?: string;
+  statusFailed?: boolean;
+  /** The chassis by name, never the hash a racer's own sheet is keyed by. */
+  chassisName?: string | null;
 };
 
 function statusClass(status: SetupDocListItem["parseStatus"]): string {
@@ -40,12 +48,51 @@ function statusClass(status: SetupDocListItem["parseStatus"]): string {
   return "text-muted-foreground";
 }
 
+/** An admin's row: the pipeline's own words, the import stage and the error, as they always read. */
+function AdminDocumentLines({ doc }: { doc: SetupDocListItem }) {
+  return (
+    <>
+      <div className="mt-0.5 text-[11px] text-muted-foreground">
+        {doc.createdAtLabel ?? doc.createdAt} · {doc.sourceType} ·{" "}
+        <span className={cn(statusClass(doc.parseStatus))}>{doc.parseStatus}</span>
+        {doc.importStatus && doc.importStatus !== "COMPLETED" ? (
+          <>
+            {" "}
+            · <span
+                className={cn(
+                  doc.importStatus === "FAILED"
+                    ? "text-destructive"
+                    : doc.importStatus === "COMPLETED_WITH_WARNINGS"
+                      ? "text-amber-200"
+                      : "text-muted-foreground"
+                )}
+              >
+              {doc.importStatus}
+            </span>
+            {doc.lastCompletedStage ? <span className="ml-1 tabular-nums text-[10px] opacity-80">({doc.lastCompletedStage})</span> : null}
+          </>
+        ) : null}
+        {doc.createdSetupId ? " · setup created" : ""}
+        {doc.setupSheetTemplate
+          ? ` · ${labelForSetupSheetTemplate(doc.setupSheetTemplate)}`
+          : ""}
+      </div>
+      {doc.importStatus === "FAILED" && doc.importErrorMessage ? (
+        <div className="mt-1 text-[11px] text-destructive line-clamp-2">{doc.importErrorMessage}</div>
+      ) : null}
+    </>
+  );
+}
+
 export function SetupDocumentLibraryClient({
   cars,
   initialDocuments,
+  isAdmin = false,
 }: {
   cars: CarOption[];
   initialDocuments: SetupDocListItem[];
+  /** Admins read the pipeline's own words (PARSED, the import stage, the error); racers plain ones. */
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const [uploadCarId, setUploadCarId] = useState("");
@@ -148,34 +195,15 @@ export function SetupDocumentLibraryClient({
               <li key={doc.id} className="flex items-center justify-between gap-4 px-4 py-3">
                 <div className="min-w-0">
                   <div className="truncate ui-title text-sm normal-case">{doc.originalFilename}</div>
-                  <div className="mt-0.5 text-[11px] text-muted-foreground">
-                    {doc.createdAtLabel ?? doc.createdAt} · {doc.sourceType} ·{" "}
-                    <span className={cn(statusClass(doc.parseStatus))}>{doc.parseStatus}</span>
-                    {doc.importStatus && doc.importStatus !== "COMPLETED" ? (
-                      <>
-                        {" "}
-                        · <span
-                            className={cn(
-                              doc.importStatus === "FAILED"
-                                ? "text-destructive"
-                                : doc.importStatus === "COMPLETED_WITH_WARNINGS"
-                                  ? "text-amber-200"
-                                  : "text-muted-foreground"
-                            )}
-                          >
-                          {doc.importStatus}
-                        </span>
-                        {doc.lastCompletedStage ? <span className="ml-1 tabular-nums text-[10px] opacity-80">({doc.lastCompletedStage})</span> : null}
-                      </>
-                    ) : null}
-                    {doc.createdSetupId ? " · setup created" : ""}
-                    {doc.setupSheetTemplate
-                      ? ` · ${labelForSetupSheetTemplate(doc.setupSheetTemplate)}`
-                      : ""}
-                  </div>
-                  {doc.importStatus === "FAILED" && doc.importErrorMessage ? (
-                    <div className="mt-1 text-[11px] text-destructive line-clamp-2">{doc.importErrorMessage}</div>
-                  ) : null}
+                  {isAdmin ? (
+                    <AdminDocumentLines doc={doc} />
+                  ) : (
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">
+                      {doc.createdAtLabel ?? doc.createdAt} ·{" "}
+                      <span className={cn(doc.statusFailed && "text-destructive")}>{doc.statusWords}</span>
+                      {doc.chassisName ? ` · ${doc.chassisName}` : ""}
+                    </div>
+                  )}
                 </div>
                 <Link
                   href={`/setup-documents/${doc.id}`}
