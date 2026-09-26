@@ -17,6 +17,7 @@ import {
   extractLiveRcRaceSessionWhenRaw,
   parseLiveRcSessionDisplayTimeToUtcIso,
 } from "./livercSessionTime";
+import { findLiveRcRaceListedTime } from "./livercRaceListedTime";
 
 const PARSER_ID = "liverc_race_result_v1";
 const LOG_PREFIX = "[liveRc-race-result]";
@@ -735,7 +736,16 @@ export async function importLiveRcRaceResult(pageUrl: string, contextName?: stri
 
   const sessionName = extractLiveRcRaceSessionNameFromHtml(mainFetch.text);
   const whenRaw = extractLiveRcRaceSessionWhenRaw(mainFetch.text);
-  const sessionCompletedAtIso = whenRaw ? parseLiveRcSessionDisplayTimeToUtcIso(whenRaw) : null;
+  const pageTimeIso = whenRaw ? parseLiveRcSessionDisplayTimeToUtcIso(whenRaw) : null;
+  // The page prints the meeting's date and no clock (its first day, at a two-day meeting). The
+  // race's own time is on the meeting's results list. When that can't be read, the page's date
+  // stands at midnight: "that day, time unknown" (`isDateOnlyTrackTime`). The lookup never costs
+  // the laps.
+  const pageHasClock = /\d{1,2}:\d{2}/.test(whenRaw ?? "");
+  const listedIso = pageHasClock
+    ? null
+    : await findLiveRcRaceListedTime(trimmedUrl, mainFetch.text).catch(() => null);
+  const sessionCompletedAtIso = listedIso ?? pageTimeIso;
 
   console.info(LOG_PREFIX, "session_loaded", {
     drivers: driversWithLaps.length,
@@ -743,6 +753,7 @@ export async function importLiveRcRaceResult(pageUrl: string, contextName?: stri
     primaryDriverLapCount: primary.laps.length,
     sessionName,
     sessionCompletedAtIso,
+    timeFrom: listedIso ? "meeting_list" : pageTimeIso ? "page" : "none",
   });
 
   return {
@@ -752,7 +763,8 @@ export async function importLiveRcRaceResult(pageUrl: string, contextName?: stri
     sessionCompletedAtIso,
     candidates: buildCandidateRows(orderedDrivers),
     sessionDrivers: orderedDrivers,
-    message: `Imported session with ${driversWithLaps.length} drivers. Select one or more drivers below.`,
+    // Shown under the driver list on the lap step, which picks one row — not "below", not "more".
+    message: `${driversWithLaps.length} drivers in this race.`,
     /*
      * The race's own name, and `className` because that is where the LiveRC PRACTICE
      * parser puts the same kind of string. `name` is not free: `pickPrimarySessionDriver`

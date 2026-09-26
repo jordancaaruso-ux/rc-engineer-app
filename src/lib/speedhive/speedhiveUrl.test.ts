@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  isSpeedhivePracticeLocationPageUrl,
   parseSpeedhivePracticeLocationId,
   parseSpeedhivePracticeActivityRef,
 } from "./speedhivePracticeUrl";
@@ -74,6 +75,52 @@ test("parseSpeedhivePracticeActivityRef", () => {
   assert.ok(ref);
   assert.equal(ref.locationId, 4591);
   assert.equal(ref.activityId, 7875691978);
+});
+
+test("parseSpeedhivePracticeActivityRef reads the link Speedhive's site gives out now", () => {
+  // Every session on a club's practice page links as /practice/<activityId>/activity. Pasted, it
+  // matched none of the location-first shapes and failed as "no lap-shaped numbers" (2026-09-26).
+  const ref = parseSpeedhivePracticeActivityRef(
+    "https://speedhive.mylaps.com/practice/8354099722/activity"
+  );
+  assert.ok(ref);
+  assert.equal(ref.activityId, 8354099722);
+  assert.equal(ref.locationId, null, "the link names the visit only; the practice API has its track");
+  assert.equal(ref.trainingSessionId, undefined);
+  assert.equal(ref.sessionUrl, "https://speedhive.mylaps.com/practice/8354099722/activity");
+
+  // A trailing slash, a language prefix or a query string is the same link.
+  for (const url of [
+    "https://speedhive.mylaps.com/practice/8356996093/activity/",
+    "https://speedhive.mylaps.com/nl/practice/8356996093/activity?utm=share",
+  ]) {
+    assert.equal(parseSpeedhivePracticeActivityRef(url)?.activityId, 8356996093, url);
+  }
+});
+
+test("the location-first practice links read as before", () => {
+  const cases: Array<[string, number, number, number | undefined]> = [
+    ["https://speedhive.mylaps.com/practice/3472/activities/8354099722", 3472, 8354099722, undefined],
+    ["https://speedhive.mylaps.com/practice/3472/activity/8354099722", 3472, 8354099722, undefined],
+    ["https://speedhive.mylaps.com/practice/3472/activities/8354099722/sessions/1", 3472, 8354099722, 1],
+  ];
+  for (const [url, locationId, activityId, trainingSessionId] of cases) {
+    const ref = parseSpeedhivePracticeActivityRef(url);
+    assert.equal(ref?.locationId, locationId, url);
+    assert.equal(ref?.activityId, activityId, url);
+    assert.equal(ref?.trainingSessionId, trainingSessionId, url);
+  }
+});
+
+test("a club's practice page is not one session", () => {
+  assert.equal(parseSpeedhivePracticeActivityRef("https://speedhive.mylaps.com/practice/3472"), null);
+  assert.equal(isSpeedhivePracticeLocationPageUrl("https://speedhive.mylaps.com/practice/3472"), true);
+  assert.equal(isSpeedhivePracticeLocationPageUrl("https://speedhive.mylaps.com/practice/3472/"), true);
+  assert.equal(
+    isSpeedhivePracticeLocationPageUrl("https://speedhive.mylaps.com/practice/8354099722/activity"),
+    false
+  );
+  assert.equal(isSpeedhivePracticeLocationPageUrl("https://example.com/practice/3472"), false);
 });
 
 test("organizationIdFromTrackUrl returns null for empty", () => {

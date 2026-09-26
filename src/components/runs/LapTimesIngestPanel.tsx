@@ -37,8 +37,9 @@ import {
 } from "@/lib/lapAnalysis";
 import { LapTimeGraph } from "@/components/runs/LapTimeGraph";
 import { haptic } from "@/lib/haptics";
+import { formatRunDateOnly } from "@/lib/formatDate";
+import { isDateOnlyTrackTime } from "@/lib/lapImport/trackClock";
 import {
-  formatDriverSessionLabel,
   formatImportedSessionTime,
   resolveImportedSessionDisplayTimeIso,
   resolveImportedSessionHasWallClockTime,
@@ -46,7 +47,7 @@ import {
   type ImportedSessionTimeFormatOptions,
   type LapTimingSource,
 } from "@/lib/lapImport/labels";
-import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
+import { matchPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
 import {
   SOURCE_LABELS,
   type LapDiscoverySessionRow,
@@ -214,6 +215,23 @@ function blockTimeFormatOpts(block: UrlImportBlock): ImportedSessionTimeFormatOp
 }
 
 /**
+ * When a block's session ran, as its rows print it. A day the timing site gave with no clock (a
+ * LiveRC race whose meeting list couldn't be read) prints as that date: never as a 12:00 am
+ * nobody raced at.
+ */
+function formatBlockWhen(block: UrlImportBlock): string {
+  const iso = blockLabelTimeIso(block);
+  const opts = blockTimeFormatOpts(block);
+  if (
+    opts.isWallClockTime !== false &&
+    isDateOnlyTrackTime({ iso, parserId: block.parserId, sourceUrl: block.sourceUrl })
+  ) {
+    return formatRunDateOnly(iso, "UTC");
+  }
+  return formatImportedSessionTime(iso, opts);
+}
+
+/**
  * What to print where a block's source would otherwise be its URL. A PDF import has no URL —
  * its `sourceUrl` is a synthetic `myrcm-pdf://…` fingerprint — so it shows the file's name.
  */
@@ -237,7 +255,12 @@ function formatSessionWhen(
   /** The session's address: a Speedhive race result prints the track's clock, its practice loop does not. */
   sourceUrl?: string | null
 ): string | null {
-  if (iso?.trim()) return formatImportedSessionTime(iso.trim(), { timingSource, sourceUrl });
+  const at = iso?.trim();
+  if (at) {
+    // A date with no clock reads as that date, not as 12:00 am (see `formatBlockWhen`).
+    if (isDateOnlyTrackTime({ iso: at, timingSource, sourceUrl })) return formatRunDateOnly(at, "UTC");
+    return formatImportedSessionTime(at, { timingSource, sourceUrl });
+  }
   if (sessionTime?.trim()) return sessionTime.trim();
   return null;
 }
@@ -940,7 +963,10 @@ export function LapTimesIngestPanel({
 
   useEffect(() => {
     if (value.sourceKind === "url" && value.urlImportBlocks.length > 0) {
-      setTab("url-auto");
+      // Laps from a timing site open on the URL side, but a URL face the racer is on stays put:
+      // jumping from URL Manual to URL Auto after a paste hid the driver list (test drive,
+      // 2026-09-26).
+      setTab((prev) => (isUrlTab(prev) ? prev : "url-auto"));
     }
   }, [value.sourceKind, value.urlImportBlocks.length]);
 
@@ -1750,8 +1776,15 @@ export function LapTimesIngestPanel({
       }
 
       attachImportRow(successes[0]!, url);
+      // The address it was filed under, which is not always the one pasted: a Speedhive
+      // `/practice/<activity>/activity` link is filed under its location-first address.
+      const filedUrl = successes[0]!.url?.trim() || url;
       setDayScanCandidates((prev) =>
-        prev ? prev.map((c) => (c.sessionUrl === url ? { ...c, alreadyImported: true } : c)) : prev
+        prev
+          ? prev.map((c) =>
+              c.sessionUrl === url || c.sessionUrl === filedUrl ? { ...c, alreadyImported: true } : c
+            )
+          : prev
       );
       void loadEventRaceSessions();
       // Deliberately does NOT advance the wizard any more. Jumping to the next
@@ -1801,23 +1834,25 @@ export function LapTimesIngestPanel({
       const topLaps = row.laps ?? [];
       const lapRowsFromApi = row.lapRows;
 
+      // Only a row the racer's own details point at is preselected — never the first row. That
+      // was the race winner, filed as "Your laps" for anyone whose name didn't match (test drive,
+      // 2026-09-26). With no match the racer picks themselves from the list.
+      const matchedDriver = opts
+        ? null
+        : matchPrimarySessionDriver(sessionDrivers, {
+            liveRcDriverId,
+            liveRcDriverName,
+            // Server-side match (Speedhive transponder / driver name aware) — used
+            // when the local LiveRC id/name don't identify a row.
+            sessionHintName: typeof row.sessionHint?.name === "string" ? row.sessionHint.name : null,
+          });
       const autoSelectIds = opts
         ? opts.primaryDriverId && sessionDrivers.some((d) => d.driverId === opts.primaryDriverId)
           ? [opts.primaryDriverId]
           : []
-        : sessionDrivers.length === 0
-          ? []
-          : sessionDrivers.length === 1 && sessionDrivers[0]?.driverId
-            ? [sessionDrivers[0].driverId]
-            : [
-              pickPrimarySessionDriver(sessionDrivers, {
-                liveRcDriverId,
-                liveRcDriverName,
-                // Server-side match (Speedhive transponder / driver name aware) — used
-                // when the local LiveRC id/name don't identify a row.
-                sessionHintName: typeof row.sessionHint?.name === "string" ? row.sessionHint.name : null,
-              }).driverId,
-            ];
+        : matchedDriver
+          ? [matchedDriver.driverId]
+          : [];
 
       const recordedAt = row.recordedAt ?? new Date().toISOString();
       const sessionCompletedAtIso =
@@ -1911,8 +1946,15 @@ export function LapTimesIngestPanel({
       } else if (leadBlockId) {
         haptic("light");
       }
+      // A whole field and nobody matched: open the face that lists it, so the racer picks
+      // themselves there. It sat on the other face, which is frozen while hidden, so a paste
+      // landed with no list in sight (test drive, 2026-09-26). The PDF door has its own picker.
+      const needsPick = !opts && !leadBlockId && sessionDrivers.length > 1 && autoSelectIds.length === 0;
+      if (needsPick) setTab("url-manual");
       setUrlInput("");
-      setUrlMessage(sameRaceMessage(attached.outcome, newBlock, shown) ?? combinedMessage);
+      setUrlMessage(
+        sameRaceMessage(attached.outcome, newBlock, shown) ?? (needsPick ? null : combinedMessage)
+      );
     }
   }
 
@@ -2143,17 +2185,19 @@ export function LapTimesIngestPanel({
                         ? "Pick your name"
                         : describeBlockSource(block)
                   }
-                  when={formatImportedSessionTime(
-                    blockLabelTimeIso(block),
-                    blockTimeFormatOpts(block)
-                  )}
+                  when={formatBlockWhen(block)}
                   lapCount={stats?.lapCount ?? 0}
                   bestLapSeconds={stats?.bestLap ?? null}
                   medianSeconds={stats?.median ?? null}
                   sourceLabel={sourceLineByBlockId.get(block.blockId) ?? null}
-                  isFocused={activeImportBlock?.blockId === block.blockId}
-                  selectable={attachedBlocks.length > 1}
-                  onFocus={() => setFocusedBlockId(block.blockId)}
+                  isFocused={attachedBlocks.length > 1 && activeImportBlock?.blockId === block.blockId}
+                  // A whole field on the import: a tap opens its list to pick or change whose laps
+                  // these are. With one import attached it could not be tapped at all.
+                  selectable={attachedBlocks.length > 1 || block.sessionDrivers.length > 1}
+                  onFocus={() => {
+                    setFocusedBlockId(block.blockId);
+                    if (block.sessionDrivers.length > 1) setTab("url-manual");
+                  }}
                   onRemove={() => removeImportBlock(block.blockId)}
                 />
               );
@@ -2699,7 +2743,7 @@ export function LapTimesIngestPanel({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <Eyebrow>
-                    Imported · {formatImportedSessionTime(blockLabelTimeIso(activeImportBlock), blockTimeFormatOpts(activeImportBlock))}
+                    Imported · {formatBlockWhen(activeImportBlock)}
                   </Eyebrow>
                   <div className="text-[11px] text-muted-foreground break-all">
                     {describeBlockSource(activeImportBlock)}
@@ -2713,17 +2757,17 @@ export function LapTimesIngestPanel({
 
               {activeImportBlock.sessionDrivers.length > 0 ? (
                 <>
+                  {activeImportBlock.sessionDrivers.length > 1 &&
+                  !activeImportBlock.selectedDriverIds?.[0] ? (
+                    <p className="text-[12px] font-semibold text-foreground">Tap your name</p>
+                  ) : null}
                   <div className="space-y-2">
                     {activeImportBlock.sessionDrivers.map((d) => {
                       const key = `${activeImportBlock.blockId}:${d.driverId}`;
                       const isPreview = activePreviewKey === key;
                       const isPrimaryForRun = activeImportBlock.selectedDriverIds?.[0] === d.driverId;
                       const stats = statsForDriver(activeImportBlock, d);
-                      const primaryLabel = formatDriverSessionLabel(
-                        d.driverName,
-                        blockLabelTimeIso(activeImportBlock),
-                        blockTimeFormatOpts(activeImportBlock)
-                      );
+                      const primaryLabel = `${d.driverName.trim() || "Driver"} · ${formatBlockWhen(activeImportBlock)}`;
                       return (
                         <div
                           key={d.driverId}

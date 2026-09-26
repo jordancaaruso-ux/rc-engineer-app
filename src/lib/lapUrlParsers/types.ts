@@ -60,6 +60,13 @@ export interface LapUrlParseResult {
    * time wherever the driver is (`lapImport/trackClock.ts`).
    */
   sessionUtcOffsetMinutes?: number | null;
+  /**
+   * The address the app files this session under, when the link that was read is another
+   * spelling of it (Speedhive's `/practice/<activity>/activity` for
+   * `/practice/<location>/activities/<activity>`). The import stores this one, so a pasted link
+   * and the same session found by URL Auto are one row.
+   */
+  canonicalUrl?: string | null;
   message?: string | null;
   /** Machine-readable failure (e.g. driver_not_found). */
   errorCode?: string;

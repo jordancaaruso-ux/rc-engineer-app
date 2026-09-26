@@ -3,7 +3,10 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { pickPrimarySessionDriver } from "@/lib/lapImport/pickPrimarySessionDriver";
+import {
+  matchPrimarySessionDriver,
+  pickPrimarySessionDriver,
+} from "@/lib/lapImport/pickPrimarySessionDriver";
 import type { LapUrlSessionDriver } from "@/lib/lapUrlParsers/types";
 
 function driver(driverId: string, driverName: string): LapUrlSessionDriver {
@@ -95,3 +98,34 @@ test("sessionHint that matches no row still falls back to P1", () => {
 });
 
 console.log("pickPrimarySessionDriver.test.ts OK");
+
+test("the lap step's match never falls back to the first row", () => {
+  // Pasting a 10-driver LiveRC race preselected the winner as "Your laps" for a racer whose name
+  // is not saved yet, and the Engineer read the winner's laps as theirs (test drive, 2026-09-26).
+  const drivers = [driver("1", "KAWASHIMA"), driver("5", "OHTSUKA")];
+  assert.equal(
+    matchPrimarySessionDriver(drivers, { liveRcDriverId: null, liveRcDriverName: null }),
+    null
+  );
+  assert.equal(
+    matchPrimarySessionDriver(drivers, { liveRcDriverId: "999", liveRcDriverName: "Haruto Nobody" }),
+    null
+  );
+  // What the racer told us still picks their row, and a lone row is theirs.
+  assert.equal(
+    matchPrimarySessionDriver(drivers, { liveRcDriverId: null, liveRcDriverName: "Ohtsuka" })?.driverId,
+    "5"
+  );
+  assert.equal(
+    matchPrimarySessionDriver(drivers, {
+      liveRcDriverId: null,
+      liveRcDriverName: null,
+      sessionHintName: "OHTSUKA",
+    })?.driverId,
+    "5"
+  );
+  assert.equal(
+    matchPrimarySessionDriver([driver("9", "Solo")], { liveRcDriverId: null, liveRcDriverName: null })?.driverId,
+    "9"
+  );
+});

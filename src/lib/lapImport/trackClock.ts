@@ -88,3 +88,27 @@ export function trackClockTime(input: TrackClockInput): Date | null {
 export function trackClockDayKey(input: TrackClockInput): string | null {
   return trackClockTime(input)?.toISOString().slice(0, 10) ?? null;
 }
+
+/**
+ * A day with no clock: a timing site printed only the date, and the parser stored that day's
+ * midnight on the track's clock. A LiveRC race page prints only its meeting's date when the
+ * meeting's list can't be read (`livercRaceListedTime.ts`); a MyRCM file can print a date alone.
+ * Nothing is timed at 00:00:00.000 to the millisecond, so in a source that stores the track's wall
+ * clock it means "that day, time unknown": printed as a date, and never a reason to call two
+ * sessions the same time on track. Races imported before the list was read are stored this way.
+ */
+export function isDateOnlyTrackTime(input: TrackClockInput): boolean {
+  const raw = input.iso?.trim();
+  if (!raw) return false;
+  const at = new Date(raw);
+  if (Number.isNaN(at.getTime())) return false;
+  const source =
+    input.timingSource ?? timingSourceFromSourceUrl(input.sourceUrl) ?? timingSourceFromParserId(input.parserId);
+  if (!isWallClockAsUtcTimingSource(source, input)) return false;
+  return (
+    at.getUTCHours() === 0 &&
+    at.getUTCMinutes() === 0 &&
+    at.getUTCSeconds() === 0 &&
+    at.getUTCMilliseconds() === 0
+  );
+}
