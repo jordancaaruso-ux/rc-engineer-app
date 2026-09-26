@@ -45,6 +45,7 @@ export function SearchableSelect({
   clearable = false,
   clearLabel = "—",
   triggerMono = false,
+  createRow,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -60,6 +61,13 @@ export function SearchableSelect({
   clearLabel?: string;
   /** Render the trigger + options in mono (setup/document lists). */
   triggerMono?: boolean;
+  /**
+   * A "New …" first row in the sheet (`PickerSheet`'s `createRow`); the sheet closes before
+   * `onAction` runs. It forces the sheet whatever the list's length: the phone's own list has
+   * nowhere to put it, and a short list (a new driver's first few events) is exactly where the
+   * thing they want isn't there yet.
+   */
+  createRow?: { label: string; onAction: (query: string) => void };
 }) {
   const [open, setOpen] = useState(false);
 
@@ -75,7 +83,7 @@ export function SearchableSelect({
     [groups, options]
   );
 
-  const useSheet = searchable ?? flat.length > PICKER_SEARCH_THRESHOLD;
+  const useSheet = createRow != null || (searchable ?? flat.length > PICKER_SEARCH_THRESHOLD);
   const selected = flat.find((o) => o.value === value) ?? null;
 
   if (useSheet) {
@@ -106,6 +114,17 @@ export function SearchableSelect({
           searchPlaceholder="Search…"
           clearRow={clearable ? { label: clearLabel } : null}
           mono={triggerMono}
+          createRow={
+            createRow
+              ? {
+                  label: createRow.label,
+                  onAction: (query) => {
+                    setOpen(false);
+                    createRow.onAction(query);
+                  },
+                }
+              : undefined
+          }
         />
       </>
     );

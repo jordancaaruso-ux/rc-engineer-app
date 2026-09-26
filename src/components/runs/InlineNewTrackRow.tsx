@@ -11,6 +11,15 @@ import {
 
 const NO_TIMING_URLS: TrackTimingUrls = { liveRcUrl: null, speedhiveUrl: null };
 
+/**
+ * The yellow-outline "+ New …" chip under a picker's box. Yellow-outline since 2026-07-27: it was
+ * bare yellow text, the brightest thing in the track panel with no container and a text-height tap
+ * target. Now a peer of the Near me chip in shape, distinguished only by tint. The log-run Event
+ * section's "+ New event" wears it too (founder pick 2026-09-26), so the two sections read alike.
+ */
+export const NEW_CHIP_CLASS =
+  "flex min-h-8 items-center gap-1.5 rounded-lg border border-primary-ink/45 bg-primary/[0.08] px-3 text-xs font-semibold text-primary-ink transition hover:bg-primary/15";
+
 export type InlineCreatedTrack = {
   id: string;
   name: string;
@@ -148,13 +157,7 @@ export const InlineNewTrackRow = forwardRef<
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={cn(
-          // Yellow-outline chip (2026-07-27): was bare yellow text — the brightest
-          // thing in the track panel with no container and a text-height tap target.
-          // Now a peer of the Detect chip in shape, distinguished only by tint.
-          "flex min-h-8 items-center gap-1.5 rounded-lg border border-primary-ink/45 bg-primary/[0.08] px-3 text-xs font-semibold text-primary-ink transition hover:bg-primary/15",
-          className
-        )}
+        className={cn(NEW_CHIP_CLASS, className)}
       >
         <Plus aria-hidden className="size-3.5" strokeWidth={2.6} />
         New track

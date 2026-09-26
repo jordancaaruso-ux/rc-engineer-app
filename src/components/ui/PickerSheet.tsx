@@ -133,6 +133,7 @@ export function PickerSheet<T extends SearchableOption>({
   panelTitle,
   emptyAction,
   searchAction,
+  createRow,
   mono = false,
   searchable,
   initialVisible,
@@ -184,6 +185,18 @@ export function PickerSheet<T extends SearchableOption>({
    * `label` is the button's accessible name; the glyph alone says nothing to a screen reader.
    */
   searchAction?: { label: string; onAction: (query: string) => void };
+  /**
+   * A first row that makes something new: "New event", then "New event “Winter Nationals”" once
+   * something is typed. It sits above everything else in the list, the clear row included.
+   *
+   * Founder pick 2026-09-26, benched against the + above and a button pinned to the bottom. The
+   * driver it is for opened the list to find their thing, didn't, and is reading the rows, so the
+   * first row is where they are already looking; and unlike the +, it says what it does. It stays
+   * through a search that finds nothing, so "Nothing matches" is never where the sheet ends.
+   *
+   * `label` is the bare action; the typed query is added to it in quotes.
+   */
+  createRow?: { label: string; onAction: (query: string) => void };
   mono?: boolean;
   /** Force the search field on or off. Unset = decided by list length. */
   searchable?: boolean;
@@ -525,6 +538,27 @@ export function PickerSheet<T extends SearchableOption>({
               role="listbox"
               aria-label={title}
             >
+              {/* An action, not an option: no role, so it is never ticked or counted as a
+                  result. The yellow square is the search bar's + in words. */}
+              {createRow ? (
+                <button
+                  type="button"
+                  onClick={() => createRow.onAction(trimmedQuery)}
+                  className="tap-active flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/60"
+                >
+                  <span
+                    className="flex size-7 shrink-0 items-center justify-center rounded-md primary-face bg-primary text-primary-foreground"
+                    aria-hidden
+                  >
+                    <Plus className="size-4" strokeWidth={2.75} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-semibold">
+                    {createRow.label}
+                    {trimmedQuery ? ` “${trimmedQuery}”` : null}
+                  </span>
+                </button>
+              ) : null}
+
               {/* The clear row sits above the results and out of the search — it
                   isn't an option, it's the way back to none. */}
               {clearRow && !trimmedQuery ? (

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import type { DashboardNewRunPrefill } from "@/lib/dashboardPrefillTypes";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, LocateFixed } from "lucide-react";
+import { Check, LocateFixed, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clientId } from "@/lib/clientId";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
@@ -91,6 +91,7 @@ import {
 import { runHasLapTimes } from "@/lib/runs/lapImportPrompt";
 import {
   InlineNewTrackRow,
+  NEW_CHIP_CLASS,
   type InlineNewTrackRowHandle,
 } from "@/components/runs/InlineNewTrackRow";
 import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEntry";
@@ -3459,6 +3460,14 @@ export function NewRunForm(props: {
     return () => setBridgeRef.current?.(null);
   }, []);
 
+  /** Opens the New event form, carrying a name typed into the event list's search. */
+  function openNewEventPanel(name: string) {
+    if (name) setNewEventName(name);
+    setShowNewEventPanel(true);
+    setStatus(null);
+    setEventError(null);
+  }
+
   async function createEvent(e?: React.MouseEvent) {
     e?.preventDefault();
     e?.stopPropagation();
@@ -5178,80 +5187,253 @@ export function NewRunForm(props: {
           )}
           contentClassName="space-y-3"
         >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <Eyebrow>Event</Eyebrow>
-              <PrefillBadge show={prefillHighlights?.event} />
-            </div>
-            <button
-              type="button"
-              className="btn-surface px-3 py-1.5 text-xs"
-              onClick={() => {
-                setShowNewEventPanel((v) => !v);
-                setStatus(null);
-                setEventError(null);
-              }}
-            >
-              {showNewEventPanel ? "Cancel" : "New event"}
-            </button>
+          <div className="flex min-w-0 items-center gap-2">
+            <Eyebrow>Event</Eyebrow>
+            <PrefillBadge show={prefillHighlights?.event} />
           </div>
 
-          <SearchableSelect
-            aria-label="Event"
-            placeholder="— Select event"
-            clearable
-            clearLabel="— Select event"
-            value={eventId}
-            onChange={(next) => {
-              wizardCtxTouchedRef.current = true;
-              setEventError(null);
-              // A "Your team" row is not mine yet — selecting it is the act of joining, and the id
-              // only becomes selectable once the server says yes.
-              const joinable = joinableEvents.find((j) => j.id === next);
-              if (joinable) {
-                void joinTeamEvent(joinable);
-                return;
-              }
-              setEventId(next);
-            }}
-            groups={[
-              ...(joinableEvents.length > 0
-                ? [
-                    {
-                      label: "Your team — tap to join",
-                      options: joinableEvents.map((ev) => ({
-                        value: ev.id,
-                        label: `${ev.name}${ev.ownerName ? ` · ${ev.ownerName}` : ""} · ${formatEventDate(ev.startDate)} · ${
-                          ev.isOnToday ? "on today" : formatEventRelativeLabel(ev)
-                        }`,
-                      })),
-                    },
-                  ]
-                : []),
-              ...(eventSelectGroups.upcoming.length > 0
-                ? [
-                    {
-                      label: "Upcoming",
-                      options: eventSelectGroups.upcoming.map((ev) => ({
-                        value: ev.id,
-                        label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
-                      })),
-                    },
-                  ]
-                : []),
-              ...(eventSelectGroups.past.length > 0
-                ? [
-                    {
-                      label: "Past",
-                      options: eventSelectGroups.past.map((ev) => ({
-                        value: ev.id,
-                        label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
-                      })),
-                    },
-                  ]
-                : []),
-            ]}
-          />
+          {/* The box, then "+ New event" under it: the Track section's own layout (founder pick
+              2026-09-26). It was a grey "New event" beside the heading, which a driver who opened
+              the list, didn't find their event and closed it again never saw. The list's own first
+              row opens the same form, carrying whatever was typed as the name. */}
+          <div className="space-y-2">
+            <SearchableSelect
+              aria-label="Event"
+              placeholder="— Select event"
+              clearable
+              clearLabel="— Select event"
+              createRow={{ label: "New event", onAction: openNewEventPanel }}
+              value={eventId}
+              onChange={(next) => {
+                wizardCtxTouchedRef.current = true;
+                setEventError(null);
+                // A "Your team" row is not mine yet — selecting it is the act of joining, and the id
+                // only becomes selectable once the server says yes.
+                const joinable = joinableEvents.find((j) => j.id === next);
+                if (joinable) {
+                  void joinTeamEvent(joinable);
+                  return;
+                }
+                setEventId(next);
+              }}
+              groups={[
+                ...(joinableEvents.length > 0
+                  ? [
+                      {
+                        label: "Your team — tap to join",
+                        options: joinableEvents.map((ev) => ({
+                          value: ev.id,
+                          label: `${ev.name}${ev.ownerName ? ` · ${ev.ownerName}` : ""} · ${formatEventDate(ev.startDate)} · ${
+                            ev.isOnToday ? "on today" : formatEventRelativeLabel(ev)
+                          }`,
+                        })),
+                      },
+                    ]
+                  : []),
+                ...(eventSelectGroups.upcoming.length > 0
+                  ? [
+                      {
+                        label: "Upcoming",
+                        options: eventSelectGroups.upcoming.map((ev) => ({
+                          value: ev.id,
+                          label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
+                        })),
+                      },
+                    ]
+                  : []),
+                ...(eventSelectGroups.past.length > 0
+                  ? [
+                      {
+                        label: "Past",
+                        options: eventSelectGroups.past.map((ev) => ({
+                          value: ev.id,
+                          label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
+                        })),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+            {showNewEventPanel ? (
+              <div className="inset-panel p-3 space-y-2">
+                <div className="inset-panel-deep p-2">
+                  <Eyebrow dot="muted" className="mb-1">Track (required)</Eyebrow>
+                  {/* The same picker and "New track" chip as the run's own Track step. This was a
+                      plain list with no way to add, so a driver whose track was missing had to leave
+                      the event half-made, add the track further down the form, and come back
+                      (founder 2026-09-25). */}
+                  <TrackCombobox
+                    tracks={tracksList}
+                    value={newEventTrackId}
+                    onChange={(next) => {
+                      setNewEventTrackId(next);
+                      // Layout belongs to a track; reset when the track changes.
+                      setNewEventLayoutId("");
+                      setNewEventDirection("");
+                      setEventError(null);
+                    }}
+                    favouriteTrackIds={favouriteTrackIds}
+                    favouriteTracks={favouriteTracks}
+                    nearby={nearbyTrackSuggestions}
+                    placeholder="Select track…"
+                    aria-label="Event track"
+                    onCreateRequest={(query) => newEventTrackRowRef.current?.openWith(query)}
+                  />
+                  <InlineNewTrackRow
+                    ref={newEventTrackRowRef}
+                    className="mt-2"
+                    onCreated={(t) => {
+                      // Merge rather than skip: on a duplicate name the row hands back the
+                      // *existing* track, with the timing URLs it already carries.
+                      setTracksList((prev) =>
+                        prev.some((x) => x.id === t.id)
+                          ? prev.map((x) => (x.id === t.id ? { ...x, ...t } : x))
+                          : [...prev, t]
+                      );
+                      setNewEventTrackId(t.id);
+                      setNewEventLayoutId("");
+                      setNewEventDirection("");
+                      setEventError(null);
+                    }}
+                  />
+                  {newEventTrackId ? (
+                    <div className="mt-2">
+                      <RunLayoutPicker
+                        trackId={newEventTrackId}
+                        layoutId={newEventLayoutId}
+                        direction={newEventDirection}
+                        onLayoutChange={setNewEventLayoutId}
+                        onDirectionChange={setNewEventDirection}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+                <input
+                  className="form-control w-full px-3 py-2 text-sm"
+                  placeholder="Event name (e.g. TITC 2026)"
+                  value={newEventName}
+                  onChange={(e) => setNewEventName(e.target.value)}
+                />
+                <EventDateRangeField
+                  label="Dates"
+                  startYmd={newEventStartDate}
+                  endYmd={newEventEndDate}
+                  onChange={(next) => {
+                    setNewEventStartDate(next.startYmd);
+                    setNewEventEndDate(next.endYmd);
+                    setEventError(null);
+                  }}
+                />
+                {/* Only when the chosen track points at nothing: laps are found from the track,
+                    so that is the one link worth taking here. */}
+                {askForEventTrackTiming(newEventTrackNeedingTiming) ? (
+                  <TrackTimingSourceNotice
+                    trackId={newEventTrackNeedingTiming!.id}
+                    trackName={newEventTrackNeedingTiming!.name}
+                    liveRcUrl={null}
+                    speedhiveUrl={null}
+                    onSaved={(next) =>
+                      setTracksList((prev) =>
+                        prev.map((t) =>
+                          t.id === newEventTrackNeedingTiming!.id ? { ...t, ...next } : t
+                        )
+                      )
+                    }
+                  />
+                ) : null}
+                <div className="space-y-1.5">
+                  <label className="block ui-label-meta">Tire</label>
+                  <SegmentedControl<"open" | "controlled">
+                    ariaLabel="Event tire — open or controlled"
+                    size="sm"
+                    value={newEventTireControlled ? "controlled" : "open"}
+                    onChange={(v) => {
+                      const on = v === "controlled";
+                      setNewEventTireControlled(on);
+                      if (!on) setNewEventControlledTireTypeId("");
+                    }}
+                    options={[
+                      { value: "open", label: "Open" },
+                      { value: "controlled", label: "Controlled" },
+                    ]}
+                  />
+                  {newEventTireControlled ? (
+                    <TireTypeCombobox
+                      value={newEventControlledTireTypeId}
+                      onChange={setNewEventControlledTireTypeId}
+                      placeholder="Select control tire type…"
+                      aria-label="Event control tire type"
+                    />
+                  ) : null}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block ui-label-meta">Additive</label>
+                  <SegmentedControl<"open" | "controlled">
+                    ariaLabel="Event additive — open or controlled"
+                    size="sm"
+                    value={newEventControlAdditiveEnabled ? "controlled" : "open"}
+                    onChange={(v) => {
+                      const on = v === "controlled";
+                      setNewEventControlAdditiveEnabled(on);
+                      if (!on) setNewEventControlledAdditiveTypeId("");
+                    }}
+                    options={[
+                      { value: "open", label: "Open" },
+                      { value: "controlled", label: "Controlled" },
+                    ]}
+                  />
+                  {newEventControlAdditiveEnabled ? (
+                    <AdditiveTypeCombobox
+                      value={newEventControlledAdditiveTypeId}
+                      onChange={setNewEventControlledAdditiveTypeId}
+                      placeholder="Select control additive…"
+                      aria-label="Event control additive type"
+                      allowInlineCreate={false}
+                    />
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={creatingEvent || !newEventName.trim() || !newEventTrackId}
+                    className={cn(
+                      buttonLinkClassName("primary"),
+                      (creatingEvent || !newEventName.trim() || !newEventTrackId) &&
+                        "opacity-60 pointer-events-none"
+                    )}
+                    onClick={(e) => createEvent(e)}
+                  >
+                    {creatingEvent ? "Creating…" : "Create event"}
+                  </button>
+                  {/* The form's own way out, as on the New track form, now that the chip that
+                      opened it has made way for it. */}
+                  <button
+                    type="button"
+                    disabled={creatingEvent}
+                    onClick={() => {
+                      setShowNewEventPanel(false);
+                      setStatus(null);
+                      setEventError(null);
+                    }}
+                    className="min-h-9 px-3 text-[13.5px] font-semibold text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={NEW_CHIP_CLASS}
+                  onClick={() => openNewEventPanel("")}
+                >
+                  <Plus aria-hidden className="size-3.5" strokeWidth={2.6} />
+                  New event
+                </button>
+              </div>
+            )}
+          </div>
 
           {joiningEventId ? (
             <p className="text-[11px] text-muted-foreground">Joining event…</p>
@@ -5261,15 +5443,6 @@ export function NewRunForm(props: {
           ) : null}
           {eventsLoadError ? (
             <p className="text-[11px] text-destructive">{eventsLoadError}</p>
-          ) : null}
-          {!eventsLoading && !eventsLoadError && events.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground">
-              No events yet — use <span className="font-medium">New event</span> above or create one on the{" "}
-              <Link href="/events" className="underline underline-offset-2">
-                Events
-              </Link>{" "}
-              page. Planned meetings work without a LiveRC link; you can log a draft days ahead.
-            </p>
           ) : null}
 
           {eventId ? (
@@ -5326,159 +5499,6 @@ export function NewRunForm(props: {
           {eventError && (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-foreground">
               {eventError}
-            </div>
-          )}
-
-          {showNewEventPanel && (
-            <div className="inset-panel p-3 space-y-2">
-              <div className="inset-panel-deep p-2">
-                <Eyebrow dot="muted" className="mb-1">Track (required)</Eyebrow>
-                {/* The same picker and "New track" chip as the run's own Track step. This was a
-                    plain list with no way to add, so a driver whose track was missing had to leave
-                    the event half-made, add the track further down the form, and come back
-                    (founder 2026-09-25). */}
-                <TrackCombobox
-                  tracks={tracksList}
-                  value={newEventTrackId}
-                  onChange={(next) => {
-                    setNewEventTrackId(next);
-                    // Layout belongs to a track; reset when the track changes.
-                    setNewEventLayoutId("");
-                    setNewEventDirection("");
-                    setEventError(null);
-                  }}
-                  favouriteTrackIds={favouriteTrackIds}
-                  favouriteTracks={favouriteTracks}
-                  nearby={nearbyTrackSuggestions}
-                  placeholder="Select track…"
-                  aria-label="Event track"
-                  onCreateRequest={(query) => newEventTrackRowRef.current?.openWith(query)}
-                />
-                <InlineNewTrackRow
-                  ref={newEventTrackRowRef}
-                  className="mt-2"
-                  onCreated={(t) => {
-                    // Merge rather than skip: on a duplicate name the row hands back the
-                    // *existing* track, with the timing URLs it already carries.
-                    setTracksList((prev) =>
-                      prev.some((x) => x.id === t.id)
-                        ? prev.map((x) => (x.id === t.id ? { ...x, ...t } : x))
-                        : [...prev, t]
-                    );
-                    setNewEventTrackId(t.id);
-                    setNewEventLayoutId("");
-                    setNewEventDirection("");
-                    setEventError(null);
-                  }}
-                />
-                {newEventTrackId ? (
-                  <div className="mt-2">
-                    <RunLayoutPicker
-                      trackId={newEventTrackId}
-                      layoutId={newEventLayoutId}
-                      direction={newEventDirection}
-                      onLayoutChange={setNewEventLayoutId}
-                      onDirectionChange={setNewEventDirection}
-                    />
-                  </div>
-                ) : null}
-              </div>
-              <input
-                className="form-control w-full px-3 py-2 text-sm"
-                placeholder="Event name (e.g. TITC 2026)"
-                value={newEventName}
-                onChange={(e) => setNewEventName(e.target.value)}
-              />
-              <EventDateRangeField
-                label="Dates"
-                startYmd={newEventStartDate}
-                endYmd={newEventEndDate}
-                onChange={(next) => {
-                  setNewEventStartDate(next.startYmd);
-                  setNewEventEndDate(next.endYmd);
-                  setEventError(null);
-                }}
-              />
-              {/* Only when the chosen track points at nothing: laps are found from the track,
-                  so that is the one link worth taking here. */}
-              {askForEventTrackTiming(newEventTrackNeedingTiming) ? (
-                <TrackTimingSourceNotice
-                  trackId={newEventTrackNeedingTiming!.id}
-                  trackName={newEventTrackNeedingTiming!.name}
-                  liveRcUrl={null}
-                  speedhiveUrl={null}
-                  onSaved={(next) =>
-                    setTracksList((prev) =>
-                      prev.map((t) =>
-                        t.id === newEventTrackNeedingTiming!.id ? { ...t, ...next } : t
-                      )
-                    )
-                  }
-                />
-              ) : null}
-              <div className="space-y-1.5">
-                <label className="block ui-label-meta">Tire</label>
-                <SegmentedControl<"open" | "controlled">
-                  ariaLabel="Event tire — open or controlled"
-                  size="sm"
-                  value={newEventTireControlled ? "controlled" : "open"}
-                  onChange={(v) => {
-                    const on = v === "controlled";
-                    setNewEventTireControlled(on);
-                    if (!on) setNewEventControlledTireTypeId("");
-                  }}
-                  options={[
-                    { value: "open", label: "Open" },
-                    { value: "controlled", label: "Controlled" },
-                  ]}
-                />
-                {newEventTireControlled ? (
-                  <TireTypeCombobox
-                    value={newEventControlledTireTypeId}
-                    onChange={setNewEventControlledTireTypeId}
-                    placeholder="Select control tire type…"
-                    aria-label="Event control tire type"
-                  />
-                ) : null}
-              </div>
-              <div className="space-y-1.5">
-                <label className="block ui-label-meta">Additive</label>
-                <SegmentedControl<"open" | "controlled">
-                  ariaLabel="Event additive — open or controlled"
-                  size="sm"
-                  value={newEventControlAdditiveEnabled ? "controlled" : "open"}
-                  onChange={(v) => {
-                    const on = v === "controlled";
-                    setNewEventControlAdditiveEnabled(on);
-                    if (!on) setNewEventControlledAdditiveTypeId("");
-                  }}
-                  options={[
-                    { value: "open", label: "Open" },
-                    { value: "controlled", label: "Controlled" },
-                  ]}
-                />
-                {newEventControlAdditiveEnabled ? (
-                  <AdditiveTypeCombobox
-                    value={newEventControlledAdditiveTypeId}
-                    onChange={setNewEventControlledAdditiveTypeId}
-                    placeholder="Select control additive…"
-                    aria-label="Event control additive type"
-                    allowInlineCreate={false}
-                  />
-                ) : null}
-              </div>
-              <button
-                type="button"
-                disabled={creatingEvent || !newEventName.trim() || !newEventTrackId}
-                className={cn(
-                  buttonLinkClassName("primary"),
-                  (creatingEvent || !newEventName.trim() || !newEventTrackId) &&
-                    "opacity-60 pointer-events-none"
-                )}
-                onClick={(e) => createEvent(e)}
-              >
-                {creatingEvent ? "Creating…" : "Create event"}
-              </button>
             </div>
           )}
 

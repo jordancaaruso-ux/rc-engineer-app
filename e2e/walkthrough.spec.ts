@@ -135,16 +135,19 @@ test("log a complete run from scratch, capturing every step", async ({ page }) =
   await page.getByRole("radio", { name: "Event" }).click();
   await beat(800);
 
-  // Pick today's meeting. Native <select>, so selectOption — clicking one opens an OS-level
-  // dropdown that Playwright cannot drive and the run hangs.
-  const eventSelect = page.getByRole("combobox", { name: "Event" });
-  const optionLabels = await eventSelect.locator("option").allTextContents();
+  // Pick today's meeting. The event list always opens as a sheet since 2026-09-26: its first row is
+  // "New event", which the phone's own list has no room for.
+  await page.getByRole("button", { name: "Event", exact: true }).click();
+  const eventSheet = page.getByRole("dialog", { name: "Event" });
+  await expect(eventSheet).toBeVisible();
+  const optionLabels = await eventSheet.getByRole("option").allTextContents();
   console.log("  event options: " + JSON.stringify(optionLabels));
-  const meetingLabel = optionLabels.find((t) => /TFTR Club Round 5/.test(t));
-  if (meetingLabel) {
-    await eventSelect.selectOption({ label: meetingLabel });
+  const meeting = eventSheet.getByRole("option", { name: /TFTR Club Round 5/ });
+  if ((await meeting.count()) > 0) {
+    await meeting.first().click();
   } else {
     console.log("  !! meeting not in the event list");
+    await eventSheet.getByRole("button", { name: "Close" }).click();
   }
   await beat(800);
   await page.getByRole("radio", { name: "Qualifying" }).click();
