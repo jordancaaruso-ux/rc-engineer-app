@@ -6,7 +6,7 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatRunCreatedAtDateTime } from "@/lib/formatDate";
+import { formatRunCreatedAtDateTime, formatRunDateTime, isDateOnlyRunTime } from "@/lib/formatDate";
 
 test("a saved setup's time reads the same in Chicago as in Sydney", () => {
   const savedAt = "2026-09-26T07:57:00.000Z";
@@ -37,4 +37,29 @@ test("every month is spelled", () => {
 
 test("not a date is a dash", () => {
   assert.equal(formatRunCreatedAtDateTime("not a date", "UTC"), "—");
+});
+
+// Test drive 2026-09-26: a LiveRC race whose clock couldn't be found is stored as midnight on its
+// day, and Sessions, the run and the day chart printed "24 Sept, 12:00 AM".
+
+test("a run time that is only a day prints the day, never 12:00 AM", () => {
+  const now = new Date("2026-09-26T08:00:00Z");
+  const midnightMelbourne = "2026-09-23T14:00:00.000Z"; // 24 Sep, 00:00 in Melbourne
+  assert.equal(isDateOnlyRunTime(midnightMelbourne, "Australia/Melbourne"), true);
+  assert.match(formatRunDateTime(midnightMelbourne, "Australia/Melbourne", now), /^24 Sept?$/);
+  assert.match(
+    formatRunDateTime("2025-09-23T14:00:00.000Z", "Australia/Melbourne", now),
+    /^24 Sept? 2025$/,
+    "an earlier year keeps its year"
+  );
+});
+
+test("any real clock time still prints, midnight read in another zone included", () => {
+  const now = new Date("2026-09-26T08:00:00Z");
+  assert.equal(isDateOnlyRunTime("2026-09-23T14:01:00.000Z", "Australia/Melbourne"), false);
+  assert.equal(isDateOnlyRunTime("2026-09-23T14:00:00.001Z", "Australia/Melbourne"), false);
+  assert.equal(isDateOnlyRunTime("2026-09-23T14:00:00.000Z", "Australia/Perth"), false);
+  assert.equal(isDateOnlyRunTime("not a date", "UTC"), false);
+  assert.match(formatRunDateTime("2026-09-23T14:01:00.000Z", "Australia/Melbourne", now), /^24 Sept?, 12:01 AM$/);
+  assert.match(formatRunDateTime("2026-09-24T04:41:00.000Z", "Australia/Melbourne", now), /^24 Sept?, 2:41 PM$/);
 });

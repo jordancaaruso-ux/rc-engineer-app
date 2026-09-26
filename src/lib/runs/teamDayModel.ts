@@ -8,6 +8,7 @@ import {
   type RunGroupZoneOptions,
 } from "@/lib/runs/buildRunHistoryGroups";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
+import { isDateOnlyRunTime } from "@/lib/formatDate";
 
 /**
  * The team day — everyone who ran this session, on one clock.
@@ -35,7 +36,10 @@ export type TeamDayPoint = {
    * run's ON-TRACK instant (`trackInstant`), never from when the log was saved.
    */
   minute: number;
-  /** "10:42" — the axis is minutes, but the tooltip must read like a clock. */
+  /**
+   * "10:42" — the axis is minutes, but the tooltip must read like a clock. Empty for a time that
+   * is only a day (`isDateOnlyRunTime`): the point sits at midnight, but no clock is claimed.
+   */
   clock: string;
   best: number | null;
   avgTop5: number | null;
@@ -237,7 +241,9 @@ export function buildTeamDayModel(
         label: shortRunLabel(run, index),
         dayKey: dayKeyOf(instant, run, opts.zones),
         minute,
-        clock: formatClock(minute),
+        clock: isDateOnlyRunTime(instant, resolveRunLocalTimeZone(run, opts.zones))
+          ? ""
+          : formatClock(minute),
         best: metrics.best,
         avgTop5: metrics.avgTop5,
         lapCount: metrics.cleanLapCount,

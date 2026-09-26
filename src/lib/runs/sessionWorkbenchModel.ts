@@ -21,7 +21,7 @@ import {
 } from "@/lib/setupCompare/changedSincePrevious";
 import { isExcludedSetupChangeKey } from "@/lib/setupCompare/setupChangeNoise";
 import { normalizeSetupData } from "@/lib/runSetup";
-import { formatRunDateShort, formatRunTimeOnly } from "@/lib/formatDate";
+import { formatRunDateShort, formatRunTimeOnly, isDateOnlyRunTime } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { runSessionName } from "@/lib/runSession";
 import { runNeedsLapImport } from "@/lib/runs/lapImportPrompt";
@@ -143,13 +143,16 @@ function normalizeCarRating(value: number | null | undefined): number | null {
  * read from another country — has one true clock, and it is the one that was on the pit
  * bench. The reader's zone is the last fallback, for runs logged before the app captured
  * a per-run zone.
+ *
+ * Empty for a time that is only a day (`isDateOnlyRunTime`): no clock is known, so none prints.
  */
 function runTimeLabel(run: WorkbenchRunSource, zones?: RunGroupZoneOptions): string {
   const zone = resolveRunLocalTimeZone(
     { localTimeZone: run.localTimeZone ?? null, userId: run.userId ?? null },
     zones
   );
-  return formatRunTimeOnly(resolveRunDisplayInstant(run), zone);
+  const at = resolveRunDisplayInstant(run);
+  return isDateOnlyRunTime(at, zone) ? "" : formatRunTimeOnly(at, zone);
 }
 
 /**
@@ -426,6 +429,7 @@ export function buildGroupRunRows(
       { localTimeZone: run.localTimeZone ?? null, userId: run.userId ?? null },
       zones
     );
+    const timeLabel = runTimeLabel(run, zones);
     return {
       id: run.id,
       label: labelByRunId.get(run.id) ?? "Run",
@@ -436,14 +440,16 @@ export function buildGroupRunRows(
         sessionLabel: run.sessionLabel,
         carName: carNameOf(run),
       }),
-      timeLabel: runTimeLabel(run, zones),
+      timeLabel,
       dayKey: runLocalDayKey(run, zones),
       dayLabel: formatRunDayLabel(runLocalDayKey(run, zones)),
       whereLabel: track,
       // One string, not two joined at the row: the comma between the date and the
       // clock is part of the format, and a row that had to know that would be the
-      // second place the rule lives.
-      whenLabel: `${formatRunDateShort(resolveRunDisplayInstant(run), zone)}, ${formatRunTimeOnly(resolveRunDisplayInstant(run), zone)}`,
+      // second place the rule lives. A day with no clock is the date alone.
+      whenLabel: [formatRunDateShort(resolveRunDisplayInstant(run), zone), timeLabel]
+        .filter(Boolean)
+        .join(", "),
       carName: carNameOf(run),
       best: metrics.best,
       avgTop5: metrics.cleanLapCount >= 5 ? metrics.avgTop5 : null,
