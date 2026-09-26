@@ -11,7 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildCadenceRead } from "@/lib/events/seasonCadence";
+import { buildCadenceRead, seasonDayOfRun, venueHistoryCutoffYmd } from "@/lib/events/seasonCadence";
 import type { SeasonEventRow } from "@/lib/events/seasonEventRow";
 
 /** 8 Aug 2026 is a Saturday. */
@@ -123,4 +123,32 @@ test("events with no track cannot anchor a claim", () => {
 test("the day count in the fallback is real", () => {
   const read = buildCadenceRead([event({ startYmd: "2026-08-07" })], TODAY);
   assert.equal(read.headline, "Your last day out was Boronia, 1 day ago.");
+});
+
+// W3-08 (test drive 2026-09-26): a 2025 meeting logged in 2026 had its runs in 2026's venue
+// records ("0 laps, no timed laps" under 2025) while Recent Form showed its 19.630.
+
+test("a run logged after its meeting ended counts on the meeting's day", () => {
+  const meeting = { startYmd: "2025-09-06", endYmd: "2025-09-06" };
+  assert.equal(seasonDayOfRun("2026-09-26", meeting), "2025-09-06");
+});
+
+test("a run on one of its meeting's days, or the practice day before, keeps its own day", () => {
+  const weekend = { startYmd: "2026-09-12", endYmd: "2026-09-13" };
+  assert.equal(seasonDayOfRun("2026-09-13", weekend), "2026-09-13");
+  assert.equal(seasonDayOfRun("2026-09-11", weekend), "2026-09-11");
+  assert.equal(seasonDayOfRun("2026-09-26", null), "2026-09-26");
+});
+
+// W1-23: on day two of her first meeting at EMCC, with five runs there, Paddock said
+// "first visit" and "You have not run this venue before".
+
+test("once a meeting has started, runs at the venue up to today count", () => {
+  assert.equal(venueHistoryCutoffYmd({ startYmd: "2026-09-25" }, "2026-09-26"), "2026-09-27");
+  // Race morning of a one-day meeting: today's earlier runs count too.
+  assert.equal(venueHistoryCutoffYmd({ startYmd: "2026-09-26" }, "2026-09-26"), "2026-09-27");
+});
+
+test("before a meeting starts, only the visits before it count", () => {
+  assert.equal(venueHistoryCutoffYmd({ startYmd: "2026-10-11" }, "2026-09-26"), "2026-10-11");
 });

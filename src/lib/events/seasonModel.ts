@@ -38,6 +38,8 @@ import {
   addDays,
   buildCadenceRead,
   daysBetween,
+  seasonDayOfRun,
+  venueHistoryCutoffYmd,
   type CadenceRead,
 } from "@/lib/events/seasonCadence";
 import type { SeasonEventRow } from "@/lib/events/seasonEventRow";
@@ -133,6 +135,12 @@ export async function loadEventsSeasonModel(input: {
     }),
   ]);
 
+  /* A meeting's days, for runs on it: every run's meeting is in scope, because a run is
+     one of the things that puts a meeting there (`eventIdsInScopeForUser`). */
+  const meetingDaysById = new Map(
+    eventRows.map((e) => [e.id, { startYmd: eventDateToYmd(e.startDate), endYmd: eventDateToYmd(e.endDate) }])
+  );
+
   /* Reduce each run to the handful of facts the page needs. `bestLapSeconds` is
      materialized but nullable, so fall back to the included laps exactly as the
      dashboard does — otherwise a run logged before that column existed counts as
@@ -145,16 +153,20 @@ export async function loadEventsSeasonModel(input: {
       trackId: r.trackId,
       // In the viewer's zone, not UTC: a Bayside evening run (22:33Z on 31 July) is 1 August
       // in Brisbane, and the venue record said "31 JUL" beside a Sessions list saying
-      // "1 Aug" for the same lap (2026-09-05 pre-release walk).
-      ymd: calendarYmdInTimeZone(
-        resolveRunDisplayInstant({
-          createdAt: r.createdAt,
-          sessionCompletedAt: r.sessionCompletedAt,
-          loggingCompletedAt: r.loggingCompletedAt,
-          sortAt: r.sortAt,
-          importedLapTimeSessionId: r.importedLapTimeSessionId,
-        }),
-        input.timeZone,
+      // "1 Aug" for the same lap (2026-09-05 pre-release walk). A run logged after its
+      // meeting ended counts on the meeting's day, as the meeting does (`seasonDayOfRun`).
+      ymd: seasonDayOfRun(
+        calendarYmdInTimeZone(
+          resolveRunDisplayInstant({
+            createdAt: r.createdAt,
+            sessionCompletedAt: r.sessionCompletedAt,
+            loggingCompletedAt: r.loggingCompletedAt,
+            sortAt: r.sortAt,
+            importedLapTimeSessionId: r.importedLapTimeSessionId,
+          }),
+          input.timeZone,
+        ),
+        r.eventId ? meetingDaysById.get(r.eventId) : null,
       ),
       bestLapSeconds:
         stored ?? (included.length ? Math.min(...included.map((l) => l.lapTimeSeconds)) : null),
@@ -360,8 +372,10 @@ export async function loadEventsSeasonModel(input: {
 
   let nextUp: NextUp | null = null;
   if (nextEvent) {
+    // Before a meeting, the visits before it; once it is running, its own runs so far too.
+    const cutoffYmd = venueHistoryCutoffYmd(nextEvent, todayYmd);
     const here = nextEvent.trackId
-      ? runs.filter((r) => r.trackId === nextEvent.trackId && r.ymd < nextEvent.startYmd)
+      ? runs.filter((r) => r.trackId === nextEvent.trackId && r.ymd < cutoffYmd)
       : [];
     const lastHere = here.reduce<RunFacts | null>(
       (latest, r) => (!latest || r.ymd > latest.ymd ? r : latest),
@@ -370,7 +384,7 @@ export async function loadEventsSeasonModel(input: {
     nextUp = {
       event: nextEvent,
       daysUntil: Math.max(0, daysBetween(todayYmd, nextEvent.startYmd)),
-      toBeatSeconds: venueBestBefore(nextEvent.trackId, nextEvent.startYmd),
+      toBeatSeconds: venueBestBefore(nextEvent.trackId, cutoffYmd),
       // Days you turned a wheel there, lifetime — the same unit the records card counts
       // in, so the two cards cannot print different numbers for the same venue. Lifetime
       // rather than scoped, to pair with `toBeatSeconds`, which is also lifetime.
