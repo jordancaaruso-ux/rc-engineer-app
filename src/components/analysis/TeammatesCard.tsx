@@ -3,9 +3,12 @@ import { TeammatesLastOutList } from "@/components/analysis/TeammatesLastOutList
 import { CardPanel } from "@/components/ui/CardPanel";
 
 /**
- * **Your team** — every teammate you have, the ones out with you today first, then the ones out
- * today somewhere else, then everyone by how recently they last ran. Added 2026-08-20 on founder
- * instruction — *"the list below should be expansive, every teammate you have."*
+ * **Your teammates** — every teammate you have, the ones out with you today first, then the ones
+ * out today somewhere else, then everyone by how recently they last ran. Added 2026-08-20 on
+ * founder instruction — *"the list below should be expansive, every teammate you have."*
+ *
+ * Named for the people, not a team (founder, 2026-09-26): a driver in more than one team sees
+ * drivers from all of them here, so "Your team" named a team that doesn't exist.
  *
  * ── The card that used to sit above this one (deleted 2026-09-14) ────────────────────────────
  * "Out with you": the other drivers who had logged a run at your meeting, or at your track that
@@ -41,7 +44,7 @@ export function TeammatesCard({ rows }: { rows: TeammateLastOut[] }) {
 
   return (
     <CardPanel contentClassName="flex flex-col gap-0 p-0">
-      <CardHead title="Your team" scope={scope} />
+      <CardHead title="Your teammates" scope={scope} />
       <TeammatesLastOutList rows={rows} />
     </CardPanel>
   );

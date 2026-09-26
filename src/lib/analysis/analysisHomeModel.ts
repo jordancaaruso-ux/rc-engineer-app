@@ -182,7 +182,7 @@ export type AnalysisRecentRun = {
 };
 
 /**
- * One teammate on the **Your team** card — every teammate you have. Added 2026-08-20 on founder
+ * One teammate on the **Your teammates** card — every teammate you have. Added 2026-08-20 on founder
  * request: *"the list below should be expansive, every teammate you have."*
  *
  * Scoped by `TeamMembership` and nothing else. Until 2026-09-14 a second card sat above this one

@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * The **Your team** list — every teammate, out with you today first, then by when they last ran
+ * The **Your teammates** list — every teammate, out with you today first, then by when they last ran
  * (`sortTeammatesByLastOut` decides; the rows arrive in order).
  *
  * ── Why the rows are two lines ───────────────────────────────────────────────────────────────

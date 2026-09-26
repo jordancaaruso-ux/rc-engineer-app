@@ -297,7 +297,7 @@ test("collectCarOptions: distinct, first-seen order, null car bucket", () => {
   ]);
 });
 
-/* ── Your team: every teammate, out with you today first, then by when they last ran ─────── */
+/* ── Your teammates: every teammate, out with you today first, then by when they last ran ── */
 
 const teammate = (
   name: string,

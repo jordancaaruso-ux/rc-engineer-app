@@ -12,7 +12,7 @@ import {
 } from "@/lib/analysis/analysisHomeModel";
 
 /**
- * The **Your team** card — every teammate you have, the teammates out with you today first.
+ * The **Your teammates** card — every teammate you have, the teammates out with you today first.
  *
  * Built 2026-08-20 on founder instruction: *"the list below should be expansive, every teammate
  * you have."* It reads `TeamMembership` and nothing else: your team, wherever they were, however
