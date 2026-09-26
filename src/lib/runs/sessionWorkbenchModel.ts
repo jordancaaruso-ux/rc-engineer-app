@@ -20,7 +20,7 @@ import {
   type SetupChangedRow,
 } from "@/lib/setupCompare/changedSincePrevious";
 import { isExcludedSetupChangeKey } from "@/lib/setupCompare/setupChangeNoise";
-import { normalizeSetupData } from "@/lib/runSetup";
+import { setupHasChassisValue } from "@/lib/setup/runContextSetupKeys";
 import { formatRunDateShort, formatRunTimeOnly } from "@/lib/formatDate";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { runSessionName } from "@/lib/runSession";
@@ -396,7 +396,9 @@ export function buildGroupRunRows(
     if (!setupDataByRunId) return null;
     const run = group.runs[index];
     const own = setupDataByRunId.get(run.id);
-    if (Object.keys(normalizeSetupData(own)).length === 0) return { mode: "no_setup" };
+    // Nothing on the CAR is no setup, as on the run page: the form writes today's tyre into every
+    // run's setup by itself, and a run logged without one otherwise diffed as every box blanked.
+    if (!setupHasChassisValue(own)) return { mode: "no_setup" };
     // `group.runs` is newest-first, so the baseline is the next one DOWN the list
     // that ran the same car — the same walk `computeSetupChangesByRunId` makes for
     // the chart's wrench, so the row and the glyph can never disagree.

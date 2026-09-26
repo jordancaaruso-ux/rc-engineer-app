@@ -175,6 +175,24 @@ test("setupDiff separates no-setup, no-baseline and a real diff", () => {
   assert.equal(rows[2]!.setupDiff?.mode, "no_baseline", "the first run on a car has nothing to diff");
 });
 
+test("a run whose setup holds only the tyre the form wrote in has no setup, not every box blanked", () => {
+  const tyre = { tireTypeId: "t1", displayName: "AKA Array Super Soft", tireRunNumber: 2, tireAgeKnown: true };
+  const rows = buildGroupRunRows(
+    group([
+      { ...run("r2", laps(6)), createdAt: new Date("2026-08-24T04:00:00Z") },
+      { ...run("r1", laps(6)), createdAt: new Date("2026-08-24T03:00:00Z") },
+    ]),
+    undefined,
+    {
+      setupDataByRunId: new Map<string, unknown>([
+        ["r2", { tires: tyre }],
+        ["r1", { camber_front: "-1.5", ride_height_rear: "5.5", tires: tyre }],
+      ]),
+    }
+  );
+  assert.equal(rows[0]!.setupDiff?.mode, "no_setup");
+});
+
 /** Without snapshots the field is null — the expansion then says so rather than "no changes". */
 test("setupDiff is null when the caller passed no setup data", () => {
   const [row] = buildGroupRunRows(group([run("r1", laps(6))]));
