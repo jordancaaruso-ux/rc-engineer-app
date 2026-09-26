@@ -1,5 +1,5 @@
 import type { UrlImportBlock } from "@/components/runs/LapTimesIngestPanel";
-import { trackClockTime } from "@/lib/lapImport/trackClock";
+import { isDateOnlyTrackTime, trackClockTime } from "@/lib/lapImport/trackClock";
 import { compareOutingSheets, type OutingSession } from "@/lib/runs/groupOutings";
 import {
   durationFromDrivers,
@@ -50,13 +50,17 @@ export type LinkedOutingSource = {
 export function blockOutingSpan(block: UrlImportBlock, fallbackTimeZone: string | null): Span | null {
   // The stored time before the parse's, as the evening pass reads it: the sweep corrects a stored
   // time from the site's list when a results page printed only the meeting's date.
-  const onTrack = trackClockTime({
+  const clock = {
     iso: block.sessionCompletedAtDbIso?.trim() || block.sessionCompletedAtIso?.trim() || "",
     parserId: block.parserId,
     sourceUrl: block.sourceUrl,
     utcOffsetMinutes: block.sessionUtcOffsetMinutes,
     fallbackTimeZone,
-  });
+  };
+  // A date with no clock is no window: two of a meeting's races both stored at its midnight are
+  // not the same race (test drive, 2026-09-26).
+  if (isDateOnlyTrackTime(clock)) return null;
+  const onTrack = trackClockTime(clock);
   if (!onTrack) return null;
   return spanFrom(
     onTrack,

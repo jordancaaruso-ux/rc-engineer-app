@@ -327,3 +327,26 @@ test("with no saved set carrying an address, everything reopens as it always did
   assert.deepEqual(out.blocks.map((b) => b.blockId), ["myrcm", "speedhive"]);
   assert.deepEqual(out.linkedSources, []);
 });
+
+test("two races known only by their meeting's date are not the same race", () => {
+  // A LiveRC race page prints only the meeting's date; stored at its midnight, the day's races all
+  // covered the same "window", and the second race pasted onto a run was linked as a copy of the
+  // first instead of being added (test drive, 2026-09-26).
+  const a1 = block({
+    id: "a1-main",
+    url: "https://westcoast.liverc.com/results/?p=view_race_result&id=1001",
+    parserId: "liverc_race_result_v1",
+    iso: "2026-09-13T00:00:00.000Z",
+    drivers: [driver("d1", "Mark Mayhew", laps(17, 18.2)), driver("d2", "Other Driver", laps(17, 18.5))],
+  });
+  const a3 = block({
+    id: "a3-main",
+    url: "https://westcoast.liverc.com/results/?p=view_race_result&id=1002",
+    parserId: "liverc_race_result_v1",
+    iso: "2026-09-13T00:00:00.000Z",
+    drivers: [driver("d1", "Mark Mayhew", laps(16, 18.4)), driver("d3", "Third Driver", laps(16, 18.9))],
+  });
+
+  assert.equal(blockOutingSpan(a1, TZ), null, "a date is not a window on track");
+  assert.deepEqual(sameOutingAttach([a1], a3, TZ), { kind: "separate" });
+});

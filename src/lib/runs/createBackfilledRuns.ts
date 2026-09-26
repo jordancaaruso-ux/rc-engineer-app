@@ -4,13 +4,17 @@ import type { Prisma as PrismaTypes, SessionType, TrackDirection } from "@prisma
 import { prisma } from "@/lib/prisma";
 import { getLiveRcDriverIdSetting, getLiveRcDriverNameSetting } from "@/lib/appSettings";
 import { sessionCompletedAtIsoFromImportedPayload } from "@/lib/lapImport/fromPayload";
+import { isDateOnlyTrackTime } from "@/lib/lapImport/trackClock";
 import { normalizeSetupSnapshotForStorage } from "@/lib/runSetup";
 import { withTireRunNumberInSnapshot } from "@/lib/tires/cascadeTireRunNumber";
 import { importedSessionInstantToReal } from "@/lib/runSessionCompletedAt";
 import { runLocalDayKey } from "@/lib/runs/buildRunHistoryGroups";
 import { planBackfilledRuns, type BackfillPlanRun } from "@/lib/runs/planBackfilledRuns";
-import { groupOutings, type Outing } from "@/lib/runs/groupOutings";
-import { spansOverlap, type Span } from "@/lib/runs/outingSpan";
+import {
+  planBackfillOutings,
+  type BackfillHostRun,
+  type BackfillOutingSession,
+} from "@/lib/runs/backfillOutingFold";
 import {
   trackClockOutingFromImportedRow,
   trackClockSpanForExistingRun,
@@ -199,7 +203,13 @@ export async function createBackfilledRuns(params: {
   const sessionById = new Map(sessions.map((s) => [s.id, s]));
 
   const result: CreateBackfilledRunsResult = { created: [], skipped: [] };
-  const plannable: Array<{ id: string; instant: Date; session: (typeof sessions)[number] }> = [];
+  const plannable: Array<{
+    id: string;
+    instant: Date;
+    session: (typeof sessions)[number];
+    /** The site gave only the day (`isDateOnlyTrackTime`): no time on track to share with anything. */
+    dateOnly: boolean;
+  }> = [];
   for (const id of ids) {
     const session = sessionById.get(id);
     if (!session) {
@@ -220,7 +230,12 @@ export async function createBackfilledRuns(params: {
     }
     // LiveRC/MyRCM store the track's wall clock as-if-UTC; Speedhive is a real instant already.
     const instant = importedSessionInstantToReal(new Date(rawIso), session.sourceUrl, zone);
-    plannable.push({ id, instant, session });
+    const dateOnly = isDateOnlyTrackTime({
+      iso: rawIso,
+      parserId: session.parserId,
+      sourceUrl: session.sourceUrl,
+    });
+    plannable.push({ id, instant, session, dateOnly });
   }
   if (plannable.length === 0) return result;
 
@@ -304,23 +319,23 @@ export async function createBackfilledRuns(params: {
     timeZoneForCoordinates(ctx.track?.latitude, ctx.track?.longitude) ??
     zone;
   const plannableById = new Map(plannable.map((p) => [p.id, p]));
-  const outings = groupOutings(
-    plannable.map(
-      (p) =>
-        trackClockOutingFromImportedRow(p.session, fallbackZone) ?? {
-          id: p.id,
-          kind: "practice" as const,
-          start: p.instant,
-          end: p.instant,
-          driverCount: 0,
-          lapCount: 0,
-        }
-    )
-  );
+  // A session with only a date is an outing of its own, never grouped (`backfillOutingFold.ts`).
+  const outingSessions: BackfillOutingSession[] = plannable.map((p) => ({
+    session: trackClockOutingFromImportedRow(p.session, fallbackZone) ?? {
+      id: p.id,
+      kind: "practice" as const,
+      start: p.instant,
+      end: p.instant,
+      driverCount: 0,
+      lapCount: 0,
+    },
+    dateOnly: p.dateOnly,
+  }));
 
   // An outing that overlaps a run the driver already has today at this track — the parent being
-  // saved included — joins that run instead of opening a second one.
-  const existingSpans: Array<{ id: string; span: Span }> = [];
+  // saved included — joins that run instead of opening a second one. Only when both have a time
+  // on track: a session or a run known only by its date joins nothing and hosts nothing.
+  const hostRuns: BackfillHostRun[] = [];
   if (ctx.trackId) {
     const existing = await prisma.run.findMany({
       where: {
@@ -356,19 +371,26 @@ export async function createBackfilledRuns(params: {
     });
     for (const r of existing) {
       const span = trackClockSpanForExistingRun(r, fallbackZone);
-      if (span) existingSpans.push({ id: r.id, span });
+      if (!span) continue;
+      const s = r.detectedImportedLapSession;
+      hostRuns.push({
+        id: r.id,
+        span,
+        dateOnly: s
+          ? isDateOnlyTrackTime({
+              iso: s.sessionCompletedAt?.toISOString() ?? sessionCompletedAtIsoFromImportedPayload(s.parsedPayload),
+              parserId: s.parserId,
+              sourceUrl: s.sourceUrl,
+            })
+          : false,
+      });
     }
   }
-  const standalone: Outing[] = [];
-  for (const outing of outings) {
-    const host = existingSpans.find((r) => spansOverlap(r.span, outing));
-    if (!host) {
-      standalone.push(outing);
-      continue;
-    }
+  const { standalone, joined } = planBackfillOutings(outingSessions, hostRuns);
+  for (const { runId, outing } of joined) {
     await prisma.importedLapTimeSession.updateMany({
       where: { id: { in: outing.sessionIds }, userId: params.userId, linkedRunId: null },
-      data: { linkedRunId: host.id },
+      data: { linkedRunId: runId },
     });
     for (const id of outing.sessionIds) {
       result.skipped.push({ importedLapTimeSessionId: id, reason: "same_outing" });
@@ -410,7 +432,8 @@ export async function createBackfilledRuns(params: {
   const canFetchWeather = ctx.track ? trackHasMarkedLocation(ctx.track) : false;
   const conditionsByPlanIndex = await Promise.all(
     plan.map((entry) =>
-      canFetchWeather
+      // A run known only by its date has no hour to ask the weather about; midnight's is not it.
+      canFetchWeather && !plannableById.get(entry.sessionId)?.dateOnly
         ? backfillRunConditionsFromTrack({
             latitude: ctx.track!.latitude!,
             longitude: ctx.track!.longitude!,
