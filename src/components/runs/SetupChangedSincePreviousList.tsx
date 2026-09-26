@@ -6,6 +6,7 @@ import { orderSetupChangedRows, type SetupChangedRow } from "@/lib/setupCompare/
 import { SheetBoxCrop, useSheetBoxCrops } from "@/components/runs/SheetBoxCrop";
 import { InlineValueEdit } from "@/components/runs/InlineValueEdit";
 import { setupKeyIsInlineEditable } from "@/lib/setup/inlineEditableKeys";
+import { inSheetWords, sheetBoxHasChoiceWords } from "@/lib/setup/sheetWords";
 import { cn } from "@/lib/utils";
 
 const HEAD_CELL =
@@ -78,7 +79,13 @@ export function SetupChangedSincePreviousList({
     );
   }
 
-  const ordered = orderSetupChangedRows(rows);
+  /*
+   * In the sheet's own words — "Anti Roll Bar (Front) 1.4", not "anti roll bar front f_1_4" (test
+   * drive, 2026-09-26). They arrive with the crops, a moment after the list draws, so the rows are
+   * ordered by the names they came with first: the list does not reshuffle when the words land.
+   */
+  const words = crops.kind === "loading" ? null : crops.words;
+  const ordered = inSheetWords(orderSetupChangedRows(rows), words);
   const capped = maxRows != null && ordered.length > maxRows;
   const shown = capped && !showAll ? ordered.slice(0, maxRows) : ordered;
 
@@ -140,7 +147,9 @@ export function SetupChangedSincePreviousList({
                   {row.label}
                 </div>
                 <div className="min-w-0 break-words px-2 py-[7px] text-right text-[13px] tabular-nums leading-tight text-foreground">
-                  {onEditValue && setupKeyIsInlineEditable(row.key) ? (
+                  {/* A row of printed choices is not retyped here: the word shown is not what is
+                      stored ("1.3" is kept as `f_1_3`), so it changes with its chips on the sheet. */}
+                  {onEditValue && setupKeyIsInlineEditable(row.key) && !sheetBoxHasChoiceWords(words, row.key) ? (
                     <InlineValueEdit
                       label={row.label}
                       value={row.value === "—" ? "" : row.value}

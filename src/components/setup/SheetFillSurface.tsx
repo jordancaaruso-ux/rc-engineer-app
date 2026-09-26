@@ -123,6 +123,19 @@ export type SheetFillPlan = {
 const EMPTY_PLAN: SheetFillPlan = { fields: [], boxes: [], pageCount: 1 };
 
 /**
+ * What a row of choices says in the bar's value box: the chips that are on, by the words printed
+ * on them. A calibrated sheet stores its own code for each choice ("1.3" is stored as `f_1_3`), and
+ * the box under the Mi10's roll-bar chips read "f_1_3" (test drive, 2026-09-26). A value no chip
+ * matches, such as one typed on an older sheet, shows as it is.
+ */
+function pickedChoiceWords(field: SheetFillField, surfaceValue: string): string {
+  const picked = (field.options ?? []).filter((word, i) =>
+    optionSelectedInSurfaceValue(surfaceValue, field.optionValues?.[i] ?? word, Boolean(field.multi))
+  );
+  return picked.length > 0 ? picked.join(", ") : surfaceValue;
+}
+
+/**
  * Zoom, as a multiple of the page fitted to the screen's width.
  *
  * `FOCUS_ZOOM` is what tapping a box gives you: enough to read the printed caption beside it while
@@ -2042,7 +2055,7 @@ export function SheetFillSurface({
                 ? values[focused.key]
                   ? "Ticked"
                   : "Not ticked"
-                : values[focused.key] || "Pick one"}
+                : pickedChoiceWords(focused, values[focused.key] ?? "") || "Pick one"}
             </button>
           ) : null}
         </div>

@@ -20,6 +20,7 @@ import { getCarSetupHistory } from "@/lib/setup/getCarSetupHistory";
 import { UploadSetupSheetBar } from "@/components/setup/UploadSetupSheetBar";
 import { priorSetupCountsByCarId } from "@/lib/setup/priorSetupCounts";
 import { carSupportsSheetUpload } from "@/lib/setupCalibrations/carSupportsSheetUpload";
+import { tiresOnCar } from "@/lib/cars/tiresOnCar";
 
 export default async function CarDetailPage(props: {
   params: Promise<{ carId: string }>;
@@ -184,29 +185,9 @@ export default async function CarDetailPage(props: {
    */
   const inferredDiscipline = disciplineForCar({ ...car, carClass: null });
 
-  const runsOnCarByTire = new Map<string, number>();
-  /** Highest run count reached on this compound — a rough "how far you've taken it". */
-  const furthestRunByTire = new Map<string, number>();
-  const tireSetsOnCar: Array<{ id: string; label: string }> = [];
-  const countTireOnCar = (id: string | null | undefined, label: string, runNumber: number) => {
-    if (!id) return;
-    runsOnCarByTire.set(id, (runsOnCarByTire.get(id) ?? 0) + 1);
-    furthestRunByTire.set(id, Math.max(furthestRunByTire.get(id) ?? 0, runNumber));
-    if (!tireSetsOnCar.some((t) => t.id === id)) tireSetsOnCar.push({ id, label });
-  };
-  for (const r of tireRunRows) {
-    countTireOnCar(
-      r.tireTypeId ?? r.tireSet?.tireTypeId,
-      r.tireType?.displayName ?? r.tireSet?.tireType?.displayName ?? "Tires",
-      r.tireRunNumber
-    );
-    countTireOnCar(
-      r.frontTireTypeId,
-      r.frontTireType?.displayName ?? "Tires",
-      r.frontTireRunNumber ?? 1
-    );
-  }
-  tireSetsOnCar.sort((a, b) => a.label.localeCompare(b.label));
+  // Each compound once, each run counted once per compound — the same tire front and rear is one
+  // run on it. See `tiresOnCar`.
+  const tireSetsOnCar = tiresOnCar(tireRunRows);
 
   return (
     <>
@@ -342,8 +323,7 @@ export default async function CarDetailPage(props: {
                     {/* Short enough to hold one line at 390px — the old wording ("… on this car ·
                         taken to run 22") wrapped and the compound lost its place. */}
                     <span className="text-[11px] text-muted-foreground tabular-nums">
-                      {runsOnCarByTire.get(ts.id) ?? 0} run{runsOnCarByTire.get(ts.id) === 1 ? "" : "s"} · to run{" "}
-                      {furthestRunByTire.get(ts.id) ?? "—"}
+                      {ts.runCount} run{ts.runCount === 1 ? "" : "s"} · to run {ts.furthestRun}
                     </span>
                   </li>
                 ))}

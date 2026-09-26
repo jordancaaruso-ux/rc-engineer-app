@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ChangedBoxCrop } from "@/lib/setupCompare/changedBoxRegion";
+import type { SheetWords } from "@/lib/setup/sheetWords";
 import {
   boxWrapsText,
   NOTE_LINE_HEIGHT,
@@ -48,20 +49,26 @@ const PLACEHOLDER_ASPECT = 2.4;
 
 type CropsState =
   | { kind: "loading" }
-  | { kind: "none" }
+  | {
+      kind: "none";
+      /** The sheet's own names for the boxes asked about — every chassis has these, sheet or not. */
+      words: SheetWords | null;
+    }
   | {
       kind: "ready";
       modelId: string;
       /** The EDITION the crops came from, when not the primary blank — see `sheet-boxes`. */
       editionBlankId: string | null;
       byKey: Map<string, ChangedBoxCrop>;
+      words: SheetWords | null;
     };
 
 /**
  * The crops for a set of changed keys, or nothing at all.
  *
  * Nothing is the ordinary case, not an error: most chassis fill as a plain form and have no sheet
- * to draw. The caller shows its list and offers no picture.
+ * to draw. The caller shows its list and offers no picture. The sheet's own names for the keys
+ * (`words`) come back either way, so the list can print them.
  *
  * Asked of the RUN, not of the car. The car route was owner-only, so on a teammate's run it 404'd,
  * the 404 read here as "no sheet", and the opener was never drawn — the driver whose run it was
@@ -73,7 +80,7 @@ export function useSheetBoxCrops(runId: string | null | undefined, keys: string[
 
   useEffect(() => {
     if (!runId || !keyList) {
-      setState({ kind: "none" });
+      setState({ kind: "none", words: null });
       return;
     }
     let cancelled = false;
@@ -88,11 +95,13 @@ export function useSheetBoxCrops(runId: string | null | undefined, keys: string[
             setupSheetModelId?: string;
             editionBlankId?: string | null;
             crops?: ChangedBoxCrop[];
+            words?: SheetWords;
           } | null
         ) => {
           if (cancelled) return;
+          const words = d?.words ?? null;
           if (!d?.sheetMode || !d.setupSheetModelId || !d.crops?.length) {
-            setState({ kind: "none" });
+            setState({ kind: "none", words });
             return;
           }
           setState({
@@ -100,12 +109,13 @@ export function useSheetBoxCrops(runId: string | null | undefined, keys: string[
             modelId: d.setupSheetModelId,
             editionBlankId: d.editionBlankId ?? null,
             byKey: new Map(d.crops.map((c) => [c.key, c] as const)),
+            words,
           });
         }
       )
       .catch(() => {
         // The list is still there. A sheet that will not load is not worth an error.
-        if (!cancelled) setState({ kind: "none" });
+        if (!cancelled) setState({ kind: "none", words: null });
       });
     return () => {
       cancelled = true;

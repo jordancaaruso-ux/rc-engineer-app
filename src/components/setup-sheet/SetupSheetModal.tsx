@@ -169,6 +169,8 @@ export function SetupSheetModal({
   const [teammateRuns, setTeammateRuns] = useState<SetupSheetModalRun[]>([]);
   const [teammateDisplay, setTeammateDisplay] = useState<Record<string, string>>({});
   const [hasTeammates, setHasTeammates] = useState(false);
+  /** Teammates' shared runs exist, only on other cars — so an empty Teammates list says why. */
+  const [teammateRunsOnOtherCars, setTeammateRunsOnOtherCars] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
   const [loadedSetupData, setLoadedSetupData] = useState<unknown>(null);
   /** Null until the server has said whether this viewer may save this setup, and how. */
@@ -241,6 +243,7 @@ export function SetupSheetModal({
     setTeammateRuns([]);
     setTeammateDisplay({});
     setHasTeammates(false);
+    setTeammateRunsOnOtherCars(false);
     setBaselineSetupData(null);
     setBaselineSetupLoading(false);
   }, [open, run?.id, startComparing]);
@@ -417,24 +420,28 @@ export function SetupSheetModal({
           runs?: SetupSheetModalRun[];
           memberDisplayByUserId?: Record<string, string>;
           hasTeammates?: boolean;
+          teammateRunsOnOtherCars?: boolean;
         };
         return {
           runs: Array.isArray(data.runs) ? data.runs : [],
           display: data.memberDisplayByUserId ?? {},
           hasTeammates: Boolean(data.hasTeammates),
+          onOtherCars: Boolean(data.teammateRunsOnOtherCars),
         };
       })
-      .then(({ runs, display, hasTeammates: ht }) => {
+      .then(({ runs, display, hasTeammates: ht, onOtherCars }) => {
         if (!alive) return;
         setTeammateRuns(runs);
         setTeammateDisplay(display);
         setHasTeammates(ht);
+        setTeammateRunsOnOtherCars(onOtherCars);
       })
       .catch(() => {
         if (!alive) return;
         setTeammateRuns([]);
         setTeammateDisplay({});
         setHasTeammates(false);
+        setTeammateRunsOnOtherCars(false);
       });
     return () => {
       alive = false;
@@ -963,9 +970,16 @@ export function SetupSheetModal({
                               }))}
                             />
                           ) : compareSource === "teammates" && sourceRuns.length === 0 ? (
+                            /*
+                             * A compare paints the other setup into THIS sheet's boxes, so only runs on
+                             * the same chassis can be one. When teammates have shared runs on other cars,
+                             * say that, rather than ask them to share what they already shared (test
+                             * drive, 2026-09-26).
+                             */
                             <p className="text-xs text-muted-foreground">
-                              No teammate runs on this setup sheet yet. Ask a teammate to log or share a run
-                              on this car.
+                              {teammateRunsOnOtherCars
+                                ? "Your teammates’ runs are on other cars, so there’s nothing on this sheet to compare."
+                                : "No teammate runs on this setup sheet yet. Ask a teammate to log or share a run on this car."}
                             </p>
                           ) : (
                             <RunPickerSelect

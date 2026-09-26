@@ -109,7 +109,7 @@ export default async function CarManagerPage({
         _count: { _all: true },
       }),
       prisma.setupDocument.count({
-        where: { userId: user.id, ...DRIVER_VISIBLE_SETUP_DOCUMENT_WHERE, carId: null },
+        where: { userId: user.id, ...DRIVER_VISIBLE_SETUP_DOCUMENT_WHERE, carId: null, blankSheet: { is: null } },
       }),
       prisma.run.groupBy({
         by: ["carId"],

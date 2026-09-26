@@ -51,6 +51,11 @@ const pickerRunSelect = {
  * "open my setup, compare to my teammate." Peers come from mutual team
  * membership and are always gated by `Run.shareWithTeam`. Returns `hasTeammates`
  * so the segment stays discoverable even when a peer hasn't logged this car yet.
+ *
+ * The anchor itself is never in the list: on a teammate's run it used to be, and picking it
+ * compared the run with itself ("No differences"). `teammateRunsOnOtherCars` says why an empty
+ * list is empty when teammates HAVE shared runs, just on other cars — the compare paints the other
+ * setup into this sheet's boxes, so another chassis cannot be one (test drive, 2026-09-26).
  */
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
@@ -78,7 +83,12 @@ export async function GET(request: Request) {
     }
   }
 
-  const empty = { runs: [], memberDisplayByUserId: {}, hasTeammates: false };
+  const empty = {
+    runs: [],
+    memberDisplayByUserId: {},
+    hasTeammates: false,
+    teammateRunsOnOtherCars: false,
+  };
 
   const allPeerIds = (await listTeamPeerUserIds(user.id)).filter((id) => id !== user.id);
   const hasTeammates = allPeerIds.length > 0;
@@ -96,10 +106,35 @@ export async function GET(request: Request) {
     select: { id: true },
   });
   const peerCarIds = peerCars.map((c) => c.id);
-  if (peerCarIds.length === 0) return NextResponse.json({ ...empty, hasTeammates });
+
+  /**
+   * Teammates' shared runs on any car that is not on this sheet. One row answers it, and a failed
+   * read only costs the explanation, never the list.
+   */
+  const sharedRunsOnOtherCars = async () =>
+    (await prisma.run
+      .findFirst({
+        where: {
+          userId: { in: allPeerIds },
+          shareWithTeam: { not: false },
+          carId: { not: null, notIn: peerCarIds },
+        },
+        select: { id: true },
+      })
+      .catch(() => null)) != null;
+
+  if (peerCarIds.length === 0) {
+    return NextResponse.json({
+      ...empty,
+      hasTeammates,
+      teammateRunsOnOtherCars: await sharedRunsOnOtherCars(),
+    });
+  }
 
   const runs = await prisma.run.findMany({
     where: {
+      // Not the run being looked at: comparing it with itself only ever says "No differences".
+      id: { not: runId },
       carId: { in: peerCarIds },
       userId: { in: allPeerIds },
       // `not: false` keeps null/legacy runs (treated as shared).
@@ -109,6 +144,13 @@ export async function GET(request: Request) {
     take: 200,
     select: pickerRunSelect,
   });
+  if (runs.length === 0) {
+    return NextResponse.json({
+      ...empty,
+      hasTeammates,
+      teammateRunsOnOtherCars: await sharedRunsOnOtherCars(),
+    });
+  }
 
   const presentUserIds = [...new Set(runs.map((r) => r.userId))];
   const members = presentUserIds.length
@@ -125,5 +167,6 @@ export async function GET(request: Request) {
     runs: runs.map(withIncludedBestLapForPicker),
     memberDisplayByUserId,
     hasTeammates,
+    teammateRunsOnOtherCars: false,
   });
 }

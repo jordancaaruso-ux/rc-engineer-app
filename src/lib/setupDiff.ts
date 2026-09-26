@@ -2,6 +2,7 @@ import { DEFAULT_SETUP_FIELDS, normalizeSetupData, type SetupSnapshotData } from
 import { A800RR_SETUP_SHEET_V1 } from "@/lib/a800rrSetupTemplate";
 import { buildCatalogFromTemplate, buildFieldMetaMap } from "@/lib/setupFieldCatalog";
 import { isMultiSelectFieldKey, multiSelectSetEquals } from "@/lib/setup/multiSelect";
+import { sheetBoxName, sheetBoxUnit, sheetValue, type SheetWords } from "@/lib/setup/sheetWords";
 
 /** Treat 2 / 2.0 / "2 mm" as equal so "changed" matches numeric reality for shims. */
 function parseNumericForDiff(s: string): number | null {
@@ -22,10 +23,18 @@ function scalarValuesEqualForDiff(curStr: string, prevStr: string): boolean {
   return false;
 }
 
-/** All keys from both snapshots, with labels where known */
+/**
+ * All keys from both snapshots, with labels where known.
+ *
+ * `words` is the car's own sheet (`sheetWords.ts`). Without it only the A800RR's names are known,
+ * and every other chassis printed its raw keys and choice codes — "anti roll bar front f_1_3 →
+ * f_1_4" for a Mi10 bar the sheet calls "Anti Roll Bar (Front)" and 1.3 / 1.4 (test drive,
+ * 2026-09-26). Whether a row changed is still decided on the stored values.
+ */
 export function buildSetupDiffRows(
   current: SetupSnapshotData,
-  previous: SetupSnapshotData | null
+  previous: SetupSnapshotData | null,
+  words?: SheetWords | null
 ): Array<{
   key: string;
   label: string;
@@ -78,12 +87,14 @@ export function buildSetupDiffRows(
           ? !multiSelectSetEquals(key, c, p)
           : !scalarValuesEqualForDiff(curStr, prevStr!)
         : false;
+    // The car's own sheet names the box when it has it. The unit is the sheet's too, or else the
+    // one this list always printed for the key.
     rows.push({
       key,
-      label: meta2?.label ?? meta?.label ?? key.replace(/_/g, " "),
-      unit: meta2?.unit ?? meta?.unit ?? "",
-      current: curStr,
-      previous: prevStr,
+      label: sheetBoxName(words, key) ?? meta2?.label ?? meta?.label ?? key.replace(/_/g, " "),
+      unit: sheetBoxUnit(words, key) ?? meta2?.unit ?? meta?.unit ?? "",
+      current: sheetValue(words, key, curStr),
+      previous: prevStr == null ? null : sheetValue(words, key, prevStr),
       changed,
     });
   }
