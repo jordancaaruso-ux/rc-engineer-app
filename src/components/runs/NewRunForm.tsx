@@ -580,6 +580,16 @@ function newRunLapIngestHasContent(v: LapIngestFormValue): boolean {
   );
 }
 
+/**
+ * The tyres on one line, as the Tires step and the Prefill card print them: the tyre alone on a
+ * single-tire car, and on a front/rear car both ends, front first — "F … / R not set" when only
+ * the front is logged. Empty when neither is.
+ */
+function tiresOneLine(front: string, rear: string): string {
+  if (!front) return rear;
+  return `F ${front} / R ${rear || "not set"}`;
+}
+
 /** Deep copy a setup snapshot so mutating `setupData` later doesn't drag the baseline along. */
 function cloneSetupSnapshot(d: SetupSnapshotData): SetupSnapshotData {
   try {
@@ -1081,14 +1091,15 @@ export function NewRunForm(props: {
           tireAgeKnown,
         })
       : "";
-    if (!frontTire.typeId) return rear;
-    const front = displayTireSelection({
-      tireTypeId: frontTire.typeId,
-      displayName: frontTire.typeName,
-      tireRunNumber: Math.max(1, frontTire.runsCompleted + 1),
-      tireAgeKnown: frontTire.ageKnown,
-    });
-    return `F ${front} / R ${rear || "not set"}`;
+    const front = frontTire.typeId
+      ? displayTireSelection({
+          tireTypeId: frontTire.typeId,
+          displayName: frontTire.typeName,
+          tireRunNumber: Math.max(1, frontTire.runsCompleted + 1),
+          tireAgeKnown: frontTire.ageKnown,
+        })
+      : "";
+    return tiresOneLine(front, rear);
   }, [tireTypeId, tireTypeName, runsCompleted, tireAgeKnown, frontTire]);
 
   const tireTypeIdRef = useRef(tireTypeId);
@@ -4759,28 +4770,28 @@ export function NewRunForm(props: {
           {
             key: "tires",
             label: "Tires",
+            // A front/rear car's promise names both ends, front first, in the words the step prints
+            // once the tap lands. A last run with a front tyre and no rear read "Tires —" here and
+            // then filled that front (test drive 2026-09-26).
             value: lastRun
-              ? lastRun.tireTypeId || lastRun.tireType
-                ? [
-                    // A front/rear car's promise names both ends, front first — as the step does.
-                    lastRun.frontTireTypeId || lastRun.frontTireType
-                      ? `F ${displayTireSelection({
-                          tireTypeId: lastRun.frontTireTypeId ?? lastRun.frontTireType?.id ?? "",
-                          displayName: lastRun.frontTireType?.displayName,
-                          tireRunNumber: lastRun.frontTireRunNumber ?? undefined,
-                          tireAgeKnown: lastRun.frontTireAgeKnown ?? true,
-                        })} / R`
-                      : null,
-                    displayTireSelection({
-                      tireTypeId: lastRun.tireTypeId ?? lastRun.tireType?.id ?? "",
-                      displayName: lastRun.tireType?.displayName,
-                      tireRunNumber: lastRun.tireRunNumber,
-                      tireAgeKnown: lastRun.tireAgeKnown ?? true,
-                    }),
-                  ]
-                    .filter(Boolean)
-                    .join(" ")
-                : "—"
+              ? tiresOneLine(
+                  lastRun.frontTireTypeId || lastRun.frontTireType
+                    ? displayTireSelection({
+                        tireTypeId: lastRun.frontTireTypeId ?? lastRun.frontTireType?.id ?? "",
+                        displayName: lastRun.frontTireType?.displayName,
+                        tireRunNumber: lastRun.frontTireRunNumber ?? undefined,
+                        tireAgeKnown: lastRun.frontTireAgeKnown ?? true,
+                      })
+                    : "",
+                  lastRun.tireTypeId || lastRun.tireType
+                    ? displayTireSelection({
+                        tireTypeId: lastRun.tireTypeId ?? lastRun.tireType?.id ?? "",
+                        displayName: lastRun.tireType?.displayName,
+                        tireRunNumber: lastRun.tireRunNumber,
+                        tireAgeKnown: lastRun.tireAgeKnown ?? true,
+                      })
+                    : ""
+                ) || "—"
               : "…",
           },
           {
