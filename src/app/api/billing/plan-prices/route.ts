@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 /**
  * The plan prices in this visitor's currency, for the landing page (`public/landing/index.html`).
  * The landing is a static file written in AUD; it swaps in these figures, keyed
- * `<tier>-<interval>` ("pro-month": "$12.99"), and keeps its AUD if this fails.
+ * `<tier>-<interval>` ("pro-month": "$14.99"), and keeps its AUD if this fails.
  *
  * Public (middleware exempts it) and read-only. Memoised briefly per instance and currency, so a
  * busy launch morning costs a few Stripe reads a minute, not five per visitor.

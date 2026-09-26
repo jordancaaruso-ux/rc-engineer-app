@@ -2,7 +2,7 @@
  * Run: `npm run test:price-currency`
  *
  * Proves which currency a visitor is priced in and which amount they see. The stakes: a page that
- * shows US$12.99 while checkout charges A$19.99 (or the reverse) is a price the driver never
+ * shows US$14.99 while checkout charges A$19.99 (or the reverse) is a price the driver never
  * agreed to.
  */
 import assert from "node:assert/strict";
@@ -44,14 +44,14 @@ const racePrice = {
   unit_amount: 1999,
   currency_options: {
     aud: { unit_amount: 1999 },
-    usd: { unit_amount: 1299 },
-    eur: { unit_amount: 1199 },
+    usd: { unit_amount: 1499 },
+    eur: { unit_amount: 1299 },
   },
 };
 
 test("amountInCurrency picks the price's own amount in that currency", () => {
-  assert.deepEqual(amountInCurrency(racePrice, "usd"), { unitAmount: 1299, currency: "usd" });
-  assert.deepEqual(amountInCurrency(racePrice, "eur"), { unitAmount: 1199, currency: "eur" });
+  assert.deepEqual(amountInCurrency(racePrice, "usd"), { unitAmount: 1499, currency: "usd" });
+  assert.deepEqual(amountInCurrency(racePrice, "eur"), { unitAmount: 1299, currency: "eur" });
   assert.deepEqual(amountInCurrency(racePrice, "aud"), { unitAmount: 1999, currency: "aud" });
 });
 
@@ -66,8 +66,8 @@ test("amountInCurrency falls back to AUD when the price has no amount in that cu
 });
 
 test("formatPlanAmount keeps the short symbol; intervalSuffix names the currency", () => {
-  assert.equal(formatPlanAmount(1299, "usd"), "$12.99");
-  assert.equal(formatPlanAmount(1199, "eur"), "€11.99");
+  assert.equal(formatPlanAmount(1499, "usd"), "$14.99");
+  assert.equal(formatPlanAmount(1299, "eur"), "€12.99");
   assert.equal(formatPlanAmount(1999, "aud"), "$19.99");
   assert.equal(formatPlanAmount(null, "aud"), null);
   assert.equal(formatPlanAmount(1999, null), null);

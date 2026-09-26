@@ -86,7 +86,7 @@ export default async function JoinSuccessPage({
             paidPlan = {
               label: TIER_LABELS[plan.tier],
               billedLabel: "Billed",
-              // "$12.99 USD / month": a bare "$" reads as US dollars to half the field.
+              // "$14.99 USD / month": a bare "$" reads as US dollars to half the field.
               billed: `${amount ?? "—"} ${intervalSuffix(plan.currency, plan.interval)}`,
               detail:
                 plan.tier === "pro"

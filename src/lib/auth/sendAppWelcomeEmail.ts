@@ -37,7 +37,7 @@ async function welcomePlans(currency: PriceCurrency): Promise<AppWelcomePlan[]> 
   const tiers = listed.length ? TIERS.filter((t) => listed.some((p) => p.tier === t)) : TIERS;
   return tiers.map((tier) => {
     const month = listed.find((p) => p.tier === tier && p.interval === "month");
-    // "$12.99 USD": the email has no page around it to say which dollars.
+    // "$14.99 USD": the email has no page around it to say which dollars.
     const amount = month ? formatPlanAmount(month.unitAmount, month.currency) : null;
     const monthly = amount && month?.currency ? `${amount} ${month.currency.toUpperCase()}` : amount;
     return { label: TIER_LABELS[tier], hook: HOOKS[tier], monthly };

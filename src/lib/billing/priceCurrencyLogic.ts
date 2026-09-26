@@ -2,7 +2,7 @@
  * Which currency a visitor's plan prices are shown and charged in (2026-09-25, founder call).
  *
  * Every live price is set in AUD, with round US-dollar and euro amounts added to the same Stripe
- * price as `currency_options` (US$12.99 / €11.99 for Race Engineer, not a converted A$19.99).
+ * price as `currency_options` (US$14.99 / €12.99 for Race Engineer, not a converted A$19.99).
  * A visitor in the US sees and pays the US$ amount, one in the euro area the € amount, and
  * everyone else sees AUD on our pages. Stripe's checkout may still convert AUD into their own
  * money (Adaptive Pricing, a dashboard switch), which never applies to USD or EUR once a price
@@ -67,7 +67,7 @@ export function amountInCurrency(
 }
 
 /**
- * "$12.99", "€11.99", "$19.99". The currency itself is named once, in the interval suffix
+ * "$14.99", "€12.99", "$19.99". The currency itself is named once, in the interval suffix
  * ("USD / month"), so the figure keeps the short symbol.
  */
 export function formatPlanAmount(

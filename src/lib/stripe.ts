@@ -97,7 +97,7 @@ const loadPlanPrices = cache(async function loadPlanPrices(): Promise<(Stripe.Pr
  *
  * `wanted` is the visitor's currency (`priceCurrencyLogic.ts`). It is all or nothing: unless every
  * plan's price carries an amount in that currency, every plan comes back in AUD, so one page can
- * never mix "$12.99 USD" with "$9.99 AUD". Checkout reads this same answer, so the currency a page
+ * never mix "$14.99 USD" with "$9.99 AUD". Checkout reads this same answer, so the currency a page
  * shows is the one Stripe charges.
  */
 export async function getPricePlansWithAmounts(
