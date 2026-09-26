@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
+import { SwitchPill } from "@/components/ui/SwitchPill";
 
 /**
  * Apple-widget-style paged card region: one card slot, several designed "faces"
@@ -297,18 +298,18 @@ export function PagedCard({
   const adaptive = heightMode === "adaptive";
 
   /* Segmented control — names each face and switches to it; the discovery
-     affordance that replaced pagination dots. Yellow stays action-only, so
-     the active segment reads as a raised neutral chip, not the accent.
+     affordance that replaced pagination dots. The app's one switch look
+     (`.switch-rail`, 2026-09-26): grey track, the open face a white pill that
+     slides. A label never truncates: its tab grows to fit the words and the
+     others share the rest ("URL Manual" was "URL Man…" at 390px).
      A single face needs no picker (wizard mode filters faces per step). */
   const control = count < 2 ? null : (
     <div
       role="tablist"
       aria-label="Card views"
-      className={cn(
-        "flex items-center gap-0.5 rounded-full border border-border bg-background/45 p-0.5",
-        controlPosition === "above" ? "mb-3" : "mt-3"
-      )}
+      className={cn("switch-rail", controlPosition === "above" ? "mb-3" : "mt-3")}
     >
+      <SwitchPill activeKey={index} />
       {faces.map((face, i) => {
         const active = i === index;
         return (
@@ -317,13 +318,12 @@ export function PagedCard({
             type="button"
             role="tab"
             aria-selected={active}
+            data-on={active}
             aria-label={`Show ${face.label}`}
             onClick={() => goTo(i)}
             className={cn(
-              "min-w-0 flex-1 truncate rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-              active
-                ? "bg-muted text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                : "text-muted-foreground hover:text-foreground",
+              "switch-seg min-h-8 min-w-fit flex-1 basis-0 whitespace-nowrap px-2 py-1 text-[11px] tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              !active && "hover:text-foreground",
               face.controlClassName
             )}
           >

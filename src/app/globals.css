@@ -3236,6 +3236,80 @@ a.primary-face:active {
  * (`BandFoot`), so nothing needs a face without its shadow any more.
  */
 
+/*
+ * Switches — the one look for every "pick one of these" control (founder pick 2026-09-26, off
+ * the Track-First test page): a grey track, and the chosen option a white pill with a soft
+ * shadow that slides to the option you tap (`SwitchPill`). It replaced four looks at once: the
+ * ink-inverted black pill (`SegmentedControl`, 21 switches), a faint grey pill you could barely
+ * see on paper (`PillToggle`, `PagedCard`, Events' season, 11), white on a near-white track (run
+ * faces, practice site) and yellow (the lap-compare picker, the Engineer subject bar), which
+ * broke "yellow = action".
+ *
+ * The track is ink at 5.5%, not a flat grey, so it shows on a white card and on the paper ground
+ * alike (a flat #F0F0EE all but vanishes on #F4F4F3). Not this control, and unchanged: the on/off
+ * `Switch` (yellow when on, 2026-09-25), chips (`chipToggleClass`), drag sliders, and the join
+ * page's Monthly | Annual on its dark photo.
+ *
+ * In `@layer components` on purpose: every utility at a call site (text size, padding, a muted
+ * option's fainter ink) must still win, and unlayered CSS here would beat them all.
+ */
+@layer components {
+  .switch-rail {
+    --switch-pill-shadow:
+      0 1px 2px rgb(var(--color-foreground) / 0.14),
+      0 2px 6px -3px rgb(var(--color-foreground) / 0.2);
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 11px;
+    background-color: rgb(var(--color-foreground) / 0.055);
+  }
+  .switch-seg {
+    position: relative;
+    z-index: 1;
+    border-radius: 9px;
+    font-weight: 600;
+    color: rgb(var(--color-muted-foreground));
+    transition: color 0.2s ease;
+  }
+  .switch-seg[data-on="true"] {
+    color: rgb(var(--color-foreground));
+  }
+  /* Until the pill has measured itself, the chosen option wears it. */
+  .switch-rail:not([data-pill]) > .switch-seg[data-on="true"] {
+    background-color: rgb(var(--color-card));
+    box-shadow: var(--switch-pill-shadow);
+  }
+  .switch-pill {
+    position: absolute;
+    z-index: 0;
+    top: 3px;
+    bottom: 3px;
+    left: 0;
+    width: 0;
+    border-radius: 9px;
+    background-color: rgb(var(--color-card));
+    box-shadow: var(--switch-pill-shadow);
+    pointer-events: none;
+    transition:
+      transform 0.24s cubic-bezier(0.3, 0.8, 0.3, 1),
+      width 0.24s cubic-bezier(0.3, 0.8, 0.3, 1);
+  }
+  .switch-rail:not([data-pill]) > .switch-pill {
+    display: none;
+  }
+  .switch-rail[data-pill="settle"] > .switch-pill {
+    transition: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .switch-pill {
+      transition: none;
+    }
+  }
+}
+
 /* Instant tap feedback on mobile nav, hub rows, and buttons */
 .tap-active {
   @apply transition-transform duration-75 active:scale-[0.97] active:opacity-90;

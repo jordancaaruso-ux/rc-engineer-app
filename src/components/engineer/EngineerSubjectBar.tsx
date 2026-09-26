@@ -2,6 +2,7 @@
 
 import { Globe, ListFilter, Pin, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SwitchPill } from "@/components/ui/SwitchPill";
 
 /**
  * Full-width subject bar above the composer (founder interview 2026-07-30; back on 2026-09-03;
@@ -16,13 +17,16 @@ import { cn } from "@/lib/utils";
  * pairs and "about which car" chips are not back — the rebuilt Engineer has no notion of
  * them, and a bar that pretended to steer it would lie. (A meeting picked from the run picker
  * IS a filter — the same block — so it lights this segment, not a pin.)
+ *
+ * The lit segment is the app's one switch look (2026-09-26): a white pill on a grey track that
+ * slides between segments (`.switch-rail`, `SwitchPill`). It was a yellow tint with a bronze
+ * outline until then, and Auto a dashed outline; yellow means an action, and this is a choice.
  */
 export type EngineerSubjectMode = "data" | "range" | "general";
 
-const LIT =
-  "flex min-w-0 items-center gap-1 rounded-md border border-primary-ink/50 bg-primary/10 py-1 text-[11px] text-foreground";
+const LIT = "switch-seg flex min-h-8 min-w-0 items-center gap-1 py-1 text-[11px]";
 const UNLIT =
-  "tap-active flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground";
+  "switch-seg tap-active flex min-h-8 shrink-0 items-center gap-1 px-2 py-1 text-[11px] hover:text-foreground";
 
 export function EngineerSubjectBar({
   mode,
@@ -63,13 +67,14 @@ export function EngineerSubjectBar({
       role="group"
       aria-label="Engineer subject"
       data-tour="engineer-subject"
-      className="flex w-full items-stretch gap-1 rounded-lg border border-border bg-secondary p-1"
+      className="switch-rail w-full items-stretch"
     >
+      <SwitchPill activeKey={mode} />
       {/* ── Run ─────────────────────────────────────────────────────────────────────── */}
       {mode === "data" ? (
         pinnedLabel ? (
-          <span className={cn(LIT, "flex-1 pl-2 pr-1")}>
-            <Pin className="size-3 shrink-0 text-primary-ink" strokeWidth={2.25} aria-hidden />
+          <span data-on className={cn(LIT, "flex-1 pl-2 pr-1")}>
+            <Pin className="size-3 shrink-0" strokeWidth={2.25} aria-hidden />
             <button
               type="button"
               onClick={onOpenPicker}
@@ -99,10 +104,8 @@ export function EngineerSubjectBar({
                 ? `Engineer is reading ${autoLabel} — tap to pin a run`
                 : "No runs yet — tap to browse"
             }
-            className={cn(
-              "tap-active flex min-w-0 flex-1 items-center gap-1 rounded-md border border-dashed border-border",
-              "bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground transition hover:border-primary-ink/50 hover:text-foreground"
-            )}
+            data-on
+            className="switch-seg tap-active flex min-h-8 min-w-0 flex-1 items-center gap-1 px-2 py-1 text-[11px]"
           >
             <span className="shrink-0 ui-title text-[9px]">Auto</span>
             <span className="min-w-0 truncate">{autoLabel ?? "No runs yet"}</span>
@@ -114,6 +117,7 @@ export function EngineerSubjectBar({
           onClick={onSelectData}
           disabled={disabled}
           aria-label="Switch this chat back onto your runs"
+          data-on={false}
           className={cn(UNLIT, mode === "general" && "min-w-0 flex-1 shrink")}
         >
           {/* In General the run segment is the widest thing on the bar and can afford the
@@ -126,8 +130,8 @@ export function EngineerSubjectBar({
 
       {/* ── Filter ──────────────────────────────────────────────────────────────────── */}
       {mode === "range" ? (
-        <span className={cn(LIT, "flex-1 pl-2 pr-1")}>
-          <ListFilter className="size-3 shrink-0 text-primary-ink" strokeWidth={2.25} aria-hidden />
+        <span data-on className={cn(LIT, "flex-1 pl-2 pr-1")}>
+          <ListFilter className="size-3 shrink-0" strokeWidth={2.25} aria-hidden />
           <button
             type="button"
             onClick={onOpenRangePicker}
@@ -153,6 +157,7 @@ export function EngineerSubjectBar({
           onClick={onOpenRangePicker}
           disabled={disabled}
           aria-label="Filter your runs — a meeting, a track, a span of dates"
+          data-on={false}
           className={UNLIT}
         >
           <ListFilter className="size-3 shrink-0" strokeWidth={2.25} aria-hidden />
@@ -162,8 +167,8 @@ export function EngineerSubjectBar({
 
       {/* ── General ─────────────────────────────────────────────────────────────────── */}
       {mode === "general" ? (
-        <span className={cn(LIT, "max-w-[60%] shrink-0 px-2")}>
-          <Globe className="size-3 shrink-0 text-primary-ink" strokeWidth={2.25} aria-hidden />
+        <span data-on className={cn(LIT, "max-w-[60%] shrink-0 px-2")}>
+          <Globe className="size-3 shrink-0" strokeWidth={2.25} aria-hidden />
           <span className="min-w-0 truncate">General</span>
         </span>
       ) : (
@@ -172,6 +177,7 @@ export function EngineerSubjectBar({
           onClick={onSelectGeneral}
           disabled={disabled}
           aria-label="Ask a general question — nothing from your logs attached"
+          data-on={false}
           className={UNLIT}
         >
           <Globe className="size-3 shrink-0" strokeWidth={2.25} aria-hidden />

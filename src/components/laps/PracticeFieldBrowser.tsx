@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, Check, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SwitchPill } from "@/components/ui/SwitchPill";
 import { importedSessionTimeForDisplay } from "@/lib/lapImport/labels";
 import { formatLap } from "@/lib/runLaps";
 import { formatRunDateTime, formatRunDateWeekday } from "@/lib/formatDate";
@@ -401,13 +402,15 @@ export function PracticeFieldBrowser({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         {sources.length > 1 ? (
-          <div role="tablist" aria-label="Timing site" className="inline-flex rounded-md bg-muted p-0.5">
+          <div role="tablist" aria-label="Timing site" className="switch-rail inline-flex">
+            <SwitchPill activeKey={source} />
             {sources.map((s) => (
               <button
                 key={s}
                 type="button"
                 role="tab"
                 aria-selected={source === s}
+                data-on={source === s}
                 onClick={() => {
                   if (source === s) return;
                   setSource(s);
@@ -416,8 +419,8 @@ export function PracticeFieldBrowser({
                   if (mode === "tick" || look.kind !== "idle") void runLook(s, dayYmd);
                 }}
                 className={cn(
-                  "tap-active rounded px-3 py-1.5 text-[12px] font-medium transition",
-                  source === s ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  "switch-seg tap-active min-h-8 px-3 py-1.5 text-[12px]",
+                  source !== s && "hover:text-foreground"
                 )}
               >
                 {PRACTICE_FIELD_SOURCE_LABEL[s]}

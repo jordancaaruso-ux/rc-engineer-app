@@ -19,6 +19,7 @@ import { createPortal } from "react-dom";
 import { ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEnterExit } from "@/components/ui/Collapse";
+import { SwitchPill } from "@/components/ui/SwitchPill";
 import { formatLap } from "@/lib/runLaps";
 
 export type LapPickerRow = {
@@ -77,12 +78,11 @@ export function LapCompareSegmentBar({
   // One segment is not a choice — drawing a control that can only be pressed
   // into its current state reads as broken. A solo run has only its driver.
   if (segments.length < 2) return null;
+  // The app's one switch look (`.switch-rail`, 2026-09-26). It was a yellow segment until then,
+  // and yellow means an action; picking whose sessions to list is a choice.
   return (
-    <div
-      className="flex gap-0.5 rounded-md border border-border bg-surface-runna-inset p-0.5"
-      role="tablist"
-      aria-label={ariaLabel}
-    >
+    <div className="switch-rail" role="tablist" aria-label={ariaLabel}>
+      <SwitchPill activeKey={active} />
       {segments.map((s) => {
         const on = s.key === active;
         return (
@@ -91,13 +91,12 @@ export function LapCompareSegmentBar({
             type="button"
             role="tab"
             aria-selected={on}
+            data-on={on}
             // text-[10px]/px-1: in the 17rem desktop rail, three segments at 11px
             // clipped "Teammates" to "Teammat…".
             className={cn(
-              "min-w-0 flex-1 truncate rounded px-1 py-1.5 text-[10px] transition",
-              on
-                ? "primary-face bg-primary font-semibold text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
+              "switch-seg min-h-8 min-w-0 flex-1 truncate px-1 py-1.5 text-[10px]",
+              !on && "hover:text-foreground"
             )}
             onClick={() => onSelect(s.key)}
           >

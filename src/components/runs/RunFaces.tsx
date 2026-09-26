@@ -83,6 +83,7 @@ import { useUnits } from "@/components/providers/UnitsProvider";
 import { formatTemp, formatWind } from "@/lib/units/unitSystem";
 import { lapImportHref } from "@/lib/runs/lapImportHref";
 import { cn } from "@/lib/utils";
+import { SwitchPill } from "@/components/ui/SwitchPill";
 
 /**
  * A whole run, folded to fit where it sits (2026-08-25).
@@ -1129,25 +1130,21 @@ export function RunFaces({
       </div>
 
       {/* ── the faces ───────────────────────────────────────────────────── */}
-      <div
-        role="tablist"
-        aria-label="What to read about this run"
-        className="flex gap-1 rounded-xl border border-border bg-secondary p-1"
-      >
+      <div role="tablist" aria-label="What to read about this run" className="switch-rail">
+        <SwitchPill activeKey={face} />
         {FACES.map((f) => (
           <button
             key={f.id}
             type="button"
             role="tab"
             aria-selected={face === f.id}
+            data-on={face === f.id}
             /* Leaving Setup unmounts the armed sheet under it — see the exits note above. */
             onClick={() => (f.id === face ? undefined : leaveSheetEditor(() => setFace(f.id)))}
             className={cn(
-              "tap-active min-h-9 flex-1 rounded-lg px-2 text-[12px] font-semibold transition-colors",
+              "switch-seg tap-active min-h-9 flex-1 px-2 text-[12px]",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-              face === f.id
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+              face !== f.id && "hover:text-foreground"
             )}
           >
             {f.label}

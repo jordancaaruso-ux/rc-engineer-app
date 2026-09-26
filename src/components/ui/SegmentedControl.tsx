@@ -2,22 +2,23 @@
 
 import { useCallback, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { SwitchPill } from "@/components/ui/SwitchPill";
 
 /**
- * Segmented single-select: one inset rail holding equal-width segments, with the
- * selected segment ink-inverted (`bg-foreground` + dark text) so "chosen" reads
- * instantly. Redesigned 2026-07-27 — was flat `chipToggleClass` chips in a gapped
- * row, where selected (`bg-muted`) vs unselected (`bg-secondary`) was grey-on-grey
- * and the options read as two loose buttons rather than one control. The shared
- * rail is what makes it a control; the inversion is what makes the state obvious.
- * Yellow stays out of it — selection is state, and yellow means action.
+ * Segmented single-select: one grey track holding equal-width segments, the chosen one a white
+ * pill that slides to whatever you tap (`.switch-rail` in globals.css, `SwitchPill`). Founder pick
+ * 2026-09-26 off the Track-First test page, replacing the ink-inverted black segment of
+ * 2026-07-27. What that redesign got right still holds: the shared track is what makes it one
+ * control rather than loose buttons, and yellow stays out of it — selection is state, and yellow
+ * means action.
  *
- * Segments are `rounded-md` inside the `rounded-lg` rail (concentric radii: 8px
- * outer − 3px padding ≈ 5px inner) and `flex-1 basis-0` so labels of any length
- * stay aligned. Size may differ per use; the style is identical.
+ * Heights follow the test page: 36px for `md`, 32px for `sm`. Size may differ per use (call sites
+ * pass `segmentClassName`); the look is identical. An `md` label never wraps: its segment grows to
+ * fit the words and the others share what is left, which keeps "Write from scratch" on one line
+ * at 390px.
  *
- * `chipToggleClass` is still the treatment for standalone multi-select toggle
- * chips (layout direction, handling ratings) — this control no longer shares it.
+ * `chipToggleClass` is still the treatment for standalone multi-select toggle chips (layout
+ * direction, handling ratings) — this control does not share it.
  *
  * Semantics: `role="radiogroup"` + `role="radio"` per segment, with Left/Right
  * (and Up/Down) arrow keys walking the options like a native radio group.
@@ -99,19 +100,19 @@ export function SegmentedControl<T extends string>({
     [move]
   );
 
-  const segText = size === "sm" ? "text-xs" : "text-sm";
-  const segPad = size === "sm" ? "px-3 py-1" : "px-4 py-1.5";
+  const segSize =
+    size === "sm"
+      ? "min-h-8 px-3 py-1 text-xs"
+      : "min-h-9 min-w-fit whitespace-nowrap px-3 py-1.5 text-sm";
 
   return (
     <div
       role="radiogroup"
       aria-label={ariaLabel}
       onKeyDown={onKeyDown}
-      className={cn(
-        "flex w-full select-none items-stretch gap-[3px] rounded-lg border border-border bg-secondary p-[3px]",
-        className
-      )}
+      className={cn("switch-rail w-full select-none items-stretch", className)}
     >
+      <SwitchPill activeKey={value} />
       {options.map((opt) => {
         const active = opt.value === value;
         return (
@@ -120,17 +121,15 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="radio"
             aria-checked={active}
+            data-on={active}
             aria-label={opt.ariaLabel}
             disabled={opt.disabled}
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "flex flex-1 basis-0 items-center justify-center gap-1.5 rounded-md font-sans tracking-tight transition-colors duration-150 touch-manipulation disabled:opacity-60",
-              segText,
-              segPad,
-              active
-                ? "bg-foreground font-semibold text-background shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
-                : "font-medium text-muted-foreground hover:text-foreground",
+              "switch-seg flex flex-1 basis-0 items-center justify-center gap-1.5 font-sans tracking-tight touch-manipulation disabled:opacity-60",
+              segSize,
+              !active && "hover:text-foreground",
               // A "hint" segment that is inactive reads fainter, still tappable.
               !active && opt.muted && "text-muted-foreground/45 hover:text-muted-foreground/45",
               segmentClassName

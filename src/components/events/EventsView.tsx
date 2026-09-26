@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SwitchPill } from "@/components/ui/SwitchPill";
 import type { EventsSeasonModel } from "@/lib/events/seasonTypes";
 import { Collapse } from "@/components/ui/Collapse";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -240,22 +241,18 @@ function YearToggle({ years, year }: { years: number[]; year: number | null }) {
   options.push({ label: "All time", value: "all", active: year == null });
 
   return (
-    <div
-      role="group"
-      aria-label="Season"
-      className="flex items-center gap-0.5 rounded-full border border-border bg-background/45 p-0.5"
-    >
+    <div role="group" aria-label="Season" className="switch-rail items-stretch">
+      <SwitchPill activeKey={year ?? "all"} />
       {options.map((option) => (
         <Link
           key={option.value}
           href={`/events?year=${option.value}`}
           prefetch={false}
           aria-current={option.active ? "true" : undefined}
+          data-on={option.active}
           className={cn(
-            "tap-active rounded-full px-3.5 py-[5px] text-[11px] font-semibold tracking-[-.01em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-            option.active
-              ? "bg-muted text-foreground"
-              : "text-muted-foreground hover:text-foreground"
+            "switch-seg tap-active inline-flex min-h-8 items-center justify-center px-3.5 py-[5px] text-[11px] tracking-[-.01em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+            !option.active && "hover:text-foreground"
           )}
         >
           {option.label}
