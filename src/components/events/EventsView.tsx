@@ -9,6 +9,7 @@ import type { EventsSeasonModel } from "@/lib/events/seasonTypes";
 import { Collapse } from "@/components/ui/Collapse";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { PageBackLink } from "@/components/ui/PageBackLink";
+import { ActionToast } from "@/components/ui/ActionToast";
 import { EventAddForm, type TrackOption } from "@/components/events/EventAddForm";
 import {
   EventList,
@@ -49,6 +50,8 @@ export function EventsView({
   stats: EventListStats;
 }) {
   const [addOpen, setAddOpen] = useState(false);
+  /** What New event just did, said once the form has closed on it. */
+  const [addDone, setAddDone] = useState<string | null>(null);
   const [suggestedYmd, setSuggestedYmd] = useState<string | null>(null);
   const { scope, years, strip, venues, events, logged, nextUp, cadence, todayYmd } = model;
 
@@ -124,7 +127,11 @@ export function EventsView({
                     tracks={tracks}
                     favouriteTrackIds={favouriteTrackIds}
                     suggestedStartYmd={suggestedYmd}
-                    onCreated={() => setAddOpen(false)}
+                    open={addOpen}
+                    onCreated={(_event, message) => {
+                      setAddOpen(false);
+                      setAddDone(message);
+                    }}
                   />
                 </div>
               </SurfaceCard>
@@ -188,6 +195,8 @@ export function EventsView({
           />
         </div>
       </section>
+
+      <ActionToast message={addDone} onDismiss={() => setAddDone(null)} />
     </>
   );
 }
