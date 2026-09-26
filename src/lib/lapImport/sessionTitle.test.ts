@@ -93,7 +93,12 @@ test("a Speedhive practice session named after its own start time is not titled 
   // The feed names every practice session by when it started, so 10 of 13 rows in the library
   // were TITLED with a date — above a second, different date in the row beneath. It is not even
   // consistently ordered: most read day-first, at least one month-first (2026-09-18).
-  for (const name of ["12/10/2025, 01:03 pm", "10/12/2025, 1:18:19 PM", "28/09/2025, 05:12 pm"]) {
+  for (const name of [
+    "12/10/2025, 01:03 pm",
+    "10/12/2025, 1:18:19 PM",
+    "28/09/2025, 05:12 pm",
+    "21 Sept 2026, 10:12 AM",
+  ]) {
     assert.equal(
       importedSessionTitle({
         parsedPayload: { sessionHint: { name } },

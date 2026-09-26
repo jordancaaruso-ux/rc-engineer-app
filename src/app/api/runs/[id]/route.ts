@@ -25,6 +25,15 @@ import { normalizeTireFitment } from "@/lib/tires/tireFitment";
 import { getFiveMinuteStintStartingAt, primaryLapRowsFromRun } from "@/lib/lapAnalysis";
 import { normalizeLapTimes } from "@/lib/runLaps";
 import { LAP_SESSION_VERSION } from "@/lib/lapSession/types";
+import {
+  parseRunAtIso,
+  readingIsForAnotherTime,
+  stampEditedRunTime,
+  withLoggingOrder,
+  withTypedTrackTemp,
+} from "@/lib/runs/runTime";
+import { backfillRunConditionsFromTrack } from "@/lib/weather/backfillRunConditionsFromTrack";
+import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 
 /**
  * Delete a run owned by the current user.
@@ -86,7 +95,9 @@ export async function DELETE(
  *
  * Everything on the session view the driver typed themselves: the session label, the
  * event, the car, the tire set and its run number, tire prep, the additive, notes, the
- * car rating and the handling assessment. Conditions are here too, but only as a
+ * car rating and the handling assessment. And when the run was on track (`runAtIso`), for a
+ * run typed in after the fact; a run whose laps came off a timing sheet keeps the sheet's
+ * time (`lib/runs/runTime.ts`). Conditions are here too, but only as a
  * leftover of the earlier design — the run page no longer offers them (founder call
  * 2026-08-20: conditions are fetched, so typing over them makes the record lie about
  * where it came from). The parser stays because nothing else writes those columns
@@ -98,8 +109,8 @@ export async function DELETE(
  *    their own door: `POST /api/runs/[id]/setup-correction`.
  *  - **Lap times.** Never retyped, imported or otherwise. Correcting laps means
  *    changing which timing session feeds the run — `PUT /api/runs/[id]/lap-import`.
- *  - **The track and the timestamp.** Fixed once logged. The one way the track can
- *    move is a run that had none taking its new event's, below.
+ *  - **The track.** Fixed once logged. The one way the track can move is a run that
+ *    had none taking its new event's, below.
  *
  * The tire set and its run number USED to be refused here, because the run-number
  * cascade lives in `POST/PUT /api/runs` and two copies would drift. That home moved to
@@ -164,6 +175,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       frontTireStintId: true,
       frontTireRunNumber: true,
       unconfirmedAt: true,
+      // When it was on track: what a new `runAtIso` is measured against, and whether a timing
+      // sheet owns the time.
+      createdAt: true,
+      sessionCompletedAt: true,
+      loggingCompletedAt: true,
+      importedLapTimeSessionId: true,
+      localTimeZone: true,
       conditionsAirTempC: true,
       conditionsTrackTempC: true,
       conditionsCloudCoverPct: true,
@@ -206,6 +224,60 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const columns: RunConditionsRecord =
       normalizeRunConditionsInput(merged) ?? NULL_RUN_CONDITIONS_COLUMNS;
     Object.assign(data, columns);
+  }
+
+  /*
+   * ============================== WHEN THE RUN WAS ON TRACK ==============================
+   *
+   * `runAtIso` is the racer's pick of when the car ran, for a run typed in after the fact: last
+   * night's practice logged this morning sat on today for good, and missed that night's meeting
+   * (test drive 2026-09-26). It moves the day the run files under (`sortAt`) and the time it shows
+   * (`sessionCompletedAt`) together, from one instant. A run whose laps came off a timing sheet
+   * keeps the sheet's time, and a pick matching what the run already says moves nothing. The rules
+   * are `lib/runs/runTime.ts`, shared with the whole-run write.
+   *
+   * The weather moves with it: a reading fetched for the old hour is fetched again for the new one
+   * from the track's pin. With no pin, or no answer, the fetched part is dropped rather than left
+   * describing another hour. A probe track temp the racer typed stays.
+   */
+  let movedTo: Date | null = null;
+  if ("runAtIso" in body) {
+    const now = new Date();
+    const parsed = parseRunAtIso(body.runAtIso, now);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    if (parsed.at) {
+      const edited = stampEditedRunTime({
+        stored: run,
+        importedAt: run.importedLapTimeSessionId != null ? run.sessionCompletedAt : null,
+        importedAtIsOnTrack: true,
+        runAt: withLoggingOrder(parsed.at, now, run.localTimeZone),
+      });
+      movedTo = edited.moveTo;
+    }
+    if (movedTo) {
+      data.sortAt = movedTo;
+      data.sessionCompletedAt = movedTo;
+      if (!conditionPatch && readingIsForAnotherTime(run, movedTo)) {
+        const track = run.trackId
+          ? await prisma.track.findUnique({
+              where: { id: run.trackId },
+              select: { latitude: true, longitude: true },
+            })
+          : null;
+        const fetched =
+          track && trackHasMarkedLocation(track)
+            ? await backfillRunConditionsFromTrack({
+                latitude: track.latitude!,
+                longitude: track.longitude!,
+                atIso: movedTo.toISOString(),
+              })
+            : null;
+        Object.assign(
+          data,
+          withTypedTrackTemp(fetched ?? NULL_RUN_CONDITIONS_COLUMNS, run.conditionsTrackTempC)
+        );
+      }
+    }
   }
 
   /*
@@ -469,13 +541,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     // "Back to auto" with nothing stored writes nothing — a valid state, not an error.
     !("fiveMinStartLap" in body) &&
     // Confirming an already-confirmed run is a no-op, not a mistake.
-    body.confirm !== true
+    body.confirm !== true &&
+    // So is a time the run already shows, or one its timing sheet owns.
+    !("runAtIso" in body)
   ) {
     return NextResponse.json({ error: "Nothing to change" }, { status: 400 });
   }
 
   if (Object.keys(data).length > 0) {
     await prisma.run.update({ where: { id: run.id }, data });
+  }
+  // A new time can carry the run across the plan window's edge (Starter keeps fifteen by
+  // `sortAt`; docs/STARTER_TIER_PLAN.md), same as a drag in Sessions.
+  if (movedTo) {
+    await applyRunWindow(userId);
   }
 
   if (wantsTireChange) {
@@ -568,7 +647,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
    * read was computed from — wiping it would cost a paid re-read for a glance.
    */
   const onlyWindowMove = Object.keys(body).length === 1 && "fiveMinStartLap" in body;
-  if (!onlyWindowMove) {
+  // A time that moved nothing changed nothing the read was computed from either.
+  const onlyUnmovedTime = Object.keys(body).length === 1 && "runAtIso" in body && movedTo == null;
+  if (!onlyWindowMove && !onlyUnmovedTime) {
     await clearEngineerReadsReferencing(userId, [run.id]);
   }
 

@@ -85,7 +85,20 @@ export { eventIsActiveOnLocalToday, eventIsActiveOnCalendarDay } from "@/lib/eve
 // "Today" bounds are computed in the USER's timezone (rc_tz cookie), never the
 // server's — Vercel runs in UTC, so server-local midnight is 10am for an AEST
 // user and every today-scoped surface (draft CTA, Today strip, hasRunToday)
-// would roll over mid-morning. See `todayBoundsInTimeZone`.
+// would roll over mid-morning. See `todayBoundsInTimeZone`. With no cookie yet (the
+// first page in a new browser) the zone is the racer's saved one, not UTC.
+
+/**
+ * Runs whose day falls before `to` (and from `from`, when given). A run's day is when it was
+ * raced: its on-track time (`sessionCompletedAt`) when it has one, else the day it was filed
+ * under (`sortAt`) — founder ruling, 2026-09-26.
+ */
+function runOnTrackBetween(from: Date | null, to: Date) {
+  const window = { ...(from ? { gte: from } : {}), lt: to };
+  return {
+    OR: [{ sessionCompletedAt: window }, { sessionCompletedAt: null, sortAt: window }],
+  };
+}
 
 const runPrefillInclude = (userId: string) =>
   ({
@@ -717,8 +730,13 @@ export async function loadDashboardHomeModel(
     // here. They are the same instant for a run logged in one sitting and differ for a draft
     // banked the night before — which used to mean a run driven this morning was missing from
     // today's best, the changes-today feed and the day's run numbering.
+    //
+    // …and on the ON-TRACK time first when the run has one (2026-09-26). `sortAt` is stamped
+    // once and laps attached later never move it, so a run that took yesterday's session on its
+    // lap step stayed "today": it swelled the run count and fed yesterday's laps into today's
+    // best, pace verdict and handling trend (test drive, report 04-2).
     prisma.run.findMany({
-      where: { userId, sortAt: { gte: todayStart, lt: todayEnd } },
+      where: { userId, ...runOnTrackBetween(todayStart, todayEnd) },
       orderBy: { sortAt: "asc" },
       select: {
         id: true,
@@ -756,10 +774,10 @@ export async function loadDashboardHomeModel(
     // no such field. A day spent on the second car in the garage is ordinary, so the
     // window covers a few runs back rather than only the very last one.
     prisma.run.findMany({
-      // `sortAt` for the same reason today's runs use it — this is the OTHER half of the same
-      // split, and reading one half on `createdAt` would let a draft banked last night appear
-      // in both windows at once, diffing a run against itself.
-      where: { userId, sortAt: { lt: todayStart } },
+      // The same clock as today's runs — this is the OTHER half of the same split, and reading
+      // one half another way would let one run appear in both windows at once, diffing a run
+      // against itself.
+      where: { userId, ...runOnTrackBetween(null, todayStart) },
       orderBy: { sortAt: "desc" },
       take: 12,
       select: { carId: true, setupSnapshot: { select: { id: true, data: true } } },

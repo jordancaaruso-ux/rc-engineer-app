@@ -17,8 +17,7 @@ test("wall-clock sources freeze in UTC (label matches the timing screen)", () =>
       timingSource,
       displayTimeZone: "Australia/Sydney",
     });
-    assert.match(label, /04:36 PM/i, `${timingSource} should show the recorded wall clock`);
-    assert.match(label, /19\/07\/2026/);
+    assert.equal(label, "19 Jul 2026, 4:36 PM", `${timingSource} should show the recorded wall clock`);
   }
 });
 
@@ -28,8 +27,7 @@ test("true instants format in the viewer's zone (Speedhive)", () => {
     displayTimeZone: "Australia/Sydney",
   });
   // 16:36 UTC = 02:36 AM next day in Sydney (AEST +10).
-  assert.match(label, /02:36 AM/i);
-  assert.match(label, /20\/07\/2026/);
+  assert.equal(label, "20 Jul 2026, 2:36 AM");
 });
 
 test("import-time fallback is a true instant even on LiveRC — no freeze", () => {
@@ -38,7 +36,7 @@ test("import-time fallback is a true instant even on LiveRC — no freeze", () =
     isWallClockTime: false,
     displayTimeZone: "Australia/Sydney",
   });
-  assert.match(label, /02:36 AM/i);
+  assert.equal(label, "20 Jul 2026, 2:36 AM");
 });
 
 test("timing source detection", () => {
@@ -98,8 +96,7 @@ test("a Speedhive race result freezes on the timing screen's clock once its addr
     sourceUrl: "https://speedhive.mylaps.com/events/3706689/sessions/5",
     displayTimeZone: "Australia/Sydney",
   });
-  assert.match(label, /04:36 PM/i);
-  assert.match(label, /19\/07\/2026/);
+  assert.equal(label, "19 Jul 2026, 4:36 PM");
 });
 
 test("weather instant: import-createdAt fallback is already real, passes through", () => {

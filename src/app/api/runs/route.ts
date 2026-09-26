@@ -41,6 +41,18 @@ import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { writeRunImportedLapSets, type ImportedLapSetInput } from "@/lib/runs/writeRunImportedLapSets";
 import { createBackfilledRuns } from "@/lib/runs/createBackfilledRuns";
 import { absorbSameOutingRuns } from "@/lib/runs/absorbSameOutingRuns";
+import {
+  importedTimeIsOnTrack,
+  parseRunAtIso,
+  pastMeeting,
+  pastMeetingDraftSortAt,
+  readingIsForAnotherTime,
+  stampEditedRunTime,
+  stampNewRunTime,
+  withLoggingOrder,
+  withTypedTrackTemp,
+} from "@/lib/runs/runTime";
+import { resolveTrackTimeZone } from "@/lib/tracks/trackTimeZone";
 
 type RunUpsertBody = {
   runId?: string;
@@ -154,6 +166,14 @@ type RunUpsertBody = {
    * Present-but-empty (or null) clears the stored reading on update; absent leaves it unchanged.
    */
   conditions?: unknown;
+  /**
+   * When the car was on track, as the racer picked it: an ISO 8601 instant with its zone
+   * (`Date.toISOString()`). Send it only when the racer set a time; absent, null or "" means
+   * "now". Refused (400) more than an hour ahead of the server's clock or before 2000.
+   * Ignored when this save's laps come from a timing session with an on-track time: the
+   * sheet's clock wins. See `lib/runs/runTime.ts`.
+   */
+  runAtIso?: string | null;
 };
 
 function normalizeCarRating(raw: unknown): number | null {
@@ -174,6 +194,13 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   const carId = body.carId;
   if (!carId) {
     return NextResponse.json({ error: "carId is required" }, { status: 400 });
+  }
+
+  // Checked before anything is written: a refused time must not leave a setup snapshot behind.
+  const now = new Date();
+  const runAtParsed = parseRunAtIso(body.runAtIso, now);
+  if (!runAtParsed.ok) {
+    return NextResponse.json({ error: runAtParsed.error }, { status: 400 });
   }
 
   // The logging device's zone, used twice: to resolve the session's wall time, and —
@@ -199,6 +226,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     frontTireStintId: string | null;
     frontTireRunNumber: number | null;
     sortAt: Date;
+    importedLapTimeSessionId: string | null;
+    unconfirmedAt: Date | null;
   } | null = null;
   if (params.mode === "update") {
     const runId = typeof body.runId === "string" ? body.runId.trim() : "";
@@ -225,6 +254,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         frontTireRunNumber: true,
         sortAt: true,
         importedLapTimeSessionId: true,
+        // With the stamps above: what the run shows as its time, so an unchanged pick moves nothing.
+        unconfirmedAt: true,
       },
     });
     if (!ex) {
@@ -383,7 +414,8 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       body.trackId
         ? prisma.track.findFirst({
             where: communityTrackByIdWhere(body.trackId),
-            select: { name: true, latitude: true, longitude: true },
+            // The zone reads a past meeting's days on the track's own calendar.
+            select: { name: true, latitude: true, longitude: true, timeZone: true },
           })
         : null,
       frontTireTypeId
@@ -558,42 +590,6 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   if (body.trackId && !track) {
     return NextResponse.json({ error: "Track not found" }, { status: 400 });
   }
-  /**
-   * Effortless capture: when the client attached no reading (fast save, a transient weather-fetch
-   * failure, or the async client fetch not landing before submit) but the run's track has a saved
-   * pin, fetch conditions server-side so auto-capture is reliable every time.
-   *
-   * Fires when the run BECOMES COMPLETE, not when the row is created (2026-08-25). It was
-   * create-only, which silently corrupted every run drafted ahead of time: saving a draft the night
-   * before a meeting — with the track picked, which you would — stamped that evening's weather onto
-   * the run. Next day the wizard's own capture at Run complete looks for "does this run already
-   * have a reading?", finds one, and stands down, so the run kept Friday night's air temp and still
-   * air forever. Weather is a real Engineer input, so that is a wrong answer rather than a missing
-   * one. A draft now carries no reading at all until it is finished, which is the honest state and
-   * the one the wizard was always designed around (`WizardConditionsBand`: the band's reading is a
-   * preview and is deliberately never lifted into the form).
-   *
-   * The "never override an explicit clear on edit" guard survives as the transition test: editing
-   * an already-complete run never reaches here.
-   */
-  const isBecomingComplete =
-    loggingComplete && (params.mode === "create" || existingUpdate?.loggingComplete === false);
-  const willStoreConditionsSource = conditionsColumns
-    ? conditionsColumns.conditionsSource != null
-    : existingUpdate?.conditionsSource != null;
-  if (
-    isBecomingComplete &&
-    !willStoreConditionsSource &&
-    track &&
-    trackHasMarkedLocation(track)
-  ) {
-    const backfilled = await backfillRunConditionsFromTrack({
-      latitude: track.latitude!,
-      longitude: track.longitude!,
-      atIso: sessionCompletedAtResolved ? sessionCompletedAtResolved.toISOString() : null,
-    });
-    if (backfilled) conditionsColumns = backfilled;
-  }
 
   // Layout must belong to the run's track. Snapshot the name so it survives layout deletion.
   const trackLayout =
@@ -612,7 +608,13 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   const event = body.eventId
     ? await prisma.event.findFirst({
         where: { id: body.eventId },
-        select: { id: true },
+        // Dates and the track's clock: a run logged into a meeting that is over files on its day.
+        select: {
+          id: true,
+          startDate: true,
+          endDate: true,
+          track: { select: { timeZone: true, latitude: true, longitude: true } },
+        },
       })
     : null;
   if (body.eventId && !event) {
@@ -662,6 +664,138 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
   const sortAtForBackfill =
     backfillIds.length > 0 && sessionCompletedAtResolved ? sessionCompletedAtResolved : null;
 
+  /*
+   * When the car was on track: the day the run files under (`sortAt`) and the time it shows
+   * (`sessionCompletedAt`). The order of evidence is in `lib/runs/runTime.ts`. Stamping "now"
+   * filed every run logged after the fact under the day it was typed in: a LiveRC race from
+   * August inside this weekend's meeting, last night's practice on today (test drive 2026-09-26).
+   */
+  const importedAtIsOnTrack = importedTimeIsOnTrack(body);
+  const runAt = runAtParsed.at ? withLoggingOrder(runAtParsed.at, now, deviceTimeZone) : null;
+  // A meeting's days are read on the track's calendar: the run's track, else the meeting's.
+  const meetingZone = resolveTrackTimeZone(track ?? event?.track ?? {}, { timeZone: deviceTimeZone });
+  const meetingOver = event
+    ? pastMeeting({ startDate: event.startDate, endDate: event.endDate, zone: meetingZone, now })
+    : null;
+  const meeting = meetingOver
+    ? { ...meetingOver, at: withLoggingOrder(meetingOver.at, now, deviceTimeZone) }
+    : null;
+  let runTime: {
+    /** Null leaves `sortAt` as it is (on create: the moment of saving). */
+    sortAt: Date | null;
+    sessionCompletedAt: Date | null;
+    /** What the weather must describe: null = now, "unknown" = no clock to fetch for. */
+    weatherAt: Date | null | "unknown";
+    /** The racer picked a new time for a stored run. */
+    moved: boolean;
+  };
+  if (params.mode === "create") {
+    const stamped = stampNewRunTime({
+      importedAt: sessionCompletedAtResolved,
+      importedAtIsOnTrack,
+      runAt,
+      meeting,
+    });
+    runTime = { ...stamped, sortAt: stamped.sortAt ?? sortAtForBackfill, moved: false };
+  } else {
+    const existing = existingUpdate!;
+    const edited = stampEditedRunTime({
+      stored: existing,
+      importedAt: sessionCompletedAtResolved,
+      importedAtIsOnTrack,
+      runAt,
+    });
+    runTime = {
+      sortAt: edited.moveTo ?? sortAtForBackfill,
+      sessionCompletedAt: edited.sessionCompletedAt,
+      // An edit that leaves the time alone leaves the weather alone.
+      weatherAt: edited.moveTo,
+      moved: edited.moveTo != null,
+    };
+    if (!edited.moveTo && loggingComplete && existing.loggingComplete === false) {
+      if (meeting && !(importedAtIsOnTrack && sessionCompletedAtResolved) && !existing.sessionCompletedAt) {
+        // Finished after its meeting is over, and nothing says when it ran: the meeting's day.
+        runTime.sortAt = pastMeetingDraftSortAt(existing.sortAt, meeting, meetingZone) ?? runTime.sortAt;
+        runTime.weatherAt = "unknown";
+      } else {
+        /**
+         * A draft finished on a different day than it was banked files onto the day it was DRIVEN.
+         *
+         * `sortAt` is otherwise stamped once and never moves — see `draftCompletionDay.ts` for why
+         * that contract is right everywhere except here, and why this only fires when the two days
+         * actually differ. Without it, prepping the night before a meeting (the case drafts exist
+         * for, and the one the wizard's own copy invites) filed the run under the previous day
+         * forever.
+         */
+        const dayStamp = deviceTimeZone
+          ? draftCompletionDayStamp({
+              sortAt: existing.sortAt,
+              storedSessionCompletedAt: existing.sessionCompletedAt,
+              importedSessionCompletedAt: sessionCompletedAtResolved,
+              now,
+              timeZone: deviceTimeZone,
+            })
+          : null;
+        if (dayStamp) {
+          runTime.sortAt = dayStamp.sortAt;
+          if (dayStamp.sessionCompletedAt) runTime.sessionCompletedAt = dayStamp.sessionCompletedAt;
+        }
+        runTime.weatherAt = runTime.sessionCompletedAt;
+      }
+    }
+  }
+
+  /*
+   * The log wizard fetches the weather at "Run complete", for now. A run that was on track at
+   * another time — a picked time, or a meeting that is over — must not carry this morning's air.
+   * The fetched part goes; a probe track temp the racer typed stays.
+   */
+  let typedTrackTempC: number | null = null;
+  if (conditionsColumns && readingIsForAnotherTime(conditionsColumns, runTime.weatherAt)) {
+    typedTrackTempC = conditionsColumns.conditionsTrackTempC;
+    conditionsColumns = NULL_RUN_CONDITIONS_COLUMNS;
+  }
+  /**
+   * Effortless capture: when the client attached no reading (fast save, a transient weather-fetch
+   * failure, or the async client fetch not landing before submit) but the run's track has a saved
+   * pin, fetch conditions server-side so auto-capture is reliable every time.
+   *
+   * Fires when the run BECOMES COMPLETE, not when the row is created (2026-08-25). It was
+   * create-only, which silently corrupted every run drafted ahead of time: saving a draft the night
+   * before a meeting — with the track picked, which you would — stamped that evening's weather onto
+   * the run. Next day the wizard's own capture at Run complete looks for "does this run already
+   * have a reading?", finds one, and stands down, so the run kept Friday night's air temp and still
+   * air forever. Weather is a real Engineer input, so that is a wrong answer rather than a missing
+   * one. A draft now carries no reading at all until it is finished, which is the honest state and
+   * the one the wizard was always designed around (`WizardConditionsBand`: the band's reading is a
+   * preview and is deliberately never lifted into the form).
+   *
+   * The "never override an explicit clear on edit" guard survives as the transition test: editing
+   * an already-complete run never reaches here — unless the racer moved its time, which makes the
+   * old reading describe the wrong hour. The reading is fetched for the run's own time; with no
+   * clock at all (a past meeting's day), nothing is fetched rather than today's weather.
+   */
+  const isBecomingComplete =
+    loggingComplete && (params.mode === "create" || existingUpdate?.loggingComplete === false);
+  const willStoreConditionsSource = conditionsColumns
+    ? conditionsColumns.conditionsSource != null
+    : existingUpdate?.conditionsSource != null;
+  if (
+    (isBecomingComplete || runTime.moved) &&
+    runTime.weatherAt !== "unknown" &&
+    !willStoreConditionsSource &&
+    track &&
+    trackHasMarkedLocation(track)
+  ) {
+    const backfilled = await backfillRunConditionsFromTrack({
+      latitude: track.latitude!,
+      longitude: track.longitude!,
+      atIso: runTime.weatherAt ? runTime.weatherAt.toISOString() : null,
+    });
+    if (backfilled) conditionsColumns = backfilled;
+  }
+  conditionsColumns = withTypedTrackTemp(conditionsColumns, typedTrackTempC);
+
   let run: { id: string; createdAt: Date };
   /** Non-null only when correcting this run's count also moved later runs on the same set. */
   let tireRunNumberCascade: { updatedRuns: number; delta: number } | null = null;
@@ -707,11 +841,11 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         sessionLabel: body.sessionLabel?.trim() || null,
         raceClass: body.raceClass?.trim() || null,
         practiceDayUrl: body.practiceDayUrl?.trim() || null,
-        sessionCompletedAt: sessionCompletedAtResolved,
+        sessionCompletedAt: runTime.sessionCompletedAt,
         loggingComplete,
         loggingCompletedAt: loggingComplete ? new Date() : null,
         shareWithTeam,
-        ...(sortAtForBackfill ? { sortAt: sortAtForBackfill } : {}),
+        ...(runTime.sortAt ? { sortAt: runTime.sortAt } : {}),
         ...(conditionsColumns ?? {}),
       } as PrismaTypes.RunUncheckedCreateInput,
       select: { id: true, createdAt: true },
@@ -758,40 +892,19 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
       engineerSummaryJson: Prisma.JsonNull,
       engineerSummaryRefRunId: null,
       engineerSummaryComputedAt: null,
-      sessionCompletedAt: sessionCompletedAtResolved,
+      // Decided above with the rest of the run's time: a timing session's, a changed pick, the
+      // day a draft was driven, or kept.
+      sessionCompletedAt: runTime.sessionCompletedAt,
       loggingComplete,
       // A wizard save is the driver vouching for the run. This is the ONLY place the mark a
       // backfilled run carries comes off — the sparse PATCH, reorder and setup-correction doors
       // leave it alone (founder ruling 2026-08-31: confirming is a deliberate act).
       unconfirmedAt: null,
-      ...(sortAtForBackfill ? { sortAt: sortAtForBackfill } : {}),
+      ...(runTime.sortAt ? { sortAt: runTime.sortAt } : {}),
       ...(conditionsColumns ?? {}),
     };
     if (loggingComplete && existing.loggingComplete === false && existing.loggingCompletedAt == null) {
       updateData.loggingCompletedAt = new Date();
-    }
-    /**
-     * A draft finished on a different day than it was banked files onto the day it was DRIVEN.
-     *
-     * `sortAt` is otherwise stamped once and never moves — see `draftCompletionDay.ts` for why that
-     * contract is right everywhere except here, and why this only fires when the two days actually
-     * differ. Without it, prepping the night before a meeting (the case drafts exist for, and the
-     * one the wizard's own copy invites) filed the run under the previous day forever.
-     */
-    if (loggingComplete && existing.loggingComplete === false && deviceTimeZone) {
-      const dayStamp = draftCompletionDayStamp({
-        sortAt: existing.sortAt,
-        storedSessionCompletedAt: existing.sessionCompletedAt,
-        importedSessionCompletedAt: sessionCompletedAtResolved,
-        now: new Date(),
-        timeZone: deviceTimeZone,
-      });
-      if (dayStamp) {
-        updateData.sortAt = dayStamp.sortAt;
-        if (dayStamp.sessionCompletedAt) {
-          updateData.sessionCompletedAt = dayStamp.sessionCompletedAt;
-        }
-      }
     }
     if ("handlingAssessmentJson" in body) {
       updateData.handlingAssessmentJson = loggingComplete

@@ -46,9 +46,14 @@ export function usable(v: string | null | undefined): string | null {
  * A name that is only a date tells the driver nothing the row does not already say, so it is
  * refused and the caller falls through to "Practice"/"Race" — which is what the fallback below
  * was written for, and could never reach while Speedhive was handing us a "name".
+ *
+ * The app's own style counts too ("21 Sept 2026, 10:12 AM", `formatRunCreatedAtDateTime`): the
+ * Speedhive practice import labels each run with it.
  */
 export function isOnlyADate(v: string): boolean {
-  return /^[\d/.\-: ,]+(?:\s*[ap]\.?m\.?)?$/i.test(v.trim());
+  return /^(?=.*\d)(?:[\d/.\-: ,]|jan|feb|mar|apr|may|june?|july?|aug|sept?|oct|nov|dec)+(?:\s*[ap]\.?m\.?)?$/i.test(
+    v.trim()
+  );
 }
 
 export function importedSessionTitle(input: {

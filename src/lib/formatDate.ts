@@ -17,17 +17,39 @@ export const RUN_DATETIME_LOCALE = "en-AU";
  * `rc_tz` cookie via {@link getExplicitTimeZoneForRunFormatting}) so SSR matches
  * the device after the cookie is set; omit `timeZone` only when you intend the
  * runtime default calendar (not recommended for run lists).
+ *
+ * The month is a word, never a number: "26/09/2026" reads day-first to an Australian and
+ * month-first to an American, and "05/10" is 5 October to one and May 10 to the other.
  */
 export const RUN_DISPLAY_DATETIME_OPTIONS: Intl.DateTimeFormatOptions = {
-  day: "2-digit",
-  month: "2-digit",
+  day: "numeric",
+  month: "short",
   year: "numeric",
-  hour: "2-digit",
+  hour: "numeric",
   minute: "2-digit",
   hour12: true,
 };
 
-const RUN_TABLE_DATETIME_OPTIONS = RUN_DISPLAY_DATETIME_OPTIONS;
+/**
+ * Month names written out here rather than asked of `Intl`: a server's and a browser's copy of
+ * the locale data can spell a month differently ("Sep" / "Sept"), and a string that differs
+ * between the server render and the browser's is a hydration mismatch. Spelled as the rest of the
+ * app prints them (`en-GB`: "26 Sept 2026").
+ */
+const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sept",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
 
 const RUN_WEEKDAY_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
   weekday: "short",
@@ -68,7 +90,12 @@ export function formatAppTimestampUtc(d: string | Date | null | undefined): stri
 }
 
 /**
- * Compact date+time for run history rows and detail.
+ * Full date and time with the month spelled out: **"26 Sept 2026, 5:04 PM"**, the same for every
+ * racer whatever their country (saved setups, a car's added date, the lap-import lists). It was
+ * "26/09/2026, 05:04 pm", which a US or Canadian racer reads month-first: a run on 5 October
+ * looked like May 10 (test drive, 2026-09-26).
+ *
+ * Built from numeric parts, so a server and a browser print the identical string.
  * Prefer passing `timeZone` (IANA) so server output matches the signed-in device
  * once the `rc_tz` cookie is present.
  */
@@ -76,11 +103,24 @@ export function formatRunCreatedAtDateTime(d: string | Date, timeZone?: string |
   const dt = new Date(d);
   if (Number.isNaN(dt.getTime())) return "—";
   const tz = timeZone?.trim();
-  const opts: Intl.DateTimeFormatOptions = {
-    ...RUN_TABLE_DATETIME_OPTIONS,
+  const parts = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hourCycle: "h23",
     ...(tz ? { timeZone: tz } : {}),
-  };
-  return new Intl.DateTimeFormat(RUN_DATETIME_LOCALE, opts).format(dt);
+  }).formatToParts(dt);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  const month = MONTHS_SHORT[Number(part("month")) - 1];
+  // Some engines print midnight as "24" in a 24-hour cycle.
+  const hour = Number(part("hour")) % 24;
+  if (!month || !Number.isFinite(hour)) return "—";
+  const minute = part("minute").padStart(2, "0");
+  const clock = `${hour % 12 === 0 ? 12 : hour % 12}:${minute} ${hour < 12 ? "AM" : "PM"}`;
+  return `${Number(part("day"))} ${month} ${part("year")}, ${clock}`;
 }
 
 /** Calendar year of an instant in an IANA zone (defaults to the runtime zone). */
