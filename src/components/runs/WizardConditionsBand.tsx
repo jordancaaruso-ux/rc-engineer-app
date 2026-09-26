@@ -118,7 +118,14 @@ export function WizardConditionsBand({
     if (!track || !hasPin || track.latitude == null || track.longitude == null) return;
     const key = `${track.id}:${track.latitude.toFixed(3)},${track.longitude.toFixed(3)}:${atIso ?? "now"}`;
     if (fetchedKeyRef.current === key) return;
-    void fetchFor({ latitude: track.latitude, longitude: track.longitude }, key);
+    const coords = { latitude: track.latitude, longitude: track.longitude };
+    if (!atIso) {
+      void fetchFor(coords, key);
+      return;
+    }
+    // A picked time changes several times while the picker spins: read the hour it settles on.
+    const t = window.setTimeout(() => void fetchFor(coords, key), 500);
+    return () => window.clearTimeout(t);
   }, [storedLine, track, hasPin, fetchFor, atIso]);
 
   const requestDeviceLocation = useCallback(async () => {
