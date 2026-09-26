@@ -33,6 +33,14 @@
  * history back into the page just left, and the driver bounces between the two. So a back
  * control that pushes says so first (`recordPush`).
  *
+ * ============================== A PUSHED RETURN KEEPS THE PLACE TOO ==========================
+ *
+ * History back puts the driver where they were on the page; a push lands at the top. The Sessions
+ * pill pushes, so "Analysis, scroll to a teammate, open them, back" came back to the top of
+ * Analysis: the 08-31 ask, come undone (founder, 2026-09-26). So `ReturnTrailTracker` notes the
+ * driver's place on every tap (`rememberScroll`), and a back control that pushes to a page the
+ * driver came through asks for that place back (`recordPush` → `takeReturnScroll`).
+ *
  * `sessionStorage`, not memory: it survives the PWA being backgrounded and the page reloading,
  * dies with the tab (a trail from last week is worthless), and is already the store the sessions
  * token uses. Every read/write is try/caught — storage can be absent or full, and the trail is
@@ -40,9 +48,14 @@
  */
 
 export const RETURN_TRAIL_KEY = "rc:return-trail";
+/** `{ pathname: scrollY }`, the driver's place on each page at their last tap there. */
+export const RETURN_SCROLL_KEY = "rc:return-scroll";
+/** The pathname a back control has just pushed to, whose place should be put back on arrival. */
+export const RETURN_SCROLL_PENDING_KEY = "rc:return-scroll-pending";
 
 /** Plenty for a session of tapping around; keeps the JSON blob trivial. */
 const MAX_TRAIL_LENGTH = 40;
+const MAX_SCROLL_ENTRIES = 40;
 
 /** Pure: fold the next visited pathname into the trail. Exported for tests. */
 export function foldPathname(trail: readonly string[], pathname: string): string[] {
@@ -104,6 +117,35 @@ export function pushPathname(trail: readonly string[], pathname: string): string
   return [...trail, pathname].slice(-MAX_TRAIL_LENGTH);
 }
 
+/**
+ * Pure: is a push from `currentPathname` to `targetPathname` a return, to a page the driver came
+ * through on the way here? Then it should put them back where they were on it. Any depth, not
+ * just the page directly underneath: a one-team driver's back from the team page goes to
+ * Settings, two steps down past the Teams list that skipped itself. Exported for tests.
+ */
+export function pushReturnsTo(
+  trail: readonly string[],
+  currentPathname: string,
+  targetPathname: string
+): boolean {
+  if (targetPathname === currentPathname) return false;
+  return foldPathname(trail, currentPathname).slice(0, -1).includes(targetPathname);
+}
+
+/** Pure: the scroll map with `pathname` at `y`, newest last, capped. Exported for tests. */
+export function withScroll(
+  map: Readonly<Record<string, number>>,
+  pathname: string,
+  y: number
+): Record<string, number> {
+  const next: Record<string, number> = {};
+  for (const [key, value] of Object.entries(map)) if (key !== pathname) next[key] = value;
+  next[pathname] = Math.max(0, Math.round(y));
+  const keys = Object.keys(next);
+  for (const key of keys.slice(0, Math.max(0, keys.length - MAX_SCROLL_ENTRIES))) delete next[key];
+  return next;
+}
+
 /** Pathname of a same-app href string ("/cars?back=/paddock" → "/cars"), or null. */
 export function hrefPathname(href: string): string | null {
   try {
@@ -157,8 +199,54 @@ export function recordPush(href: string): void {
   const pathname = hrefPathname(href);
   if (!pathname) return;
   try {
-    sessionStorage.setItem(RETURN_TRAIL_KEY, JSON.stringify(pushPathname(readTrail(), pathname)));
+    const trail = readTrail();
+    // A push back to a page the driver came through: put them back where they were on it, as
+    // history back would have (`takeReturnScroll`, on arrival).
+    if (pushReturnsTo(trail, window.location.pathname, pathname)) {
+      sessionStorage.setItem(RETURN_SCROLL_PENDING_KEY, pathname);
+    }
+    sessionStorage.setItem(RETURN_TRAIL_KEY, JSON.stringify(pushPathname(trail, pathname)));
   } catch {
     // Non-fatal — the trail is only ever an optimisation.
+  }
+}
+
+function readScrollMap(): Record<string, number> {
+  try {
+    const raw = sessionStorage.getItem(RETURN_SCROLL_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, number] => typeof entry[1] === "number")
+    );
+  } catch {
+    return {};
+  }
+}
+
+/** Called by `ReturnTrailTracker` on every tap: the driver's place on the page they may leave. */
+export function rememberScroll(pathname: string, y: number): void {
+  try {
+    sessionStorage.setItem(RETURN_SCROLL_KEY, JSON.stringify(withScroll(readScrollMap(), pathname, y)));
+  } catch {
+    // Non-fatal — the trail is only ever an optimisation.
+  }
+}
+
+/**
+ * Called by `ReturnTrailTracker` on arrival: the place to put the driver back at, when a back
+ * control has just pushed them to a page they came through (`recordPush`). Consumed either way:
+ * a pending restore is only ever for the very next page.
+ */
+export function takeReturnScroll(pathname: string): number | null {
+  try {
+    const pending = sessionStorage.getItem(RETURN_SCROLL_PENDING_KEY);
+    if (pending == null) return null;
+    sessionStorage.removeItem(RETURN_SCROLL_PENDING_KEY);
+    if (pending !== pathname) return null;
+    const y = readScrollMap()[pathname];
+    return typeof y === "number" && y > 0 ? y : null;
+  } catch {
+    return null;
   }
 }

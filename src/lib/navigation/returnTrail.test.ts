@@ -4,8 +4,10 @@ import {
   foldPathname,
   hrefPathname,
   pushPathname,
+  pushReturnsTo,
   trailParentAmong,
   trailSaysCameFrom,
+  withScroll,
 } from "./returnTrail";
 
 function walk(paths: string[]): string[] {
@@ -90,6 +92,31 @@ test("a pushed return is not read as history back, so the parent's arrow can't b
   assert.equal(trailSaysCameFrom(pushed, "/teams", "/teams/t1"), false);
   // …and the tracker's own fold afterwards changes nothing.
   assert.deepEqual(foldPathname(pushed, "/teams/t1"), pushed);
+});
+
+test("a pushed back to a page the driver came through is a return, and keeps their place", () => {
+  // The Sessions pill back to Analysis, before and after the tracker records Sessions.
+  assert.equal(pushReturnsTo(["/analysis", "/runs/history"], "/runs/history", "/analysis"), true);
+  assert.equal(pushReturnsTo(["/analysis"], "/runs/history", "/analysis"), true);
+  // A one-team driver: back from the team page to Settings, past the Teams list that skipped itself.
+  assert.equal(pushReturnsTo(["/settings", "/teams", "/teams/t1"], "/teams/t1", "/settings"), true);
+  // Not returns: the team page opened cold, Sessions reached from the dashboard, or the same page.
+  assert.equal(pushReturnsTo(["/teams/t1"], "/teams/t1", "/settings"), false);
+  assert.equal(pushReturnsTo(["/", "/runs/history"], "/runs/history", "/analysis"), false);
+  assert.equal(pushReturnsTo(["/analysis", "/runs/history"], "/runs/history", "/runs/history"), false);
+});
+
+test("the scroll map keeps each page's latest place, newest last, and stays small", () => {
+  let map = withScroll({}, "/analysis", 412.6);
+  map = withScroll(map, "/runs/history", 90);
+  map = withScroll(map, "/analysis", 640);
+  assert.deepEqual({ ...map }, { "/runs/history": 90, "/analysis": 640 });
+  assert.deepEqual(Object.keys(map), ["/runs/history", "/analysis"]);
+  assert.equal(withScroll({}, "/x", -5)["/x"], 0);
+  for (let i = 0; i < 60; i++) map = withScroll(map, `/page-${i}`, i);
+  assert.equal(Object.keys(map).length, 40);
+  assert.equal(map["/page-59"], 59);
+  assert.equal(map["/analysis"], undefined);
 });
 
 test("hrefPathname strips query and hash, refuses garbage gracefully", () => {
