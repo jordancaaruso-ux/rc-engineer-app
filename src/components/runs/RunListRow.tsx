@@ -164,10 +164,20 @@ export function RunListRow({
               The lap count came off with the same call — it never decided anything a
               driver was about to do, and it was the third fact on a line that only has
               room to be scanned.
+
+              The where gives way, never the when. Truncated as one line, a day of races
+              at one track read "West Coast Model RC · 13 Sept…" six times on a phone, the
+              clock that tells them apart cut off (test drive, 2026-09-26). The venue now
+              shrinks first; the time only once the venue is gone.
             */}
-            <span className="truncate text-[11.5px] leading-none text-faint">
-              {row.whereLabel ? `${row.whereLabel} · ` : ""}
-              <span className="tabular-nums">{row.whenLabel}</span>
+            <span className="flex min-w-0 items-baseline overflow-hidden text-[11.5px] leading-none text-faint">
+              {row.whereLabel ? (
+                <>
+                  <span className="min-w-0 truncate">{row.whereLabel}</span>
+                  <span className="shrink-0 whitespace-pre"> · </span>
+                </>
+              ) : null}
+              <span className="max-w-full shrink-0 truncate tabular-nums">{row.whenLabel}</span>
             </span>
           </span>
           {row.needsLapImport ? (
