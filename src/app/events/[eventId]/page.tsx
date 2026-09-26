@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
@@ -9,6 +10,7 @@ import { EventMetaEditor } from "@/components/events/EventMetaEditor";
 import { EventDeleteClient } from "@/components/events/EventDeleteClient";
 import { loadEventDeleteView } from "@/lib/events/deleteOwnEvent";
 import { canEditSharedEventFields } from "@/lib/events/eventAccess";
+import { findMergedEventFor } from "@/lib/events/mergeEvents";
 import {
   EVENT_LIST_INCLUDE,
   mapEventForUser,
@@ -48,6 +50,13 @@ export default async function EventDetailPage(props: {
   });
 
   if (!raw || !(await userCanAccessEvent(user.id, eventId))) {
+    // A meeting that joined another one (LiveRC's, usually) sends its drivers on to it.
+    const mergedInto = raw ? null : await findMergedEventFor(user.id, eventId);
+    if (mergedInto && (await userCanAccessEvent(user.id, mergedInto))) {
+      redirect(`/events/${encodeURIComponent(mergedInto)}`);
+    }
+    // Said in the page body: the header's subtitle is hidden at every width, so this page used to
+    // read as a blank "Event" (test drive 2026-09-26, W1-11). A stranger's meeting names nothing.
     return (
       <>
         <header className="page-header">
@@ -55,10 +64,19 @@ export default async function EventDetailPage(props: {
             <PageBackLink href="/events" />
             <div>
               <h1 className="page-title">Event</h1>
-              <p className="page-subtitle">Not found.</p>
             </div>
           </div>
         </header>
+        <section className="page-body">
+          <CardPanel className="max-w-2xl" contentClassName="space-y-3 text-sm">
+            <p className="text-foreground">
+              {raw ? "You’re not on this meeting." : "This meeting isn’t here any more."}
+            </p>
+            <ButtonLink href="/events" variant="outline">
+              Your events
+            </ButtonLink>
+          </CardPanel>
+        </section>
       </>
     );
   }
