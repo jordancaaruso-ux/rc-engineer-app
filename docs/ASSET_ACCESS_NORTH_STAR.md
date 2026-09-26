@@ -76,7 +76,7 @@ away the moment they made the track.
 
 | Asset | Create | Edit / delete | Verified flag | Notes |
 |---|---|---|---|---|
-| **Track + layouts** | Any user | Unified rule | ✅ | Grip moves off the track entirely (below), making track edits low-stakes. DB case-insensitive unique on name. |
+| **Track + layouts** | Any user | Unified rule | ✅ | Grip moves off the track entirely (below), making track edits low-stakes. DB case-insensitive unique on name. Layouts as built 2026-09-26: any driver adds one from Log run (`POST /api/tracks/[trackId]/layouts`; a name the track already has returns that layout); rename, reorder and remove stay with the track's creator and admins (`PUT`, which only removes layouts the page had loaded). |
 | **Tire type** | Any user | Unified rule (creators gain edit-while-unverified; admins keep full) | ✅ | `modelCode` unique stays the identity. AI pre-seed first (TC). |
 | **Additive type** | Any user | Unified rule — **fixes**: admin delete parity with tires; pass `isAdmin` to `AdditiveGaragePanel` | ✅ | AI pre-seed. |
 | **Chassis type** | **Admin-only** by name or box by box. **Any driver by uploading a fillable PDF sheet since 2026-08-11** (`POST /api/setup-sheet-models/blank?derive=1`), live for everyone, badged Unreviewed until approved | Existing `isAuthorized` rule (= unified rule) | ✅ (`isAuthorized`) | Missing chassis never blocks logging (pending-car flow). Type implies schema + calibration work users can't finish. Highest-stakes aggregation key. **Pending car creation pings the founder** (push/email) so the request loop actually closes. AI pre-seed expands coverage. Founder may open create later by removing the gate — the flag machinery already fits. |

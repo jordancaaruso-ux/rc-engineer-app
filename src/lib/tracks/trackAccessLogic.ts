@@ -34,7 +34,8 @@ export function canDeleteTrack(
  * Everything else on a track is a CONTRIBUTION and open to any driver: grip and layout tags,
  * the pin, the Speedhive link, and the LiveRC link on a track a user made themselves — none of
  * those are identity. Founder call 2026-09-18: a contribution nobody can correct is a worse
- * flaw than one anybody can change, so "add but never overwrite" was rejected.
+ * flaw than one anybody can change, so "add but never overwrite" was rejected. A new named
+ * layout joined them 2026-09-26 (`trackLayouts.ts`): any driver adds one, from Log run.
  */
 export function canEditLiveRcUrl(
   user: TrackAccessUser,

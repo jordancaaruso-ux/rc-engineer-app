@@ -176,7 +176,8 @@ export default async function TrackDetailPage(props: {
             initialLayoutTags={track.layoutTags}
           />
 
-          {/* This track's own named layouts — still the creator's or an admin's list. */}
+          {/* This track's named layouts. Any driver adds one from Log run (founder ruling
+              2026-09-26); renaming, reordering and removing them stays the creator's or an admin's. */}
           {canManage ? <TrackLayoutsEditor trackId={track.id} initialLayouts={layouts} /> : null}
 
           {/* A track with neither link searches nothing and looks like a scan that found nothing.

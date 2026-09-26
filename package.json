@@ -195,6 +195,7 @@
     "test:demo": "npx tsx src/lib/demo/demoAccess.test.ts",
     "test:demo-tour": "npx tsx --test src/lib/demo/tourSteps.test.ts",
     "test:track-access": "npx tsx --test src/lib/tracks/trackAccess.test.ts",
+    "test:track-layouts": "npx tsx --test src/lib/tracks/trackLayouts.test.ts",
     "test:track-lookalike": "npx tsx --test src/lib/tracks/trackLookalike.test.ts",
     "test:track-catalog-scope": "node --conditions=react-server --import tsx src/lib/tracks/trackCatalogScope.test.ts",
     "test:track-timing-url": "npx tsx --test src/lib/tracks/trackTimingUrl.test.ts",

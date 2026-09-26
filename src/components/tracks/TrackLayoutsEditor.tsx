@@ -29,6 +29,9 @@ export function TrackLayoutsEditor({
 }) {
   const router = useRouter();
   const [rows, setRows] = useState<DraftRow[]>(() => toDraft(initialLayouts));
+  // What this page has seen, so a save only removes layouts taken out here — never one a driver
+  // added from Log run after the page loaded (the route keeps anything outside this list).
+  const [knownIds, setKnownIds] = useState<string[]>(() => initialLayouts.map((l) => l.id));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -74,6 +77,7 @@ export function TrackLayoutsEditor({
             name: r.name,
             notes: r.notes.trim() || null,
           })),
+          knownIds,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -84,7 +88,10 @@ export function TrackLayoutsEditor({
         setMessage(data.error ?? "Could not save layouts.");
         return;
       }
-      if (data.layouts) setRows(toDraft(data.layouts));
+      if (data.layouts) {
+        setRows(toDraft(data.layouts));
+        setKnownIds(data.layouts.map((l) => l.id));
+      }
       setMessage("Saved.");
       router.refresh();
     } catch {
