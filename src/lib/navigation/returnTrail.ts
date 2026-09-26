@@ -28,6 +28,11 @@
  * step ago. Nothing here can strand them — `PageBackLink` renders the real href for new tabs,
  * crawlers, and every case the trail doesn't recognise.
  *
+ * One ping-pong we cause ourselves: a back control that PUSHES its destination (the phone's
+ * corner pill over Sessions always does). Misread as a return, the parent's own arrow then walks
+ * history back into the page just left, and the driver bounces between the two. So a back
+ * control that pushes says so first (`recordPush`).
+ *
  * `sessionStorage`, not memory: it survives the PWA being backgrounded and the page reloading,
  * dies with the tab (a trail from last week is worthless), and is already the store the sessions
  * token uses. Every read/write is try/caught — storage can be absent or full, and the trail is
@@ -69,6 +74,36 @@ export function trailSaysCameFrom(
   return last === targetPathname;
 }
 
+/**
+ * Pure: which of `candidates` sits directly under `currentPathname` on the trail (the page the
+ * driver opened this one from), or null. For a page with more than one parent: team sessions
+ * opens from Analysis and from the team's own page, and back should return to the one the driver
+ * used ("takes me to analysis, not back to where I was", founder 2026-09-26).
+ *
+ * Folds the current page in first, so the answer is the same before and after the tracker has
+ * recorded it, and on a history return from a child page (the trail still ends at the child) as
+ * much as on a first visit. Exported for tests.
+ */
+export function trailParentAmong(
+  trail: readonly string[],
+  currentPathname: string,
+  candidates: readonly string[]
+): string | null {
+  const folded = foldPathname(trail, currentPathname);
+  const under = folded.length >= 2 ? folded[folded.length - 2] : null;
+  if (under == null) return null;
+  return candidates.find((href) => hrefPathname(href) === under) ?? null;
+}
+
+/**
+ * Pure: fold in a pathname the driver was PUSHED to. Never pops: a link that happens to point at
+ * the page underneath is still a push. Exported for tests.
+ */
+export function pushPathname(trail: readonly string[], pathname: string): string[] {
+  if (trail[trail.length - 1] === pathname) return [...trail];
+  return [...trail, pathname].slice(-MAX_TRAIL_LENGTH);
+}
+
 /** Pathname of a same-app href string ("/cars?back=/paddock" → "/cars"), or null. */
 export function hrefPathname(href: string): string | null {
   try {
@@ -101,4 +136,29 @@ export function recordPathname(pathname: string): void {
 /** Called by `PageBackLink` (client only, after mount). */
 export function cameFromPathname(targetPathname: string, currentPathname: string): boolean {
   return trailSaysCameFrom(readTrail(), targetPathname, currentPathname);
+}
+
+/** Called by `useReturnParent` (client only, after mount). */
+export function returnParentAmong(
+  currentPathname: string,
+  candidates: readonly string[]
+): string | null {
+  return trailParentAmong(readTrail(), currentPathname, candidates);
+}
+
+/**
+ * Called by a back control the moment it PUSHES its destination instead of going back through
+ * history. To the pop heuristic, a push to the page underneath looks exactly like a history back,
+ * so it pops, and that page's own arrow then walks history straight back into the page the driver
+ * just left: the team page's arrow bouncing into team sessions, over and over. Recorded here
+ * first, the tracker's fold sees the same pathname again and leaves the trail alone.
+ */
+export function recordPush(href: string): void {
+  const pathname = hrefPathname(href);
+  if (!pathname) return;
+  try {
+    sessionStorage.setItem(RETURN_TRAIL_KEY, JSON.stringify(pushPathname(readTrail(), pathname)));
+  } catch {
+    // Non-fatal — the trail is only ever an optimisation.
+  }
 }

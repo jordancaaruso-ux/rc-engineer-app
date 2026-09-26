@@ -773,6 +773,13 @@ export default async function RunHistoryPage({
   const pageSubtitle = teamAccessDenied
     ? "That team was not found or you are not a member."
     : activeViewDescription;
+  /*
+   * Team sessions has a second parent: the team's own page, whose "Team sessions" button opens
+   * it. Back returns to whichever the driver came from (the return trail decides); Analysis
+   * stays the answer for every other arrival. Founder, 2026-09-26: Settings → Teams → the team →
+   * Team sessions, then back "takes me to analysis, not back to where I was".
+   */
+  const teamParents = teamMode && teamId ? [`/teams/${encodeURIComponent(teamId)}`] : undefined;
 
   function renderFlatRunList() {
     const showSessionColumn = runs.some(
@@ -925,9 +932,10 @@ export default async function RunHistoryPage({
             destination there, and an arrow to `/analysis` walks sideways into a page the
             desktop nav can no longer reach. Dashboard, Engineer, Garage and Tools carry no
             back arrow for the same reason. Repeated verbatim on the two early-return headers
-            below; move all three together.
+            below; move all three together. Only this one takes `alternateParents`: the early
+            returns never have a team in scope.
           */}
-          <PageBackLink href="/analysis" className="md:hidden" />
+          <PageBackLink href="/analysis" alternateParents={teamParents} className="md:hidden" />
           <div>
             <h1 className="page-title">{pageTitle}</h1>
             <p className="page-subtitle">{pageSubtitle}</p>
@@ -989,6 +997,7 @@ export default async function RunHistoryPage({
             teamMode={teamMode}
             teamTitle={teamTitle}
             teamId={teamId}
+            alternateParents={teamParents}
             filtersActive={filtersActive}
             filterLabels={browserFilterLabels}
             railFooter={viewMore}

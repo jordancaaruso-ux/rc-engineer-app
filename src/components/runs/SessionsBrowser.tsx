@@ -35,6 +35,7 @@ import {
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
 import { useRegisterMobileBack } from "@/components/layout/MobileBackContext";
+import { useReturnParent } from "@/components/ui/PageBackLink";
 import { BACK_PARAM } from "@/lib/runs/sessionsReturn";
 import { lapImportHref } from "@/lib/runs/lapImportHref";
 import { formatLap } from "@/lib/runLaps";
@@ -115,6 +116,7 @@ export function SessionsBrowser({
   teamMode,
   teamTitle,
   teamId,
+  alternateParents,
   filtersActive = false,
   filterLabels = [],
   railFooter,
@@ -135,6 +137,12 @@ export function SessionsBrowser({
   teamTitle: string | null;
   /** Team scope only — carried so the mobile back href keeps the scope. */
   teamId?: string | null;
+  /**
+   * Pages besides Analysis that open this one: the team's own page, in team scope. The top of
+   * the stack goes back to whichever the driver came from. The header's `PageBackLink` gets the
+   * same list, and the two must agree.
+   */
+  alternateParents?: readonly string[];
   /** Any filter is on, so every session here is a subset. Drives the landing and the ribbon. */
   filtersActive?: boolean;
   filterLabels?: string[];
@@ -341,23 +349,25 @@ export function SessionsBrowser({
    * page header's arrow rather than sitting on top of it — so a second chevron of
    * our own would land in the same 34px of screen. `useRegisterMobileBack` is how
    * a page takes it over; we register at every depth (at the top of the stack we
-   * register exactly what `PageBackLink` would, `/analysis`, so it keeps behaving
-   * as it always has and that link hides itself rather than duplicating).
+   * register exactly what `PageBackLink` would, `/analysis` or the team's page when
+   * that is where team sessions was opened, so that link hides itself rather than
+   * duplicating).
    *
    * The href is the real destination for the case where nothing has hydrated yet;
    * the action only changes *how* we get there, keeping the rail's scroll and the
    * pane's state instead of reloading the page.
    */
+  const parentHref = useReturnParent("/analysis", alternateParents) ?? "/analysis";
   const upHref = useMemo(() => {
     const params = new URLSearchParams();
     if (teamMode && teamId) params.set("teamId", teamId);
     if (depth >= 2 && selection.groupId) params.set(GROUP_PARAM, selection.groupId);
     if (depth >= 3 && selection.driverId) params.set(DRIVER_PARAM, selection.driverId);
-    if (depth === 0) return "/analysis";
+    if (depth === 0) return parentHref;
     const query = params.toString();
     return query ? `/runs/history?${query}` : "/runs/history";
     // `depth` is derived from `selection`, which is what the linter can't see.
-  }, [depth, selection.groupId, selection.driverId, teamId, teamMode]);
+  }, [depth, parentHref, selection.groupId, selection.driverId, teamId, teamMode]);
   const mobileBackAdopted = useRegisterMobileBack(upHref, depth > 0 ? goUp : null);
 
   if (groups.length === 0) return null;

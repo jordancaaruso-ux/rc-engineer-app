@@ -5,6 +5,7 @@ import { ChevronLeft } from "lucide-react";
 import { JrcMark } from "@/components/brand/JrcMark";
 import { PRODUCT_NAME } from "@/lib/brand/brandNames";
 import { useMobileBackAction, useMobileBackHref } from "@/components/layout/MobileBackContext";
+import { recordPush } from "@/lib/navigation/returnTrail";
 
 /**
  * Mobile-only top-left corner control, pinned to balance the account avatar
@@ -37,11 +38,16 @@ export function MobileBrandMark() {
         // The href stays the truth of *where* back goes; the action only changes
         // *how* (history rather than a push), so the pill keeps working unhydrated.
         onClick={(e) => {
-          const action = getBackAction();
-          if (!action) return;
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-          e.preventDefault();
-          action();
+          const action = getBackAction();
+          if (action) {
+            e.preventDefault();
+            action();
+            return;
+          }
+          // No handler, so the link pushes. Say so to the return trail, or a push to the page
+          // underneath is misread as a return and that page's own back bounces (`recordPush`).
+          recordPush(backHref);
         }}
         className={`${PILL_CLASS} w-[34px] text-foreground`}
         style={PILL_POSITION}
