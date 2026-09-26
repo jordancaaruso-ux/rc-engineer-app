@@ -136,6 +136,7 @@
     "test:lap-compare-scope": "npx tsx --test src/lib/lapCompareScope.test.ts",
     "test:practice-field": "node --conditions=react-server --import tsx --test src/lib/practiceField/practiceField.test.ts src/lib/lapWatch/livercPracticeRowDetail.test.ts",
     "test:run-compare-meta": "npx tsx --test src/lib/runCompareMeta.test.ts",
+    "test:run-time": "npx tsx --test src/lib/runs/runTime.test.ts src/lib/formatDate.test.ts",
     "test:car-swap": "npx tsx --test src/lib/runs/carSwap.test.ts",
     "test:setup-source": "npx tsx --test src/lib/runs/setupSourceDefault.test.ts src/lib/runs/prefillSetupSource.test.ts",
     "test:car-discipline": "npx tsx --test src/lib/cars/disciplineForCar.test.ts",
