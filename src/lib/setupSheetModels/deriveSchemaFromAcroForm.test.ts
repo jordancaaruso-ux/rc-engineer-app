@@ -58,6 +58,60 @@ for (const n of ["fr-shock-oil", "pinion", "fdr", "traction", "re-lenght"]) {
   assert.equal(isGenericAcroFieldName(n), false, `${n} should read as meaningful`);
 }
 
+// --- The same defaults in other languages (test drive 2026-09-26: a Serpent sheet drew its tick
+// boxes as "Casilla de verificación11 · box 1 of 7") ---
+for (const n of [
+  // Seen on real catalog blanks.
+  "Casilla de verificación11",
+  "Texto47",
+  "Texte2",
+  "Liste déroulante1",
+  "チェックボックス1",
+  "TextFormField 162",
+  "CheckBoxFormField 114",
+  // The same controls in the other languages, with and without the accent or the space.
+  "Case à cocher3",
+  "Case a cocher 3",
+  "Champ de texte1",
+  "Campo de texto 4",
+  "Kontrollkästchen12",
+  "Textfeld 7",
+  "Casella di controllo2",
+  "Campo di testo1",
+  "Caixa de seleção5",
+  "Selectievakje1",
+  "テキスト2",
+]) {
+  assert.equal(isGenericAcroFieldName(n), true, `${n} should read as generic`);
+}
+// Somebody's own name for a box, in any language, is not a default — even when it starts with one.
+for (const n of ["Texto notas", "Caída delantera", "Carrossage avant", "Sturz vorne", "トラクションレベル1", "ギャップレベル2"]) {
+  assert.equal(isGenericAcroFieldName(n), false, `${n} should read as meaningful`);
+}
+
+// --- A Spanish tick-box row gets the plain placeholder the English one gets ---
+{
+  const ex = extraction([
+    field({
+      name: "Casilla de verificación11",
+      type: "CheckBox",
+      widgets: [widget({ y: 300, x: 100, index: 0 }), widget({ y: 300, x: 150, index: 1 })],
+    }),
+    field({ name: "Texto47", widgets: [widget({ y: 320 })] }),
+  ]);
+  const { schema, stats } = deriveSchemaFromAcroForm(ex, "Spanish sheet");
+  for (const f of schema.fields) {
+    assert.match(f.displayLabel, /^Box \d+/, `${f.key} should be labelled by position, got "${f.displayLabel}"`);
+    assert.equal(f.showInAnalysis, false, `${f.key} is unnamed, so it stays out of analysis`);
+  }
+  assert.equal(stats.placeholderLabelCount, 3);
+  // Only the label changes. The key is still read off the field name, so it is what it always was.
+  assert.deepEqual(
+    schema.fields.map((f) => f.key),
+    ["casilla_de_verificaci_n11__b1", "casilla_de_verificaci_n11__b2", "texto47"]
+  );
+}
+
 // --- Labels stay honest: tidy the punctuation, never expand an abbreviation ---
 assert.equal(labelFromAcroFieldName("fr-shock-oil"), "Fr shock oil");
 assert.equal(labelFromAcroFieldName("frontRollBar"), "Front roll bar");

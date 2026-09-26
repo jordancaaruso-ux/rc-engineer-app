@@ -164,10 +164,110 @@ const GENERIC_NAME_PATTERNS = [
   /^[a-z]?\d+$/i,
 ];
 
+/**
+ * The same defaults in the other languages the editors ship in. The list above was English only,
+ * so a Spanish sheet drew 34 tick boxes as "Casilla de verificación11 · box 1 of 7" while the
+ * English defaults beside them read "Box 12" (test drive, 2026-09-26).
+ *
+ * "Seen" marks a default found on a real blank in the chassis catalog (scanned 2026-09-26). The
+ * rest are the same controls in the other languages Acrobat ships in, so the next sheet from
+ * Germany or Italy is not the next finding.
+ *
+ * Matched with case, accents, spaces and punctuation taken out, and any number on the end, so
+ * "Case a cocher 3" and "Case à cocher3" are the same default. A name that only CONTAINS one of
+ * these ("Texto notas") is somebody's name for the box and is left alone.
+ */
+const LOCALIZED_DEFAULT_NAMES = [
+  // Spanish. Seen: Serpent ("Casilla de verificación11", "Texto47").
+  "Texto",
+  "Campo de texto",
+  "Casilla de verificación",
+  "Botón de opción",
+  "Botón",
+  "Lista desplegable",
+  "Cuadro combinado",
+  "Cuadro de lista",
+  "Campo",
+  // French. Seen: Awesomatix A800FXR ("Texte2", "Liste déroulante1").
+  "Texte",
+  "Champ de texte",
+  "Case à cocher",
+  "Bouton radio",
+  "Bouton d'option",
+  "Bouton",
+  "Liste déroulante",
+  "Zone de liste",
+  "Champ",
+  // German.
+  "Textfeld",
+  "Kontrollkästchen",
+  "Optionsfeld",
+  "Kombinationsfeld",
+  "Listenfeld",
+  "Schaltfläche",
+  "Feld",
+  // Italian.
+  "Testo",
+  "Campo di testo",
+  "Casella di testo",
+  "Casella di controllo",
+  "Pulsante di scelta",
+  "Pulsante di opzione",
+  "Pulsante",
+  "Elenco a discesa",
+  "Casella di riepilogo",
+  "Casella combinata",
+  // Portuguese.
+  "Caixa de texto",
+  "Caixa de seleção",
+  "Caixa de verificação",
+  "Botão de opção",
+  "Botão",
+  "Lista suspensa",
+  "Caixa de listagem",
+  "Caixa de combinação",
+  // Dutch.
+  "Tekst",
+  "Tekstveld",
+  "Tekstvak",
+  "Selectievakje",
+  "Keuzerondje",
+  "Keuzelijst",
+  "Vervolgkeuzelijst",
+  "Knop",
+  "Veld",
+  // Japanese. Seen: CRC MetriCKs ("チェックボックス1").
+  "テキスト",
+  "テキストフィールド",
+  "テキストボックス",
+  "チェックボックス",
+  "ラジオボタン",
+  "ドロップダウン",
+  "コンボボックス",
+  "リストボックス",
+  "ボタン",
+  "フィールド",
+  // English from an editor other than Acrobat. Seen: RC Maker SP2 ("TextFormField 162").
+  "TextFormField",
+  "CheckBoxFormField",
+];
+
+/** "Casilla de verificación11" → "casilladeverificacion": the name with nothing but its words. */
+function defaultNameStem(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "")
+    .replace(/\d+$/u, "");
+}
+
+const LOCALIZED_DEFAULT_STEMS = new Set(LOCALIZED_DEFAULT_NAMES.map(defaultNameStem));
+
 export function isGenericAcroFieldName(name: string): boolean {
   const n = name.trim();
   if (!n) return true;
-  return GENERIC_NAME_PATTERNS.some((re) => re.test(n));
+  return GENERIC_NAME_PATTERNS.some((re) => re.test(n)) || LOCALIZED_DEFAULT_STEMS.has(defaultNameStem(n));
 }
 
 /**
