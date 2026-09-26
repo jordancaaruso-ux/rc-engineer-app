@@ -12,10 +12,12 @@ import { loadEventDeleteView } from "@/lib/events/deleteOwnEvent";
 import { canEditSharedEventFields } from "@/lib/events/eventAccess";
 import { findMergedEventFor } from "@/lib/events/mergeEvents";
 import {
+  countMyRunsInMeeting,
   EVENT_LIST_INCLUDE,
   mapEventForUser,
   userCanAccessEvent,
 } from "@/lib/events/eventParticipation";
+import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 
 export default async function EventDetailPage(props: {
   params: Promise<{ eventId: string }>;
@@ -83,8 +85,15 @@ export default async function EventDetailPage(props: {
 
   const event = mapEventForUser(raw, user.id);
 
+  // Your runs at this meeting, picked for it or not: the same rule Sessions groups by (W1-07).
   const [runCount, deleteView] = await Promise.all([
-    prisma.run.count({ where: { eventId: event.id, userId: user.id } }),
+    getExplicitTimeZoneForRunFormatting().then((viewerTimeZone) =>
+      countMyRunsInMeeting({
+        event: raw,
+        userId: user.id,
+        zones: { ownerTimeZoneByUserId: { [user.id]: user.timeZone }, viewerTimeZone },
+      })
+    ),
     loadEventDeleteView(event.id, user.id),
   ]);
 

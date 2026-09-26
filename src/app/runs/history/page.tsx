@@ -35,6 +35,7 @@ import {
   resolveSessionGroupKeys,
   runSessionSortInstant,
   sessionGroupKey,
+  type MeetingForGrouping,
   type RunHistoryGroup,
 } from "@/lib/runs/buildRunHistoryGroups";
 import {
@@ -274,6 +275,8 @@ async function loadSessionRunTotals(input: {
   displayTimeZone: string | null;
   ownerTimeZoneByUserId: Record<string, string | null>;
   oldestDisplayed: RunInGroup | null;
+  /** The viewer's meetings, so the count folds exactly as the list does. */
+  meetings: readonly MeetingForGrouping[];
 }): Promise<Map<string, number> | null> {
   if (!input.enabled || !input.oldestDisplayed || input.userIds.length === 0) return null;
   const since = new Date(
@@ -321,7 +324,7 @@ async function loadSessionRunTotals(input: {
     ownerTimeZoneByUserId: input.ownerTimeZoneByUserId,
     viewerTimeZone: input.displayTimeZone,
   };
-  const keyByRunId = resolveSessionGroupKeys(rows, zones);
+  const keyByRunId = resolveSessionGroupKeys(rows, zones, input.meetings);
   const totals = new Map<string, number>();
   for (const row of rows) {
     const key = keyByRunId.get(row.id) ?? sessionGroupKey(row, zones);
@@ -434,6 +437,8 @@ export default async function RunHistoryPage({
   let filterDrivers: { id: string; label: string }[] = [];
   /** Whose runs this page is allowed to show — the viewer, or the (narrowed) roster. */
   let scopedUserIds: string[] = [user.id];
+  /** The viewer's meetings: one no run was picked for still holds its day's runs (W1-07). */
+  let viewerMeetings: MeetingForGrouping[] = [];
 
   if (teamId) {
     const allowed = await assertUserInTeam(teamId, user.id);
@@ -531,6 +536,7 @@ export default async function RunHistoryPage({
     filterCars = cars.map((c) => ({ id: c.id, label: c.name }));
     filterTracks = tracks.map((t) => ({ id: t.id, label: t.name }));
     filterEvents = scopedEvents.map((e) => ({ id: e.id, label: e.name }));
+    viewerMeetings = scopedEvents;
     // Compounds the driver has actually run, with how many runs are on each.
     const tireTypeNames = new Map<string, string>(
       (
@@ -636,7 +642,10 @@ export default async function RunHistoryPage({
   const groups: Group[] =
     filters.layout === "flat"
       ? []
-      : buildRunHistoryGroups(runs, displayTimeZone, { ownerTimeZoneByUserId });
+      : buildRunHistoryGroups(runs, displayTimeZone, {
+          ownerTimeZoneByUserId,
+          meetings: viewerMeetings,
+        });
   const allRunsDescending = [...runs].sort(compareRunTimestamp);
   const compareRunsDescending = allRunsDescending.map(toCompareRunShape);
   const focusRunId =
@@ -668,6 +677,7 @@ export default async function RunHistoryPage({
     displayTimeZone,
     ownerTimeZoneByUserId,
     oldestDisplayed: groups.at(-1)?.runs.at(-1) ?? null,
+    meetings: viewerMeetings,
   });
   const groupZones = { ownerTimeZoneByUserId, viewerTimeZone: displayTimeZone };
   /**

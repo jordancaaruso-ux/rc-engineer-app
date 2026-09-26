@@ -595,3 +595,87 @@ test("a meeting's dates are the days it ran, whatever zone the server is in", ()
     process.env.TZ = machineZone;
   }
 });
+
+// W1-07 (test drive 2026-09-26): Henry made "Canowindra Club Day" for today on Events, then logged
+// four runs at that track on "Testing" without picking it. Its page said "0 runs linked" and
+// Sessions filed the day as "Test day". Approved rule: a run at the same track on a meeting's day
+// sits in that meeting, picked or not.
+
+const CANOWINDRA = "Canowindra Model Car Club";
+const clubDay = {
+  id: "club",
+  name: "Canowindra Club Day",
+  startDate: new Date("2026-09-26T12:00:00Z"),
+  endDate: new Date("2026-09-26T12:00:00Z"),
+  trackNameSnapshot: CANOWINDRA,
+  track: { name: CANOWINDRA },
+};
+const henryRun = (id: string, iso: string, track = CANOWINDRA) => ({
+  id,
+  userId: "henry",
+  createdAt: new Date(iso),
+  sortAt: new Date(iso),
+  eventId: null,
+  localTimeZone: "Australia/Sydney",
+  trackNameSnapshot: track,
+  track: { name: track },
+  event: null,
+});
+const henrysDay = [
+  henryRun("h1", "2026-09-26T09:10:00+10:00"),
+  henryRun("h2", "2026-09-26T10:05:00+10:00"),
+  henryRun("h3", "2026-09-26T11:40:00+10:00"),
+  henryRun("h4", "2026-09-26T13:15:00+10:00"),
+];
+
+test("a meeting nobody picked for a run still holds the day's runs at its track", () => {
+  const groups = buildRunHistoryGroups(henrysDay, "Australia/Sydney", { meetings: [clubDay] });
+  assert.equal(groups.length, 1);
+  const meeting = groups[0]!;
+  assert.equal(meeting.id, "event-club");
+  assert.equal(meeting.type, "Event");
+  assert.equal(meeting.title, "Canowindra Club Day");
+  assert.equal(meeting.trackName, CANOWINDRA);
+  assert.match(meeting.dateLabel, /^26 Sept? 2026$/);
+  assert.equal(meeting.runs.length, 4);
+  // Not told about the meeting, the day is still a test day, as before.
+  assert.equal(buildRunHistoryGroups(henrysDay, "Australia/Sydney")[0]!.type, "Testing");
+});
+
+test("the count and the list agree on a meeting nobody picked", () => {
+  const keys = resolveSessionGroupKeys(henrysDay, { viewerTimeZone: "Australia/Sydney" }, [clubDay]);
+  assert.deepEqual([...new Set(keys.values())], ["event-club"]);
+});
+
+test("a meeting nobody picked holds nothing at another track or on another day", () => {
+  const elsewhere = henryRun("x1", "2026-09-26T10:00:00+10:00", "Orange Raceway");
+  const nextDay = henryRun("x2", "2026-09-28T10:00:00+10:00");
+  const groups = buildRunHistoryGroups([...henrysDay, elsewhere, nextDay], "Australia/Sydney", {
+    meetings: [clubDay],
+  });
+  assert.deepEqual(
+    groups.map((g) => [g.id.startsWith("event-") ? g.id : g.type, g.runs.length]).sort(),
+    [
+      ["Testing", 1],
+      ["Testing", 1],
+      ["event-club", 4],
+    ]
+  );
+});
+
+test("a meeting a run was picked for wins the day from one nobody picked", () => {
+  const picked = {
+    ...henryRun("p1", "2026-09-26T08:30:00+10:00"),
+    eventId: "open-day",
+    event: {
+      name: "Open Day",
+      startDate: new Date("2026-09-26T12:00:00Z"),
+      endDate: new Date("2026-09-26T12:00:00Z"),
+      track: { name: CANOWINDRA },
+    },
+  };
+  const groups = buildRunHistoryGroups([picked, ...henrysDay], "Australia/Sydney", { meetings: [clubDay] });
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0]!.id, "event-open-day");
+  assert.equal(groups[0]!.runs.length, 5);
+});

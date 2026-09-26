@@ -7,6 +7,7 @@ import {
   type WorkbenchRunRow,
 } from "@/lib/runs/sessionWorkbenchModel";
 import { buildRunHistoryGroups, runSessionSortInstant } from "@/lib/runs/buildRunHistoryGroups";
+import { loadMeetingsForGrouping } from "@/lib/events/eventParticipation";
 import type { AnalysisTrendModel } from "@/lib/analysis/analysisHomeModel";
 import { toCompareRunShape } from "@/lib/runCompareShape";
 import { resolveOutingHeading } from "@/lib/runs/outingHeading";
@@ -237,8 +238,16 @@ export async function loadAnalysisOuting(
       },
     })
   );
+  // The driver's meetings in the same window: one no run was picked for still holds the runs at
+  // its track on its days, exactly as in Sessions (test drive 2026-09-26, W1-07).
+  const meetings = await loadMeetingsForGrouping({
+    userId,
+    from: new Date(latest.createdAt.getTime() - LOOKBACK_MS),
+    to: new Date(latest.createdAt.getTime() + LOOKAHEAD_MS),
+  });
   const meeting = buildRunHistoryGroups(candidates, viewerTimeZone, {
     ownerTimeZoneByUserId: zones.ownerTimeZoneByUserId,
+    meetings,
   }).find((group) => group.runs.some((run) => run.id === latest.id));
   if (!meeting) return null;
 
