@@ -12,6 +12,7 @@ import {
   Timer,
   Tire,
   Wrench,
+  X,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { keyboardCoversBar } from "@/lib/runs/wizardKeyboard";
@@ -308,6 +309,19 @@ export function LogRunWizardBottomBar({
     };
   }, []);
 
+  // Escape closes whichever sheet is up. On a laptop the run summary had no way out but a click
+  // on the dimmed page above it, which the test drive's own clicker never found (2026-09-26).
+  useEffect(() => {
+    if (!sheetOpen && !exitOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (sheetOpen) setSheetOpen(false);
+      else onExitOpenChange(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sheetOpen, exitOpen, onExitOpenChange]);
+
   if (!mounted) return null;
 
   const walk = walkStepIds();
@@ -601,7 +615,18 @@ export function LogRunWizardBottomBar({
             role="dialog"
             aria-label="Run map"
           >
-            <div className="mx-auto mb-2 h-1 w-9 rounded-full bg-border" aria-hidden />
+            <div className="relative mb-1 flex h-8 justify-center">
+              <div className="h-1 w-9 rounded-full bg-border" aria-hidden />
+              <button
+                type="button"
+                onClick={() => setSheetOpen(false)}
+                aria-label="Close the run summary"
+                title="Close"
+                className="tap-active absolute right-0 top-0 flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+              >
+                <X size={16} weight="bold" aria-hidden />
+              </button>
+            </div>
             <div className="pb-1">
               {rows.map((r) => (
                 <button
