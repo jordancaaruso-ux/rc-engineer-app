@@ -11,15 +11,24 @@ export type UploadedSheetState = {
   importStatus?: string | null;
   createdSetupId?: string | null;
   /**
-   * Set when the upload was a blank sheet for a chassis (its `SetupSheetBlank`). No chassis means it
-   * was refused (not fillable, or unreadable), and the founder follows each of those up.
+   * Set when a `SetupSheetBlank` points at the upload. No chassis means it was refused (not
+   * fillable, or unreadable), and the founder follows each of those up.
    */
-  blankSheet?: { setupSheetModelId: string | null } | null;
+  blankSheet?: { setupSheetModelId: string | null; isEdition?: boolean } | null;
 };
 
+/**
+ * A blank sheet uploaded to make a chassis (`createModelFromBlank`): it holds no setup and is never
+ * read. An EDITION's upload is not one of these: it is a racer's own filled sheet whose layout the
+ * chassis learned, and its values were read and saved like any other upload's.
+ */
+export function isChassisSourceSheet(doc: Pick<UploadedSheetState, "blankSheet">): boolean {
+  return Boolean(doc.blankSheet && !doc.blankSheet.isEdition);
+}
+
 export function uploadedSheetStatusWords(doc: UploadedSheetState): string {
-  if (doc.blankSheet) {
-    return doc.blankSheet.setupSheetModelId ? "Became your chassis sheet" : "Waiting for review";
+  if (isChassisSourceSheet(doc)) {
+    return doc.blankSheet?.setupSheetModelId ? "Became your chassis sheet" : "Waiting for review";
   }
   const status =
     doc.importStatus === "PROCESSING"
@@ -42,5 +51,5 @@ export function uploadedSheetTitle(originalFilename: string): string {
 
 /** Whether the words say it went wrong, so they can be drawn as an error. */
 export function uploadedSheetFailed(doc: UploadedSheetState): boolean {
-  return !doc.blankSheet && (doc.importStatus === "FAILED" || doc.parseStatus === "FAILED");
+  return !isChassisSourceSheet(doc) && (doc.importStatus === "FAILED" || doc.parseStatus === "FAILED");
 }

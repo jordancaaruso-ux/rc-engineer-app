@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  isChassisSourceSheet,
   uploadedSheetFailed,
   uploadedSheetStatusWords,
   uploadedSheetTitle,
@@ -25,6 +26,19 @@ test("an upload that became a chassis sheet says so, never PENDING", () => {
     uploadedSheetStatusWords({ ...blank, blankSheet: { setupSheetModelId: null } }),
     "Waiting for review"
   );
+});
+
+test("an edition's upload is a racer's own filled sheet, and reads like any other upload", () => {
+  const edition = {
+    parseStatus: "PARSED",
+    importStatus: "COMPLETED",
+    createdSetupId: "s1",
+    blankSheet: { setupSheetModelId: "m1", isEdition: true },
+  };
+  assert.equal(isChassisSourceSheet(edition), false);
+  assert.equal(uploadedSheetStatusWords(edition), "Read · setup saved");
+  assert.equal(isChassisSourceSheet({ blankSheet: { setupSheetModelId: "m1", isEdition: false } }), true);
+  assert.equal(isChassisSourceSheet({ blankSheet: null }), false);
 });
 
 test("a chassis's source sheet is named by the chassis, not the store's prefix", () => {

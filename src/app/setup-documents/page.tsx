@@ -83,7 +83,7 @@ export default async function SetupDocumentsPage(): Promise<ReactNode> {
       setupSheetTemplate: true,
       setupSheetModel: { select: { name: true } },
       car: { select: { setupSheetModel: { select: { name: true } } } },
-      blankSheet: { select: { setupSheetModelId: true, setupSheetModel: { select: { name: true } } } },
+      blankSheet: { select: { setupSheetModelId: true, isEdition: true, setupSheetModel: { select: { name: true } } } },
     },
   }),
     prisma.car.findMany({
