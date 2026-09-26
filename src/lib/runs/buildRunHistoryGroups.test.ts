@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
   buildDayRunNameMap,
   buildRunHistoryGroups,
+  meetingIdByRunId,
   resolveSessionGroupKeys,
   sessionGroupKey,
 } from "@/lib/runs/buildRunHistoryGroups";
@@ -678,4 +679,31 @@ test("a meeting a run was picked for wins the day from one nobody picked", () =>
   assert.equal(groups.length, 1);
   assert.equal(groups[0]!.id, "event-open-day");
   assert.equal(groups[0]!.runs.length, 5);
+});
+
+// Re-check of W1-07 (test drive 2026-09-26): the club day's page said 4 runs while the Events list
+// showed none, and Ethan's EMCC CUP read 1 in the list and 2 on its page. The list now counts every
+// meeting off the same fold at once.
+
+test("every meeting's runs, read at once, are the runs each meeting's page counts", () => {
+  const cup = {
+    id: "cup",
+    name: "EMCC CUP",
+    startDate: new Date("2026-09-25T12:00:00Z"),
+    endDate: new Date("2026-09-27T12:00:00Z"),
+    trackNameSnapshot: "EMCC",
+    track: { name: "EMCC" },
+  };
+  const picked = { ...henryRun("e1", "2026-09-26T10:00:00+10:00", "EMCC"), eventId: "cup", event: cup };
+  const leftOnTesting = henryRun("e2", "2026-09-27T09:00:00+10:00", "EMCC");
+  const elsewhere = henryRun("x1", "2026-09-26T10:00:00+10:00", "Orange Raceway");
+  const byRun = meetingIdByRunId(
+    [...henrysDay, picked, leftOnTesting, elsewhere],
+    { viewerTimeZone: "Australia/Sydney" },
+    [clubDay, cup]
+  );
+  const counts: Record<string, number> = {};
+  for (const id of byRun.values()) counts[id] = (counts[id] ?? 0) + 1;
+  assert.deepEqual(counts, { club: 4, cup: 2 });
+  assert.equal(byRun.has("x1"), false, "a run in no meeting counts for none");
 });
