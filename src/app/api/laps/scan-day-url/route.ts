@@ -22,6 +22,7 @@ import {
   sessionUtcOffsetMinutesFromImportedPayload,
 } from "@/lib/lapImport/fromPayload";
 import { rawSessionDriversFromImportedPayload } from "@/lib/lapImport/importedIngestPlan";
+import { withLiveRcRound } from "@/lib/lapImport/labels";
 import {
   getSpeedhiveTransponderNumbersForUser,
   hasSpeedhiveIdentityForUser,
@@ -394,7 +395,7 @@ export async function POST(request: Request) {
     const toCandidateRow = (c: (typeof discovered.unimportedCandidates)[number]): ScanDayUrlCandidateRow => ({
       sessionId: c.sessionId,
       sessionUrl: c.sessionUrl,
-      driverName: c.label,
+      driverName: withLiveRcRound(c.label, c.roundName),
       sessionTime: null,
       sessionCompletedAtIso: c.sessionCompletedAtIso,
       sessionUtcOffsetMinutes: c.sessionUtcOffsetMinutes ?? null,
@@ -419,7 +420,7 @@ export async function POST(request: Request) {
     const importedRows = await importedRowsForScan(
       userId,
       [
-        ...discovered.candidates,
+        ...discovered.candidates.map((c) => ({ ...c, label: withLiveRcRound(c.label, c.roundName) })),
         ...(discovered.status?.sessionsToday ?? []).map((s) => ({
           sessionId: s.sessionId,
           sessionUrl: s.sessionUrl,
@@ -563,7 +564,7 @@ export async function POST(request: Request) {
       return {
         sessionId: r.sessionId,
         sessionUrl: r.sessionUrl,
-        driverName: label,
+        driverName: withLiveRcRound(label, r.roundName),
         sessionTime: r.sessionTime ?? null,
         sessionCompletedAtIso: r.sessionCompletedAtIso,
         matchesDriver: null,

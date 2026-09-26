@@ -16,6 +16,8 @@ export type TrackTimingDiscoveredSession = {
   /** Speedhive practice runs: the track's offset from UTC (see `SpeedhiveDiscoveredSession`). */
   sessionUtcOffsetMinutes?: number | null;
   label: string;
+  /** A LiveRC race's round ("Qualifier Round 1"), for the picker row only — see `withLiveRcRound`. */
+  roundName?: string | null;
   bestLapSeconds?: number | null;
   /** Timed laps, when the discovery page carries them (Speedhive practice runs). */
   lapCount?: number | null;
@@ -103,6 +105,7 @@ export async function discoverTrackTimingSessions(input: {
       sessionUrl: c.sessionUrl,
       sessionCompletedAtIso: c.sessionCompletedAtIso,
       label: c.label,
+      roundName: c.roundName ?? null,
       bestLapSeconds: null,
       alreadyImported: c.alreadyImported,
       linkedRunId: c.linkedRunId,

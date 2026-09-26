@@ -29,6 +29,7 @@ import {
   resolveCanonicalLiveRcDriverId,
 } from "@/lib/lapWatch/liveRcDriverIdResolve";
 import { detectActiveRaceMeetingAtTrack } from "@/lib/lapWatch/detectActiveRaceMeetingAtTrack";
+import { withLiveRcRound } from "@/lib/lapImport/labels";
 import {
   emptyLapDiscoveryStatus,
   lapDiscoveryStatusMessage,
@@ -71,6 +72,12 @@ export type DiscoveredSession = {
   /** Display metadata only — not run session type. */
   sourceKind: "practice" | "race";
   label: string;
+  /**
+   * A race's round as the results page heads it ("Qualifier Round 1"). Kept apart from `label`,
+   * which event detection stores and the Engineer reads; a picker row joins them with
+   * `withLiveRcRound`.
+   */
+  roundName?: string | null;
   alreadyImported: boolean;
   linkedRunId: string | null;
 };
@@ -520,7 +527,7 @@ export async function discoverLiveRcSessionsForUser(input: {
         sessionsToday.push({
           sessionId: r.sessionId,
           sessionUrl: r.sessionUrl,
-          label: r.listLinkText?.trim() || r.raceClass?.trim() || "Race session",
+          label: withLiveRcRound(r.listLinkText?.trim() || r.raceClass?.trim() || "Race session", r.roundName),
           detail: null,
           sessionCompletedAtIso: r.sessionCompletedAtIso,
           source: "liverc",
@@ -539,6 +546,7 @@ export async function discoverLiveRcSessionsForUser(input: {
             sessionCompletedAtIso: r.sessionCompletedAtIso,
             sourceKind: "race",
             label: r.listLinkText?.trim() || r.raceClass?.trim() || "Race session",
+            roundName: r.roundName,
             alreadyImported: false,
             linkedRunId: null,
           });

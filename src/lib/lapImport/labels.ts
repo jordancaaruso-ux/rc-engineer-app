@@ -245,6 +245,11 @@ export function formatImportedSessionTime(
  * Pass `sessionTimeIso` from {@link resolveImportedSessionDisplayTimeIso} for imports,
  * and `opts` so LiveRC/MyRCM wall-clock times stay frozen (see
  * {@link formatImportedSessionTime}); without `opts` the time renders in the runtime zone.
+ *
+ * Speedhive's practice loop names nobody, so the import calls each stint by its start time, and a
+ * stint read "24 Sept 2026, 7:35 PM · 24 Sept 2026, 7:35 PM". A name that is the time itself is
+ * said once. Only when the two match: a stint of a longer visit is named for its own start, which
+ * is not the session's, and an import from before the month was spelled names it "24/09/2026".
  */
 export function formatDriverSessionLabel(
   driverName: string,
@@ -253,7 +258,23 @@ export function formatDriverSessionLabel(
 ): string {
   const t = driverName.trim() || "Driver";
   const when = formatImportedSessionTime(sessionTimeIso, opts);
-  return `${t} · ${when}`;
+  return t === when ? when : `${t} · ${when}`;
+}
+
+/**
+ * A LiveRC race as a list row names it, round first: "Qualifier 1 · Race 4: ISTC - 21.5T
+ * (Heat 2/2)". LiveRC numbers a meeting's races from 1 again in every round, so one class's three
+ * qualifiers all read "Race 4: ISTC - 21.5T (Heat 2/2)" and only the time told them apart (West
+ * Coast, 13 Sept 2026). First, and "Qualifier Round 1" without its "Round", so a phone's
+ * truncation keeps it. Only a numbered round is added: a main names itself ("A3-Main").
+ */
+export function withLiveRcRound(title: string, roundName: string | null | undefined): string {
+  const heading = roundName?.replace(/\s+/g, " ").trim() ?? "";
+  if (!/\bround\s*\d/i.test(heading)) return title;
+  const round = heading.replace(/(\S)\s+round\s+(?=\d)/i, "$1 ");
+  const said = title.toLowerCase();
+  if (said.includes(round.toLowerCase()) || said.includes(heading.toLowerCase())) return title;
+  return `${round} · ${title}`;
 }
 
 /** Optional short context (e.g. track) after the primary driver · time label. */

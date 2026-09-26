@@ -14,7 +14,8 @@ import {
 
 /** Empty-state headline, detail line, and the buttons that can actually fix it. */
 export type ScanStatusAction =
-  | { kind: "settings" }
+  /** `add`: nothing is saved yet, so the door says "Add timing details", not "Check". */
+  | { kind: "settings"; add?: boolean }
   | { kind: "retry" }
   | { kind: "paste" }
   | { kind: "track" }
@@ -80,6 +81,11 @@ export function resolveScanStatus(opts: {
   candidateCount: number;
   olderCount: number;
   importedCount: number;
+  /**
+   * Sessions already taken onto the run being logged. The card is resolved again after every
+   * import, and "No sessions from today yet" read wrong straight after taking today's session.
+   */
+  attachedCount?: number;
 }): ScanStatus | null {
   const {
     status,
@@ -89,6 +95,7 @@ export function resolveScanStatus(opts: {
     candidateCount,
     olderCount,
     importedCount,
+    attachedCount = 0,
   } = opts;
 
   if (candidateCount > 0) return null;
@@ -102,7 +109,7 @@ export function resolveScanStatus(opts: {
         return {
           title: "Add your timing details so laps attach on their own",
           detail: `We need your driver name and transponder number to pick your sessions out of ${names}.`,
-          actions: [{ kind: "settings" }, ...pages],
+          actions: [{ kind: "settings", add: true }, ...pages],
         };
       case "no_match": {
         const day = describePostedDay(status.postedDayIso);
@@ -176,7 +183,7 @@ export function resolveScanStatus(opts: {
   if (scanMessage) return { title: scanMessage, detail: null, actions: [] };
   if (olderCount > 0) {
     return {
-      title: "No sessions from today yet",
+      title: attachedCount > 0 ? "Nothing new from today" : "No sessions from today yet",
       detail: `${olderCount} older session${olderCount === 1 ? "" : "s"} available below.`,
       actions: [],
     };

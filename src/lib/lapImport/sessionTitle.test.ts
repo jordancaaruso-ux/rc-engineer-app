@@ -8,7 +8,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { importedSessionTitle } from "./sessionTitle";
+import { importedSessionTitle, isStartTimeName } from "./sessionTitle";
 import { extractLiveRcRaceSessionNameFromHtml } from "../lapUrlParsers/livercSessionTime";
 
 test("a detection label beats everything else", () => {
@@ -107,6 +107,29 @@ test("a Speedhive practice session named after its own start time is not titled 
       "Practice",
       name
     );
+  }
+});
+
+test("a Speedhive practice stint whose 'driver' is its own start time is not titled with it", () => {
+  // The practice import names each stint's driver after when it started — the same instant the
+  // row prints beneath, so titled with it the time read twice (test drive, 2026-09-26).
+  assert.equal(
+    importedSessionTitle({
+      parsedPayload: { sessionHint: { name: "24 Sept 2026, 7:35 PM" } },
+      driverName: "24 Sept 2026, 7:35 PM",
+      driverCount: 1,
+    }),
+    "Practice"
+  );
+  assert.equal(importedSessionTitle({ driverName: "21/09/2026, 10:12 am", driverCount: 1 }), "Practice");
+});
+
+test("a start time given as a name is recognised; a person or a bare number is not", () => {
+  for (const name of ["24 Sept 2026, 7:35 PM", "21/09/2026, 10:12 am", "10/12/2025, 1:18:19 PM"]) {
+    assert.equal(isStartTimeName(name), true, name);
+  }
+  for (const name of ["Mark Mayhew", "P3", "7281046", "Run 12", "", "ISTC 13.5"]) {
+    assert.equal(isStartTimeName(name), false, name);
   }
 });
 

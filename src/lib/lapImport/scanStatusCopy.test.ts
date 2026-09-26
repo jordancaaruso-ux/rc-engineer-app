@@ -45,6 +45,14 @@ test("no identity: asks for both halves, name and transponder", () => {
   assert.ok(kinds(s).includes("settings"));
 });
 
+test("no identity: nothing is saved yet, so the Settings door says add, not check", () => {
+  const settings = ask(st({ code: "no_identity" }))!.actions.find((a) => a.kind === "settings");
+  assert.deepEqual(settings, { kind: "settings", add: true });
+  // Where details ARE saved and just don't match, it stays a check.
+  const noMatch = ask(st({ code: "no_match", postedCount: 3, postedDayIso: today() }));
+  assert.deepEqual(noMatch!.actions.find((a) => a.kind === "settings"), { kind: "settings" });
+});
+
 test("no match today: leads with 'might not be uploaded yet', not with your name", () => {
   const s = ask(st({ code: "no_match", postedCount: 14, postedDayIso: today() }));
   assert.match(s!.title, /^14 sessions posted today/);
@@ -149,6 +157,16 @@ test("no structured state: an older day's backlog still explains itself", () => 
   const s = ask(null, { olderCount: 4 });
   assert.match(s!.title, /No sessions from today yet/);
   assert.match(s!.detail!, /4 older sessions available below/);
+});
+
+test("an older backlog after a session is taken: nothing new, counting what is left", () => {
+  // West Coast, 13 Sept: six older sessions, one taken onto the run. The card is worked out
+  // again with the lists as they stand, and must not claim today is empty of the one just taken.
+  const s = ask(null, { olderCount: 5, attachedCount: 1 });
+  assert.equal(s!.title, "Nothing new from today");
+  assert.match(s!.detail!, /^5 older sessions available below/);
+  assert.doesNotMatch(`${s!.title} ${s!.detail}`, /name|transponder|Settings/i);
+  assert.deepEqual(kinds(s), []);
 });
 
 test("no structured state: a server sentence is passed through untouched", () => {
