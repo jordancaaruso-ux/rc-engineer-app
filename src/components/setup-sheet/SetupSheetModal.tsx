@@ -111,6 +111,7 @@ export function SetupSheetModal({
   viewerUserId = null,
   memberDisplayByUserId,
   startEditing = false,
+  startComparing = false,
   onRunSetupCorrected,
 }: {
   open: boolean;
@@ -126,6 +127,13 @@ export function SetupSheetModal({
    * request to correct rather than to read.
    */
   startEditing?: boolean;
+  /**
+   * Open with the compare picker already showing — the run face's "Compare" door (founder ask,
+   * 2026-09-26). A driver who pressed Compare has already said what they came for; landing on
+   * "Setup vs previous run" and asking for a second tap on "Compare to another run" made them
+   * say it twice. The Setup doors elsewhere still open on the vs-previous list.
+   */
+  startComparing?: boolean;
   /**
    * ============================== WHAT MAKES THIS MODAL EDITABLE ==============================
    *
@@ -224,7 +232,7 @@ export function SetupSheetModal({
 
   useEffect(() => {
     if (!open) return;
-    setCompareOpen(false);
+    setCompareOpen(startComparing);
     setCompareSource("mine");
     setOtherRunId("");
     setSelectedDocId("");
@@ -234,7 +242,7 @@ export function SetupSheetModal({
     setHasTeammates(false);
     setBaselineSetupData(null);
     setBaselineSetupLoading(false);
-  }, [open, run?.id]);
+  }, [open, run?.id, startComparing]);
 
   useEffect(() => {
     if (!open || !run?.id) {

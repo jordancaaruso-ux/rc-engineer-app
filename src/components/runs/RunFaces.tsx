@@ -1591,6 +1591,8 @@ export function RunFaces({
           pickerRuns={sheetModal.pickerRuns}
           runListSource={runListSource}
           viewerUserId={viewerUserId}
+          // The only door here is the sheet card's Compare button, so land on the picker.
+          startComparing
           /*
            * The same handler the inline sheet uses, and for the same reason: a correction
            * made in the pop-up earns the same questions as one made in the face. This door
