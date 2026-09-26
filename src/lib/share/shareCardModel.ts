@@ -32,6 +32,7 @@ import {
 } from "@/lib/lapAnalysis";
 import { formatLap, formatStintTime } from "@/lib/runLaps";
 import { formatRunSessionDisplay } from "@/lib/runSession";
+import { meetingNameLessTrack } from "@/lib/events/meetingNameLessTrack";
 import { formatConditionsChip } from "@/lib/weather/conditions";
 import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
@@ -177,7 +178,10 @@ export type ShareRunCard = {
   style: ShareCardStyle;
   /** Hero masthead, right side. `SAT 8 AUG 2026`. */
   dateStamp: string;
-  /** Report eyebrow — the event. Empty when the run belongs to no event. */
+  /**
+   * Report eyebrow — the event, less the track it starts with (the track has its own line below).
+   * Empty when the run belongs to no event, or the event's name is only the track.
+   */
   eyebrow: string;
   /** `Qualifier 2` — the session's own name, in the display voice. */
   title: string;
@@ -546,7 +550,9 @@ export function buildShareRunCard(params: BuildShareCardParams): ShareRunCard {
   const card: ShareRunCard = {
     style,
     dateStamp: params.dateStamp?.trim() || params.dateTimeLabel,
-    eyebrow: eventName ?? "",
+    // A new meeting is named "<track> · <day>", and the track prints on the line under the title:
+    // whole, the picture read "INDOOR RACEWAY · SAT 26 SEP" over "Indoor Raceway · Serpent X20".
+    eyebrow: meetingNameLessTrack(eventName, trackName) ?? "",
     title,
     driverName,
     trackName,
@@ -580,4 +586,26 @@ export function runIsShareable(run: { lapTimes: unknown; lapSession?: unknown },
 /** Laps to draw: the story leads with a best lap, so a run without any is not offered one. */
 export function runHasLaps(run: { lapTimes: unknown; lapSession?: unknown }): boolean {
   return primaryLapRowsFromRun(run).length > 0;
+}
+
+/**
+ * The run's name under "Share this run", in the text the phone's share sheet sends, and in the
+ * file name: the meeting, the session, the track. The meeting drops the track it starts with
+ * (`meetingNameLessTrack`): a new meeting is named "<track> · <day>", and whole the line read
+ * "Indoor Raceway · Sat 26 Sep · Race · Indoor Raceway".
+ */
+export function shareRunLabel(
+  run: Pick<
+    ShareRunInput,
+    "sessionType" | "meetingSessionType" | "meetingSessionCode" | "sessionLabel" | "track" | "trackNameSnapshot" | "event"
+  >
+): string {
+  const trackName = run.track?.name ?? run.trackNameSnapshot ?? null;
+  return [
+    meetingNameLessTrack(run.event?.name, trackName),
+    formatRunSessionDisplay(run, { fallback: "Testing run" }),
+    trackName,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }

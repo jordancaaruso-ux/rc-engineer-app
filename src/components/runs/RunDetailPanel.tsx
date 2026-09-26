@@ -64,8 +64,7 @@ import {
 } from "@/components/runs/HandlingAssessmentFields";
 import { RUN_HISTORY_DATA_CLASS } from "@/components/runs/runHistoryTableColumns";
 import { ShareRunButton } from "@/components/share/ShareRunButton";
-import { runHasLaps, runIsShareable } from "@/lib/share/shareCardModel";
-import { formatRunSessionDisplay } from "@/lib/runSession";
+import { runHasLaps, runIsShareable, shareRunLabel } from "@/lib/share/shareCardModel";
 import { InlineValueEdit } from "@/components/runs/InlineValueEdit";
 import { RunWhenInlineEdit } from "@/components/runs/RunWhenField";
 import { InlinePickEdit, type InlinePickOption } from "@/components/runs/InlinePickEdit";
@@ -764,13 +763,7 @@ export function RunDetailPanel({
       : null;
   // No laps and no setup means the picture would be a title and nothing else — so no button.
   const shareable = runIsShareable(run, Boolean(run.setupSnapshot?.id));
-  const shareLabel = [
-    run.event?.name ?? null,
-    formatRunSessionDisplay(run, { fallback: "Testing run" }),
-    run.track?.name ?? run.trackNameSnapshot ?? null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const shareLabel = shareRunLabel(run);
   const tireSetDisplay = run.tireType
     ? `${run.tireType.displayName} · run ${run.tireRunNumber}${run.tireAgeKnown === false ? " (age unknown)" : ""}`
     : "—";

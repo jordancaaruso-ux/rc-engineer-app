@@ -48,7 +48,7 @@ import { ShareRunButton } from "@/components/share/ShareRunButton";
 import { RatingDial } from "@/components/ui/RatingDial";
 import { ActionToast } from "@/components/ui/ActionToast";
 import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
-import { runHasLaps, runIsShareable } from "@/lib/share/shareCardModel";
+import { runHasLaps, runIsShareable, shareRunLabel } from "@/lib/share/shareCardModel";
 import {
   computeMistakeLaps,
   fadeOverRunSeconds,
@@ -74,7 +74,6 @@ import {
 } from "@/lib/runHandlingAssessment";
 import { formatFiveMinuteStint, formatLap, formatStintTime } from "@/lib/runLaps";
 import { formatRunDateTime } from "@/lib/formatDate";
-import { formatRunSessionDisplay } from "@/lib/runSession";
 import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { runConditionsFromRecord } from "@/lib/weather/runConditionsRecord";
 import { skyLabelFromCloudCover, skyLabelFromWeatherCode } from "@/lib/weather/conditions";
@@ -352,7 +351,6 @@ export function RunFaces({
   }, [run.conditionsCloudCoverPct, run.conditionsWeatherCode]);
 
   const carDisplay = run.car?.name ?? run.carNameSnapshot ?? "Deleted car";
-  const trackDisplay = run.track?.name ?? run.trackNameSnapshot ?? null;
   const rating =
     typeof run.carRating === "number" && run.carRating >= 1 && run.carRating <= 10
       ? Math.round(run.carRating)
@@ -940,13 +938,7 @@ export function RunFaces({
   // Owner-only, as in RunDetailPanel: the picture routes only draw the viewer's own run, so on a
   // teammate's run the button opened a broken picture (test drive 2026-09-26).
   const shareable = allowRunMutations && runIsShareable(run, Boolean(run.setupSnapshot?.id));
-  const shareLabel = [
-    run.event?.name ?? null,
-    formatRunSessionDisplay(run, { fallback: "Testing run" }),
-    trackDisplay,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const shareLabel = shareRunLabel(run);
 
   return (
     <div className={cn("flex flex-col gap-2 border-l-2 border-primary bg-muted/40 px-2.5 py-3", className)}>
