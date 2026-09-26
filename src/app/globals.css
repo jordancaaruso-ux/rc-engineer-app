@@ -579,7 +579,8 @@ html[data-standalone="true"] .no-select {
  * fill the status bar with that box's colour and hide the blur (`LocalFrameView::
  * fixedContainerEdges`, `-[WKWebView _shouldHideTopScrollPocket]`). This strip is that box. It is
  * paper on paper, so it is invisible until something scrolls under it, and there the page now ends
- * in a clean edge instead of a smear.
+ * in a clean edge instead of a smear. Checked on the founder's iPhone, iOS 27, on a freshly added
+ * icon (2026-09-26): the blur is gone.
  *
  * Its height is `.page-header`'s below-md padding-top, the inset plus 0.75rem, so at rest it ends
  * where the title's line box starts and covers nothing. Keep it over 10px past the inset: below
