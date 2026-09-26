@@ -1,12 +1,16 @@
 "use client";
 
 import { formatDistanceMeters } from "@/lib/location/trackProximity";
+import { cn } from "@/lib/utils";
 
 export function TrackNearbySuggestions({
   suggestions,
+  selectedId = null,
   onSelect,
 }: {
   suggestions: { trackId: string; trackName: string; distanceM: number }[];
+  /** The run's track when it is among these, drawn pressed (the layout chips' lit look). */
+  selectedId?: string | null;
   onSelect: (trackId: string) => void;
 }) {
   if (suggestions.length === 0) return null;
@@ -17,17 +21,24 @@ export function TrackNearbySuggestions({
         Nearby
       </p>
       <div className="flex flex-wrap gap-1.5">
-        {suggestions.map((s) => (
-          <button
-            key={s.trackId}
-            type="button"
-            onClick={() => onSelect(s.trackId)}
-            className="flex min-h-7 items-center gap-1 rounded-lg border border-border bg-secondary px-2.5 text-[11px] font-medium text-foreground transition hover:bg-muted"
-          >
-            {s.trackName}
-            <span className="text-muted-foreground font-normal">({formatDistanceMeters(s.distanceM)})</span>
-          </button>
-        ))}
+        {suggestions.map((s) => {
+          const selected = s.trackId === selectedId;
+          return (
+            <button
+              key={s.trackId}
+              type="button"
+              onClick={() => onSelect(s.trackId)}
+              aria-pressed={selected}
+              className={cn(
+                "flex min-h-7 items-center gap-1 rounded-lg border px-2.5 text-[11px] font-medium text-foreground transition",
+                selected ? "border-foreground/50 bg-muted" : "border-border bg-secondary hover:bg-muted"
+              )}
+            >
+              {s.trackName}
+              <span className="text-muted-foreground font-normal">({formatDistanceMeters(s.distanceM)})</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { hasDatabaseUrl } from "@/lib/env";
 import { isSamePlatform } from "@/lib/cars/carClasses";
 import { disciplineForCar } from "@/lib/cars/chassisPlatform";
 import { tireProfileForDiscipline } from "@/lib/cars/tireProfile";
+import { activeTireBucket } from "@/lib/tires/tireCatalogScope";
 
 const TIRE_TYPE_SELECT = {
   id: true,
@@ -37,7 +38,10 @@ const MAX_RECENT = 8;
  *
  * With `?end=front` the list is the tires this driver has run on the FRONT — on a front/rear car
  * the two ends are different products, and offering a rear pin tire as the front's most likely
- * answer is worse than offering nothing. Any other value reads the rear (or only) tire.
+ * answer is worse than offering nothing. Any other value reads the rear (or only) tire. The one
+ * exception is a one-tire class that can log its ends apart (touring, FWD: `frontRearSwitch`):
+ * the same tires fit both ends, so its front also offers the tires it has run all round. Its
+ * front list was otherwise empty until a front had been saved (review, 2026-09-26).
  *
  * The discipline comes from `disciplineForCar`, never from `Car.carClass` alone:
  * that column is only the last-resort override, so reading it directly placed
@@ -65,7 +69,9 @@ export async function GET(request: Request) {
       })
     : [];
   const discipline = disciplineForCar(cars.find((c) => c.id === carId));
-  const bucket = tireProfileForDiscipline(discipline).bucket;
+  const profile = tireProfileForDiscipline(discipline);
+  const bucket = await activeTireBucket(profile.bucket);
+  const frontFromEitherEnd = front && profile.frontRearSwitch;
   // Only cars that positively share the discipline — `isSamePlatform` treats an unplaced car as
   // "same", which is right for carrying tires and wrong for ranking a list.
   const sameDisciplineCarIds = discipline
@@ -77,9 +83,11 @@ export async function GET(request: Request) {
         .map((c) => c.id)
     : [];
 
-  const baseWhere = front
-    ? ({ userId: userId, frontTireTypeId: { not: null } } as const)
-    : ({ userId: userId, tireTypeId: { not: null } } as const);
+  const baseWhere = frontFromEitherEnd
+    ? { userId: userId, OR: [{ frontTireTypeId: { not: null } }, { tireTypeId: { not: null } }] }
+    : front
+      ? ({ userId: userId, frontTireTypeId: { not: null } } as const)
+      : ({ userId: userId, tireTypeId: { not: null } } as const);
   const query = async (where: object) => {
     const runs = await prisma.run.findMany({
       where,
@@ -90,7 +98,12 @@ export async function GET(request: Request) {
         frontTireType: { select: TIRE_TYPE_SELECT },
       },
     });
-    return runs.map((r) => ({ tireType: front ? r.frontTireType : r.tireType }));
+    // A run's front first, then its rear, so a front the driver has logged still leads.
+    return runs.flatMap((r) =>
+      frontFromEitherEnd
+        ? [{ tireType: r.frontTireType }, { tireType: r.tireType }]
+        : [{ tireType: front ? r.frontTireType : r.tireType }]
+    );
   };
 
   // Two scans rather than one filtered afterwards: a driver whose last 40 runs

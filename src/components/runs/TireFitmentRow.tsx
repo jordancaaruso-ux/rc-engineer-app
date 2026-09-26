@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { PickerSheet, PickerTrigger } from "@/components/ui/PickerSheet";
 import type { OptionSection } from "@/lib/search/optionSearch";
 import {
   STOCK_INSERT,
+  TIRE_DIAMETER_MAX_MM,
+  TIRE_DIAMETER_MIN_MM,
   TIRE_FITMENT_MODS_MAX,
   TIRE_FITMENT_NAME_MAX,
   formatTireDiameterMm,
@@ -12,6 +14,7 @@ import {
   type TireEndBox,
   type TireFitmentEnd,
 } from "@/lib/tires/tireFitment";
+import { cn } from "@/lib/utils";
 
 /**
  * What one end's tire is glued to: its insert, its wheel, its diameter, and anything done to
@@ -136,6 +139,10 @@ const TEXT_BOX_CLASS =
  * Unlike an insert or wheel NAME, a bare "42.5" says nothing on its own (driven at 390px, it read
  * as any number at all), so a filled box keeps "Diameter" in front and "mm" behind. The row is
  * the control: `search-row-composite` hands the global input focus ring to the wrapper.
+ *
+ * A number it can't keep (300: a width, or a typo) stays on screen when the driver leaves the
+ * box, with the range under it. It used to vanish without a word (review, 2026-09-26). Nothing
+ * is said while typing — "4" is on its way to "42".
  */
 function DiameterBox({
   endName,
@@ -147,6 +154,8 @@ function DiameterBox({
   onChange: (next: number | null) => void;
 }) {
   const [text, setText] = useState(value != null ? formatTireDiameterMm(value) : "");
+  const [unreadable, setUnreadable] = useState(false);
+  const messageId = useId();
   useEffect(() => {
     setText((current) =>
       parseTireDiameterMm(current) === value ? current : value != null ? formatTireDiameterMm(value) : ""
@@ -154,33 +163,58 @@ function DiameterBox({
   }, [value]);
   const filled = text.trim() !== "";
   return (
-    <label className="search-row-composite flex w-full cursor-text items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm focus-within:border-ring/45 focus-within:ring-2 focus-within:ring-ring/35">
-      {filled ? <span aria-hidden className="shrink-0 text-muted-foreground">Diameter</span> : null}
-      {/* The input hugs its text so "mm" sits right after the number: an invisible copy of the
-          text sizes the grid cell the input shares. Same element either way — swapping the
-          wrapper on the first keystroke would drop focus mid-typing. */}
-      <span className="inline-grid min-w-0">
-        <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-pre">
-          {text || "Diameter (mm)"}
+    <div className="space-y-1">
+      <label
+        className={cn(
+          "search-row-composite flex w-full cursor-text items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm focus-within:border-ring/45 focus-within:ring-2 focus-within:ring-ring/35",
+          unreadable && "border-destructive/70"
+        )}
+      >
+        {filled ? <span aria-hidden className="shrink-0 text-muted-foreground">Diameter</span> : null}
+        {/* The input hugs its text so "mm" sits right after the number: an invisible copy of the
+            text sizes the grid cell the input shares. Same element either way — swapping the
+            wrapper on the first keystroke would drop focus mid-typing. */}
+        <span className="inline-grid min-w-0">
+          <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-pre">
+            {text || "Diameter (mm)"}
+          </span>
+          <input
+            type="text"
+            inputMode="decimal"
+            size={1}
+            value={text}
+            onChange={(e) => {
+              const parsed = parseTireDiameterMm(e.target.value);
+              setText(e.target.value);
+              if (parsed != null || !e.target.value.trim()) setUnreadable(false);
+              onChange(parsed);
+            }}
+            onBlur={() => {
+              if (value != null) {
+                setText(formatTireDiameterMm(value));
+                setUnreadable(false);
+              } else if (text.trim()) {
+                setUnreadable(true);
+              } else {
+                setText("");
+              }
+            }}
+            maxLength={8}
+            placeholder="Diameter (mm)"
+            aria-label={`${endName} diameter in millimetres`}
+            aria-invalid={unreadable || undefined}
+            aria-describedby={unreadable ? messageId : undefined}
+            className="col-start-1 row-start-1 w-full min-w-0 bg-transparent p-0 text-foreground outline-none placeholder:text-muted-foreground"
+          />
         </span>
-        <input
-          type="text"
-          inputMode="decimal"
-          size={1}
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            onChange(parseTireDiameterMm(e.target.value));
-          }}
-          onBlur={() => setText(value != null ? formatTireDiameterMm(value) : "")}
-          maxLength={8}
-          placeholder="Diameter (mm)"
-          aria-label={`${endName} diameter in millimetres`}
-          className="col-start-1 row-start-1 w-full min-w-0 bg-transparent p-0 text-foreground outline-none placeholder:text-muted-foreground"
-        />
-      </span>
-      {filled ? <span aria-hidden className="shrink-0 text-muted-foreground">mm</span> : null}
-    </label>
+        {filled ? <span aria-hidden className="shrink-0 text-muted-foreground">mm</span> : null}
+      </label>
+      {unreadable ? (
+        <p id={messageId} className="text-[11px] text-destructive">
+          Diameter must be {TIRE_DIAMETER_MIN_MM}–{TIRE_DIAMETER_MAX_MM} mm
+        </p>
+      ) : null}
+    </div>
   );
 }
 

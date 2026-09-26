@@ -21,9 +21,19 @@ export async function tireCatalogScopeWhere(
   bucket: TireBucket | null,
   userId: string
 ): Promise<Prisma.TireTypeWhereInput> {
-  if (!bucket) return {};
+  const active = await activeTireBucket(bucket);
+  return active ? tireCatalogWhere(active, userId) : {};
+}
+
+/**
+ * `bucket` once it holds imported rows, else null: the fail-open rule above, for a caller that
+ * filters rows itself ("Recently used"). A class mapped to a list the database hasn't been given
+ * yet (code deployed before the import ran) keeps seeing everything, never nothing.
+ */
+export async function activeTireBucket(bucket: TireBucket | null): Promise<TireBucket | null> {
+  if (!bucket) return null;
   const imported = await prisma.tireType.count({
     where: { discipline: bucket, createdByUserId: null },
   });
-  return imported > 0 ? tireCatalogWhere(bucket, userId) : {};
+  return imported > 0 ? bucket : null;
 }

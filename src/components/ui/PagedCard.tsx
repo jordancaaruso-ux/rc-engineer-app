@@ -301,7 +301,8 @@ export function PagedCard({
      affordance that replaced pagination dots. The app's one switch look
      (`.switch-rail`, 2026-09-26): grey track, the open face a white pill that
      slides. A label never truncates: its tab grows to fit the words and the
-     others share the rest ("URL Manual" was "URL Man…" at 390px).
+     others share the rest ("URL Manual" was "URL Man…" at 390px). Below 340px
+     the tabs take less padding, or the Laps tabs ran past the track at 320px.
      A single face needs no picker (wizard mode filters faces per step). */
   const control = count < 2 ? null : (
     <div
@@ -322,7 +323,7 @@ export function PagedCard({
             aria-label={`Show ${face.label}`}
             onClick={() => goTo(i)}
             className={cn(
-              "switch-seg min-h-8 min-w-fit flex-1 basis-0 whitespace-nowrap px-2 py-1 text-[11px] tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              "switch-seg min-h-8 min-w-fit flex-1 basis-0 whitespace-nowrap px-2 py-1 text-[11px] tracking-tight max-[339px]:px-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
               !active && "hover:text-foreground",
               face.controlClassName
             )}

@@ -110,7 +110,6 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
 import { Switch } from "@/components/ui/Switch";
 import { splitEventsForPicker } from "@/lib/events/splitEventsForPicker";
-import { eventDateToYmd } from "@/lib/eventDateParse";
 import { normalizeLapTimes } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
 import { primaryLapRowsFromRun } from "@/lib/lapAnalysis";
@@ -1192,6 +1191,13 @@ export function NewRunForm(props: {
   const [nearbyTrackSuggestions, setNearbyTrackSuggestions] = useState<
     { trackId: string; trackName: string; distanceM: number }[]
   >([]);
+  /**
+   * Set by a Near me tap, so its chips show even over a track already picked (founder 2026-09-26:
+   * a picked track doesn't mean the driver won't want the tracks near them). They used to show only
+   * while no track was picked, so Near me after a pick looked dead. The quiet on-mount read still
+   * shows them only until a track is picked. Picking one folds them away again.
+   */
+  const [nearbyAsked, setNearbyAsked] = useState(false);
   const [trackAutoDetectMessage, setTrackAutoDetectMessage] = useState<string | null>(null);
   const [trackAutoDetectLoading, setTrackAutoDetectLoading] = useState(false);
   /** Once-per-mount latch for the permission-gated auto-detect effect. */
@@ -1212,12 +1218,6 @@ export function NewRunForm(props: {
   } | null>(null);
   /** The LiveRC meeting whose event is being made (or joined) after a tap in the list. */
   const [addingLiveRcEvent, setAddingLiveRcEvent] = useState<string | null>(null);
-  /**
-   * Latest picked track, for the events effect: it runs off `needsEvent` alone (adding `trackId` to
-   * its deps would refetch and re-auto-select on every track change), so its closure would other-
-   * wise hold whatever track was current when the driver flipped to an Event day.
-   */
-  const trackIdRef = useRef(trackId);
   /**
    * My team's events at the selected track that I am not on yet. Fills a "Your team" group in the
    * event picker, so a meeting a teammate booked for Saturday is selectable on Wednesday rather
@@ -2252,6 +2252,7 @@ export function NewRunForm(props: {
         setNearbyTrackSuggestions(
           near.map((n) => ({ trackId: n.track.id, trackName: n.track.name, distanceM: n.distanceM }))
         );
+        if (!silent) setNearbyAsked(near.length > 0);
         if (near.length === 0 && !silent) setTrackAutoDetectMessage("No tracks within 25 km.");
       } catch (e) {
         if (silent) return;
@@ -2578,10 +2579,6 @@ export function NewRunForm(props: {
   }, [trackId, editingCompletedRun, pickedTrackLiveRcUrl]);
 
   useEffect(() => {
-    trackIdRef.current = trackId;
-  }, [trackId]);
-
-  useEffect(() => {
     if (trackId.trim() || trackLockedToEvent) setTrackSaveWarning(false);
   }, [trackId, trackLockedToEvent]);
 
@@ -2879,6 +2876,10 @@ export function NewRunForm(props: {
             {supportsSheetUpload ? (
               <SegmentedControl<"blank" | "upload">
                 ariaLabel="New setup source"
+                // The size of the Previous runs | Saved | New switch it sits under: a choice
+                // within "New" read bigger than the choice above it (review, 2026-09-26).
+                size="sm"
+                segmentClassName="min-w-fit whitespace-nowrap px-2 text-[11px]"
                 value={newSetupMode}
                 onChange={(next) => setNewSetupMode(next)}
                 options={[
@@ -3161,29 +3162,14 @@ export function NewRunForm(props: {
     jsonFetch<{ events: EventOption[] }>("/api/events", { cache: "no-store" })
       .then(({ events: list }) => {
         if (!alive) return;
-        const all = list ?? [];
-        setEvents(all);
-        const today = localTodayYmd();
-        const { upcoming } = splitEventsForPicker(all, today);
-        setEventId((current) => {
-          if (current) return current;
-          /**
-           * Auto-pick only an event that is on TODAY, at the track already chosen.
-           *
-           * An event with a track OVERRIDES the run's track (`trackLockedToEvent`), so the old
-           * unconditional `upcoming[0]` quietly moved you: pick your local club, switch to an Event
-           * day, and the wizard filed you at whatever track your next booked meeting happens to be
-           * at. It then still picked a meeting days away at the right track (2026-09-26): a
-           * Saturday practice run filed under a meeting a week out. The list shows those under
-           * "Coming up"; choosing one is the driver's call.
-           */
-          const tid = trackIdRef.current.trim();
-          const pool = upcoming.filter(
-            (e) => (!tid || e.trackId === tid) && eventDateToYmd(e.startDate) <= today
-          );
-          if (pool.length > 0) return pool[0]!.id;
-          return "";
-        });
+        /**
+         * Only the list loads. Tapping Event never picks an event for the driver (founder
+         * 2026-09-26: "clicking event shouldn't do that at all"). It used to pick one on today, at
+         * the chosen track or, with no track yet, at ANY track, and the event then set the run's
+         * track: a driver standing at their club tapped Event and was filed at another venue's
+         * club day. Today's events lead the list; choosing one is one tap.
+         */
+        setEvents(list ?? []);
       })
       .catch((err) => {
         if (!alive) return;
@@ -4231,10 +4217,25 @@ export function NewRunForm(props: {
       };
     } else {
       wizardCarSwapPlanRef.current = null;
+      // Blank apart from what the driver picked by hand, tires included.
+      if (from && to && !isSamePlatform(from.platform, to.platform)) dropTiresForCarChange();
     }
     setWizardCarSwapNote(null);
     setCarId(nextId);
   };
+  /**
+   * A car change the tires can't follow (another class: the wheels don't bolt on, `planCarSwap`):
+   * the tires and their prep picked for the car just left go with it. Without this a touring tire
+   * picked first stayed on the buggy chosen after, at the touring car's run count ("Run 10"), and a
+   * buggy's front, insert and wheel landed on a pan car (review, 2026-09-26). The prefill's own swap
+   * plan already did this; a hand pick before any prefill didn't.
+   */
+  function dropTiresForCarChange() {
+    carryTiresForward(null);
+    setAdditiveTypeId("");
+    setTirePrep([]);
+    setCopyTireWarning(null);
+  }
 
   // ---- v6 prefill (founder 2026-07-17, artifact round 3): the wizard lands
   // blank and the Session step's manifest card OFFERS the selected car's last
@@ -4696,6 +4697,7 @@ export function NewRunForm(props: {
                       layoutPickedManuallyRef.current = false;
                       setCopyTrackWarning(null);
                       setTrackAutoDetectMessage(null);
+                      setNearbyAsked(false);
                     }}
                     lastRunTrackId={lastRun?.trackId ?? null}
                     favouriteTrackIds={favouriteTrackIds}
@@ -4742,8 +4744,9 @@ export function NewRunForm(props: {
                           setTrackDirection("");
                           layoutPickedManuallyRef.current = false;
                           setCopyTrackWarning(null);
-                              setTrackAutoDetectMessage(null);
-                            }}
+                          setTrackAutoDetectMessage(null);
+                          setNearbyAsked(false);
+                        }}
                       />
                       {trackAutoDetectMessage ? (
                         <span className="text-[11px] text-muted-foreground leading-snug">
@@ -4761,8 +4764,14 @@ export function NewRunForm(props: {
                     </div>
                   ) : null}
                   <TrackNearbySuggestions
-                    suggestions={trackId.trim() ? [] : nearbyTrackSuggestions.slice(0, 3)}
+                    suggestions={
+                      trackId.trim() && !nearbyAsked ? [] : nearbyTrackSuggestions.slice(0, 3)
+                    }
+                    selectedId={trackId.trim() || null}
                     onSelect={(id) => {
+                      setNearbyAsked(false);
+                      // The track already picked: just fold the chips, keeping its layout.
+                      if (id === trackId) return;
                       trackPickedManuallyRef.current = true;
                       releaseEventForTrack(id);
                       setTrackId(id);
@@ -5419,6 +5428,9 @@ export function NewRunForm(props: {
                   setCopyCarWarning(null);
                   setPrefillHighlights((h) => (h ? { ...h, car: false } : h));
                   if (next && prev && next !== prev) {
+                    const fromPlatform = carsList.find((c) => c.id === prev)?.platform;
+                    const toPlatform = carsList.find((c) => c.id === next)?.platform;
+                    if (!isSamePlatform(fromPlatform, toPlatform)) dropTiresForCarChange();
                     setLoadSetupSelection("");
                     setLoadOtherSetupSelection("");
                     setSetupBaselineSnapshotId(null);
@@ -5528,7 +5540,21 @@ export function NewRunForm(props: {
                   checked={splitTiresActive}
                   onChange={(on) => {
                     setFrontRearChosen(on);
-                    if (!on) {
+                    if (on) {
+                      // The front starts as the tire already picked, at its count: until now the
+                      // car ran it all round, and the driver changes whichever end differs. It
+                      // was an empty Front above their pick, which read as the pick gone missing
+                      // (review, 2026-09-26). Its own stint is minted on save.
+                      if (tireTypeId && !frontTire.typeId) {
+                        setFrontTire({
+                          typeId: tireTypeId,
+                          typeName: tireTypeName,
+                          runsCompleted,
+                          ageKnown: tireAgeKnown,
+                          stintId: null,
+                        });
+                      }
+                    } else {
                       setFrontTire(EMPTY_TIRE_END);
                       setTireFitment({});
                     }

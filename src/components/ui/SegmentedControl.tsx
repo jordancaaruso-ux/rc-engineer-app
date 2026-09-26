@@ -100,10 +100,13 @@ export function SegmentedControl<T extends string>({
     [move]
   );
 
+  // Narrow phones take less padding first, then a point off the text: at 360px (a common
+  // Android width) "Practice | Seeding | Qualifying | Race" ran 5px past its track, and at
+  // 320px "Upload sheet" did (review, 2026-09-26).
   const segSize =
     size === "sm"
-      ? "min-h-8 px-3 py-1 text-xs"
-      : "min-h-9 min-w-fit whitespace-nowrap px-3 py-1.5 text-sm";
+      ? "min-h-8 px-3 py-1 text-xs max-[379px]:px-2 max-[339px]:px-1.5"
+      : "min-h-9 min-w-fit whitespace-nowrap px-3 py-1.5 text-sm max-[379px]:px-2 max-[339px]:text-[13px]";
 
   return (
     <div
