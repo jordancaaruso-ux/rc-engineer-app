@@ -97,6 +97,7 @@ import {
   followDateEventName,
   linkedMeetingNotice,
   meetingSessionKind,
+  saveFailureMessage,
 } from "@/lib/runs/logRunSession";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
 import {
@@ -986,6 +987,8 @@ export function NewRunForm(props: {
   const [, startCopyTransition] = useTransition();
   const [status, setStatus] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
+  /** A save that didn't go through, said once at the wizard's Complete button. */
+  const [wizardSaveError, setWizardSaveError] = useState<string | null>(null);
   const [completeValidation, setCompleteValidation] = useState<{
     show: boolean;
     carRating: boolean;
@@ -3680,6 +3683,7 @@ export function NewRunForm(props: {
     if (saving) return;
     setInlineError(null);
     setStatus(null);
+    setWizardSaveError(null);
     if (!carId) {
       setInlineError("Select a car.");
       return;
@@ -4093,9 +4097,22 @@ export function NewRunForm(props: {
         navigateAway(returnHref ?? "/");
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to save run";
-      setStatus(msg);
-      setInlineError(msg);
+      // Said once, where the driver tapped, in words: with no signal the browser's own "Failed
+      // to fetch" used to sit twice under the setup sheet, out of sight (test drive 2026-09-26).
+      const msg = saveFailureMessage(err, {
+        online: typeof navigator === "undefined" || navigator.onLine !== false,
+        retryLabel: opts?.stay
+          ? "Save to this run"
+          : intent === "draft"
+            ? "Save draft"
+            : editingCompletedRun
+              ? confirmingRun
+                ? "Confirm run"
+                : "Save edits"
+              : "Complete",
+      });
+      if (wizardActive) setWizardSaveError(msg);
+      else setInlineError(msg);
     } finally {
       if (!(intent === "completed" && pendingCompleteNavigationRef.current)) {
         if (!(intent === "draft" && pendingDraftNavigationRef.current)) {
@@ -6226,6 +6243,7 @@ export function NewRunForm(props: {
           canSave={canSave}
           saving={saving}
           saveSuccess={saveSuccess}
+          saveError={wizardSaveError}
           hasContent={wizardHasContent}
           exitOpen={wizardExitPromptOpen}
           onExitOpenChange={setWizardExitPromptOpen}

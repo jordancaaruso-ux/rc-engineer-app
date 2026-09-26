@@ -119,3 +119,22 @@ export function linkedMeetingNotice(
     into ? `LiveRC’s “${into}”` : "its LiveRC meeting"
   }.`;
 }
+
+/** The browsers' own words for a request that never left the phone. */
+const NO_SIGNAL_ERROR = /failed to fetch|load failed|networkerror|network request failed|network error/i;
+
+/**
+ * What a driver reads when a save fails. With no signal: the run isn't saved, nothing is lost,
+ * and which button to tap again — never the browser's raw "Failed to fetch". Anything else keeps
+ * the reason the save gave.
+ */
+export function saveFailureMessage(
+  err: unknown,
+  opts: { online: boolean; retryLabel: string },
+): string {
+  const reason = err instanceof Error ? err.message.trim() : "";
+  if (!opts.online || NO_SIGNAL_ERROR.test(reason)) {
+    return `No signal, so the run isn’t saved yet. Nothing is lost. Tap ${opts.retryLabel} again when you have signal.`;
+  }
+  return reason || "Couldn’t save the run. Try again.";
+}

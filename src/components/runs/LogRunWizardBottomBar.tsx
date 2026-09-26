@@ -174,6 +174,7 @@ export function LogRunWizardBottomBar({
   canSave,
   saving,
   saveSuccess,
+  saveError = null,
   hasContent,
   exitOpen,
   onExitOpenChange,
@@ -199,6 +200,11 @@ export function LogRunWizardBottomBar({
   canSave: boolean;
   saving: boolean;
   saveSuccess: boolean;
+  /**
+   * The last save didn't go through (no signal, usually). Said once, beside the button that
+   * tried — it used to be the browser's "Failed to fetch", twice, under the form and out of sight.
+   */
+  saveError?: string | null;
   /** Anything worth saving? Gates the exit prompt — an untouched run leaves
    *  without ceremony. */
   hasContent: boolean;
@@ -403,6 +409,11 @@ export function LogRunWizardBottomBar({
           >
             <span className="h-1 w-[34px] rounded-full bg-white/[0.22]" aria-hidden />
           </button>
+          {saveError && !sheetOpen ? (
+            <p role="alert" className="px-1.5 font-sans text-[12px] font-semibold leading-snug text-warning">
+              {saveError}
+            </p>
+          ) : null}
           {/* min-w-0: as a grid item this row's min-width defaults to auto —
               the nowrap green subtitle would otherwise widen the whole bar
               past the container and shove the CTA off-screen. */}
@@ -630,6 +641,11 @@ export function LogRunWizardBottomBar({
               ))}
             </div>
             <div className="grid gap-2 pt-1.5">
+              {saveError ? (
+                <p role="alert" className="px-2 font-sans text-[12px] font-semibold leading-snug text-warning">
+                  {saveError}
+                </p>
+              ) : null}
               {editingCompleted ? (
                 <button
                   type="button"

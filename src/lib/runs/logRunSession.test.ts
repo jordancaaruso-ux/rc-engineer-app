@@ -5,6 +5,7 @@ import {
   followDateEventName,
   linkedMeetingNotice,
   meetingSessionKind,
+  saveFailureMessage,
   uiSessionToMeeting,
 } from "./logRunSession";
 import type { EntryCandidate } from "./entryCandidate";
@@ -95,4 +96,29 @@ test("linkedMeetingNotice names both meetings, and falls back when a name isn't 
     "2 of your meetings joined their LiveRC meetings."
   );
   assert.equal(linkedMeetingNotice([]), null);
+});
+
+test("saveFailureMessage: no signal gets plain words, never the browser's", () => {
+  for (const raw of ["Failed to fetch", "Load failed", "NetworkError when attempting to fetch resource.", "Network error"]) {
+    const msg = saveFailureMessage(new TypeError(raw), { online: true, retryLabel: "Complete" });
+    assert.equal(
+      msg,
+      "No signal, so the run isn’t saved yet. Nothing is lost. Tap Complete again when you have signal."
+    );
+    assert.ok(!msg.includes(raw));
+  }
+  // The phone says it is offline, whatever the error read.
+  assert.match(
+    saveFailureMessage(new Error("Request timed out. Try again."), { online: false, retryLabel: "Save draft" }),
+    /^No signal, .* Tap Save draft again when you have signal\.$/
+  );
+  // A reason from the server is kept.
+  assert.equal(
+    saveFailureMessage(new Error("Select a track."), { online: true, retryLabel: "Complete" }),
+    "Select a track."
+  );
+  assert.equal(
+    saveFailureMessage("boom", { online: true, retryLabel: "Complete" }),
+    "Couldn’t save the run. Try again."
+  );
 });
