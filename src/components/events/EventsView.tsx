@@ -184,6 +184,7 @@ export function EventsView({
             tracks={tracks}
             favouriteTrackIds={favouriteTrackIds}
             stats={stats}
+            todayYmd={todayYmd}
           />
         </div>
       </section>
