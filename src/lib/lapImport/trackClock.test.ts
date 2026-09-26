@@ -12,7 +12,12 @@ import {
   isSpeedhiveRaceResultSession,
   isWallClockAsUtcTimingSource,
 } from "@/lib/lapImport/labels";
-import { trackClockDayKey, trackClockTime, utcOffsetMinutesFromIso } from "@/lib/lapImport/trackClock";
+import {
+  isDateOnlyTrackTime,
+  trackClockDayKey,
+  trackClockTime,
+  utcOffsetMinutesFromIso,
+} from "@/lib/lapImport/trackClock";
 import { instantToWallClockAsUtc, utcOffsetMinutesInZone, wallClockAsUtcToInstant } from "@/lib/eventActive";
 
 const MYRCM_PDF = "myrcm-pdf://0123456789abcdef/report-96077-1.pdf";
@@ -175,4 +180,19 @@ test("a nonsense offset is refused rather than shifting the clock by days", () =
     utcOffsetMinutes: 99_999,
   };
   assert.equal(importedSessionTimeIsTrackClock(opts), false);
+});
+
+test("a date with no clock is told from a real time", () => {
+  // A LiveRC race page prints only the meeting's date; stored as that day's midnight, it read as a
+  // real "12:00 am" and every race of the day sat at the same instant (test drive, 2026-09-26).
+  assert.equal(isDateOnlyTrackTime({ iso: "2026-09-13T00:00:00.000Z", sourceUrl: LIVERC_RACE }), true);
+  assert.equal(isDateOnlyTrackTime({ iso: "2026-09-13T00:00:00.000Z", sourceUrl: MYRCM_PDF }), true);
+  assert.equal(isDateOnlyTrackTime({ iso: "2026-09-13T00:00:00.000Z", parserId: "liverc_race_result_v1" }), true);
+  // A real clock, even one a minute past midnight, is a time.
+  assert.equal(isDateOnlyTrackTime({ iso: "2026-09-13T14:23:00.000Z", sourceUrl: LIVERC_RACE }), false);
+  assert.equal(isDateOnlyTrackTime({ iso: "2026-09-13T00:01:00.000Z", sourceUrl: LIVERC_RACE }), false);
+  // A true instant (Speedhive practice) at UTC midnight is a real moment, not a bare date.
+  assert.equal(isDateOnlyTrackTime({ iso: "2026-09-13T00:00:00.000Z", sourceUrl: SPEEDHIVE_PRACTICE }), false);
+  assert.equal(isDateOnlyTrackTime({ iso: null, sourceUrl: LIVERC_RACE }), false);
+  assert.equal(isDateOnlyTrackTime({ iso: "not a date", sourceUrl: LIVERC_RACE }), false);
 });

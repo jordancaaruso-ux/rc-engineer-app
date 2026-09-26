@@ -27,6 +27,7 @@ import {
   hasSpeedhiveIdentityForUser,
 } from "@/lib/speedhive/speedhiveDriverSettings";
 import { formatRunSessionDisplay } from "@/lib/runSession";
+import { getTimeZoneFromCookies } from "@/lib/requestTimeZone";
 import { emptyLapDiscoveryStatus } from "@/lib/lapWatch/lapDiscoveryStatus";
 
 export const dynamic = "force-dynamic";
@@ -194,6 +195,7 @@ async function importedRowsForScan(
         })
       : [];
   const runById = new Map(runs.map((r) => [r.id, r]));
+  const viewerTimeZone = runs.length > 0 ? await getTimeZoneFromCookies().catch(() => null) : null;
 
   const rows: ScanDayUrlImportedRow[] = [];
   for (const c of candidates) {
@@ -218,7 +220,7 @@ async function importedRowsForScan(
       bestLapSeconds: c.bestLapSeconds ?? null,
       lapCount: c.lapCount ?? null,
       importedSessionId: imp.id,
-      linkedRunLabel: run ? runDisplayLabel(run) : null,
+      linkedRunLabel: run ? runDisplayLabel(run, viewerTimeZone) : null,
       linkedRunUnconfirmed: run?.unconfirmedAt != null,
     });
   }
@@ -230,21 +232,27 @@ async function importedRowsForScan(
  * off. The unconfirmed state is NOT appended here: the picker says it in its own words, and as a
  * suffix it was the half of the line that truncated on a phone ("On Run · Mon, 13 Oct · Unco…").
  */
-function runDisplayLabel(run: {
-  sessionType: string;
-  meetingSessionType: string | null;
-  meetingSessionCode: string | null;
-  sessionLabel: string | null;
-  sessionCompletedAt: Date | null;
-  sortAt: Date;
-  trackNameSnapshot: string | null;
-}): string {
+function runDisplayLabel(
+  run: {
+    sessionType: string;
+    meetingSessionType: string | null;
+    meetingSessionCode: string | null;
+    sessionLabel: string | null;
+    sessionCompletedAt: Date | null;
+    sortAt: Date;
+    trackNameSnapshot: string | null;
+  },
+  timeZone: string | null
+): string {
   const session = formatRunSessionDisplay(run, { fallback: "Run" });
   const when = run.sessionCompletedAt ?? run.sortAt;
   const day = when.toLocaleDateString("en-AU", {
     weekday: "short",
     day: "numeric",
     month: "short",
+    // The viewer's day, not the server's (UTC): a Saturday race in Christchurch is still Friday
+    // in UTC, and the label read "On Run · Fri, 21 Aug" for a 22 Aug race (test drive, 2026-09-26).
+    ...(timeZone ? { timeZone } : {}),
   });
   return [session, day].filter(Boolean).join(" · ");
 }

@@ -124,9 +124,10 @@ function extractDateTimeLike(text: string): string | null {
  *  3. Anything date-shaped in the body, as a last resort.
  *
  * A multi-day meeting prints a RANGE here ("Sep 12, 2026 to Sep 13, 2026") and only its first
- * day is taken — the page does not say which day this heat ran. That is a day-level answer for
- * a heat on day two, and still nearer than the day it was imported. A session imported through
- * meeting discovery never reaches this: it carries its own per-session clock.
+ * day is taken — the page does not say which day this heat ran. The race's own day and clock are
+ * on the meeting's results list, which the race importer reads next (`livercRaceListedTime.ts`);
+ * this date is only what stands when that list can't be read, and it stands at midnight, which
+ * means "that day, time unknown" to everything that reads it (`isDateOnlyTrackTime`).
  */
 export function extractLiveRcRaceSessionWhenRaw(html: string): string | null {
   const $ = load(html);

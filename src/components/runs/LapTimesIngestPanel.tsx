@@ -37,8 +37,9 @@ import {
 } from "@/lib/lapAnalysis";
 import { LapTimeGraph } from "@/components/runs/LapTimeGraph";
 import { haptic } from "@/lib/haptics";
+import { formatRunDateOnly } from "@/lib/formatDate";
+import { isDateOnlyTrackTime } from "@/lib/lapImport/trackClock";
 import {
-  formatDriverSessionLabel,
   formatImportedSessionTime,
   resolveImportedSessionDisplayTimeIso,
   resolveImportedSessionHasWallClockTime,
@@ -214,6 +215,23 @@ function blockTimeFormatOpts(block: UrlImportBlock): ImportedSessionTimeFormatOp
 }
 
 /**
+ * When a block's session ran, as its rows print it. A day the timing site gave with no clock (a
+ * LiveRC race whose meeting list couldn't be read) prints as that date: never as a 12:00 am
+ * nobody raced at.
+ */
+function formatBlockWhen(block: UrlImportBlock): string {
+  const iso = blockLabelTimeIso(block);
+  const opts = blockTimeFormatOpts(block);
+  if (
+    opts.isWallClockTime !== false &&
+    isDateOnlyTrackTime({ iso, parserId: block.parserId, sourceUrl: block.sourceUrl })
+  ) {
+    return formatRunDateOnly(iso, "UTC");
+  }
+  return formatImportedSessionTime(iso, opts);
+}
+
+/**
  * What to print where a block's source would otherwise be its URL. A PDF import has no URL —
  * its `sourceUrl` is a synthetic `myrcm-pdf://…` fingerprint — so it shows the file's name.
  */
@@ -237,7 +255,12 @@ function formatSessionWhen(
   /** The session's address: a Speedhive race result prints the track's clock, its practice loop does not. */
   sourceUrl?: string | null
 ): string | null {
-  if (iso?.trim()) return formatImportedSessionTime(iso.trim(), { timingSource, sourceUrl });
+  const at = iso?.trim();
+  if (at) {
+    // A date with no clock reads as that date, not as 12:00 am (see `formatBlockWhen`).
+    if (isDateOnlyTrackTime({ iso: at, timingSource, sourceUrl })) return formatRunDateOnly(at, "UTC");
+    return formatImportedSessionTime(at, { timingSource, sourceUrl });
+  }
   if (sessionTime?.trim()) return sessionTime.trim();
   return null;
 }
@@ -2150,10 +2173,7 @@ export function LapTimesIngestPanel({
                         ? "Pick your name"
                         : describeBlockSource(block)
                   }
-                  when={formatImportedSessionTime(
-                    blockLabelTimeIso(block),
-                    blockTimeFormatOpts(block)
-                  )}
+                  when={formatBlockWhen(block)}
                   lapCount={stats?.lapCount ?? 0}
                   bestLapSeconds={stats?.bestLap ?? null}
                   medianSeconds={stats?.median ?? null}
@@ -2706,7 +2726,7 @@ export function LapTimesIngestPanel({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <Eyebrow>
-                    Imported · {formatImportedSessionTime(blockLabelTimeIso(activeImportBlock), blockTimeFormatOpts(activeImportBlock))}
+                    Imported · {formatBlockWhen(activeImportBlock)}
                   </Eyebrow>
                   <div className="text-[11px] text-muted-foreground break-all">
                     {describeBlockSource(activeImportBlock)}
@@ -2726,11 +2746,7 @@ export function LapTimesIngestPanel({
                       const isPreview = activePreviewKey === key;
                       const isPrimaryForRun = activeImportBlock.selectedDriverIds?.[0] === d.driverId;
                       const stats = statsForDriver(activeImportBlock, d);
-                      const primaryLabel = formatDriverSessionLabel(
-                        d.driverName,
-                        blockLabelTimeIso(activeImportBlock),
-                        blockTimeFormatOpts(activeImportBlock)
-                      );
+                      const primaryLabel = `${d.driverName.trim() || "Driver"} · ${formatBlockWhen(activeImportBlock)}`;
                       return (
                         <div
                           key={d.driverId}
