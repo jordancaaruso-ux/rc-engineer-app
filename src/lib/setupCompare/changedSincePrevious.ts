@@ -1,5 +1,7 @@
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
 import { compareSetupField } from "@/lib/setupCompare/compare";
+import { scalarSetupTextFromUnknown } from "@/lib/setup/presetWithOther";
+import { displayTireSelection, isTireSelectionValue } from "@/lib/tires/tireSelectionValue";
 import {
   UNIVERSAL_TOURING_PARAMETERS,
   universalParameterIdForSnapshotKey,
@@ -44,6 +46,25 @@ export function orderSetupChangedRows(rows: SetupChangedRow[]): SetupChangedRow[
   });
 }
 
+/** What an old `String(object)` write left in a box, and what the compare prints for an object. */
+const OBJECT_AS_TEXT = "[object Object]";
+
+/**
+ * One side of a row, as the driver reads it.
+ *
+ * The compare prints every value as text, and a value that is still an OBJECT printed as
+ * "[object Object]": the run page listed "tires | — | [object Object]" when the run before held a
+ * tyre and this one held none (test drive 2026-09-26). An object prints the words it holds — a
+ * tyre its name and run, anything else its text — or a blank, never the object. Which rows appear
+ * is still the compare's call; only what a row prints is decided here.
+ */
+function readableSide(raw: unknown, compared: string): string {
+  if (isTireSelectionValue(raw)) return displayTireSelection(raw) || "—";
+  if (!compared.includes(OBJECT_AS_TEXT)) return compared;
+  const text = scalarSetupTextFromUnknown(raw).trim();
+  return text && !text.includes(OBJECT_AS_TEXT) ? text : "—";
+}
+
 /** Fields that differ between a run's setup and the previous run on the same car (compare semantics). */
 export function setupChangedRowsSincePrevious(
   current: unknown,
@@ -64,8 +85,8 @@ export function setupChangedRowsSincePrevious(
     rows.push({
       key,
       label: setupFieldLabel(key),
-      value: cmp.normalizedA,
-      previousValue: cmp.normalizedB,
+      value: readableSide(cur[key], cmp.normalizedA),
+      previousValue: readableSide(prev[key], cmp.normalizedB),
     });
   }
   return rows;

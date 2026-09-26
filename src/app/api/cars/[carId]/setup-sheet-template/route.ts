@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import type { SetupSheetTemplateView } from "@/lib/setupSheetModels/buildSetupSheetTemplate";
 import { getSetupSheetTemplateAndKeyForCar } from "@/lib/setupSheetModels/getTemplateForCar";
 import { chassisFillsAsSheet } from "@/lib/setupSheetModels/sheetPlan";
+import { loadSheetWordsForCar } from "@/lib/setup/loadSheetWords";
 
 type RouteCtx = { params: Promise<{ carId: string }> };
 
@@ -49,13 +50,22 @@ export async function GET(request: Request, ctx: RouteCtx) {
       })
     : null;
 
-  const { template, templateKey } = await getSetupSheetTemplateAndKeyForCar(userId, car, view);
+  /*
+   * And, for the run form, what this car's sheet calls its boxes and printed choices
+   * (`sheetWords.ts`), so "Setup is from … with the following changes" reads "Anti Roll Bar (Front)
+   * 1.3 → 1.4" rather than the stored "anti roll bar front f_1_3 → f_1_4" (test drive 2026-09-26).
+   */
+  const [{ template, templateKey }, words] = await Promise.all([
+    getSetupSheetTemplateAndKeyForCar(userId, car, view),
+    view === "logRun" ? loadSheetWordsForCar(userId, car) : Promise.resolve(null),
+  ]);
   return NextResponse.json(
     {
       template,
       templateKey,
       setupSheetModelId: car.setupSheetModelId,
       sheetMode: chassisFillsAsSheet(blank),
+      words,
     },
     { headers: { "Cache-Control": "no-store" } }
   );

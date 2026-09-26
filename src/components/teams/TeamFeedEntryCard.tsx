@@ -142,6 +142,9 @@ export function TeamFeedEntryCard({
  * A labelled block of facts. The empty state is a sentence, not a blank — "Nothing else
  * moved" is real information about how clean the comparison was, and leaving it out would
  * quietly turn an informative absence into an oversight.
+ *
+ * The sentence stands without the label: "CHANGED" over "No setup change" announced a change
+ * that did not happen (test drive 2026-09-26), and the sentence already says what it is about.
  */
 function FactRow({
   label,
@@ -156,7 +159,7 @@ function FactRow({
 }) {
   return (
     <div className="border-b border-border/40 px-4 py-2.5 last:border-b-0">
-      <Eyebrow className="mb-1.5">{label}</Eyebrow>
+      {rows.length > 0 ? <Eyebrow className="mb-1.5">{label}</Eyebrow> : null}
       {rows.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">{empty}</p>
       ) : (

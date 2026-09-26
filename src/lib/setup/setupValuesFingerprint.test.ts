@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { changedSetupKeys, setupValuesFingerprint } from "./setupValuesFingerprint";
-import { setupChangesSinceLoaded } from "./setupChangesSinceLoaded";
+import { setupChangesSinceLoaded, setupHasUnsavedChanges } from "./setupChangesSinceLoaded";
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import {
@@ -147,4 +147,34 @@ test("clearing a box that had a value is a change", () => {
 
 test("nothing loaded, nothing to count", () => {
   assert.deepEqual(setupChangesSinceLoaded({ toe_rear: 3 }, null), []);
+});
+
+// --- "Save to this run" beside the sheet (`setupHasUnsavedChanges`) ----------------------------
+//
+// Test drive 2026-09-26: Noah changed Anti Roll Bar (Front) 1.3 → 1.4 and back; the badge cleared
+// and the yellow "Save to this run" stayed.
+
+test("an edit put back leaves nothing to save", () => {
+  const loaded = loadIntoForm(MI10_BASELINE);
+  const surface = sheetValuesFromSnapshot(loaded);
+  const once = sheetReport(loaded, { ...surface, anti_roll_bar_front: "f_1_4" });
+  assert.equal(setupHasUnsavedChanges(once, loaded), true);
+  const back = sheetReport(once, { ...surface, anti_roll_bar_front: "f_1_3" });
+  assert.equal(setupHasUnsavedChanges(back, loaded), false);
+});
+
+test("against a save, going back to the loaded value is still an edit to save", () => {
+  const loaded = loadIntoForm(MI10_BASELINE);
+  const surface = sheetValuesFromSnapshot(loaded);
+  const saved = sheetReport(loaded, { ...surface, anti_roll_bar_front: "f_1_4" });
+  const back = sheetReport(saved, { ...surface, anti_roll_bar_front: "f_1_3" });
+  assert.equal(setupHasUnsavedChanges(back, saved), true);
+  assert.equal(setupHasUnsavedChanges(saved, saved), false);
+});
+
+test("a blank sheet with a box filled has something to save; the tyre alone does not", () => {
+  assert.equal(setupHasUnsavedChanges(loadIntoForm({ toe_rear: 3 }), null), true);
+  assert.equal(setupHasUnsavedChanges(loadIntoForm({ toe_rear: "" }), null), false);
+  const tyre = { tireTypeId: "t1", displayName: "Blue", tireRunNumber: 1, tireAgeKnown: true };
+  assert.equal(setupHasUnsavedChanges(loadIntoForm({ tires: tyre }), loadIntoForm({})), false);
 });

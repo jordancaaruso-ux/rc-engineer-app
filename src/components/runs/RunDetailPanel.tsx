@@ -15,6 +15,8 @@ import { resolveRunDisplayInstant } from "@/lib/runCompareMeta";
 import { formatLap, formatStintTime, normalizeLapTimes } from "@/lib/runLaps";
 import { DEFAULT_SETUP_FIELDS, normalizeSetupData } from "@/lib/runSetup";
 import { setupChangedRowsSincePrevious } from "@/lib/setupCompare/changedSincePrevious";
+import { isRunToRunSetupNoiseKey } from "@/lib/setupCompare/setupChangeNoise";
+import { setupHasChassisValue } from "@/lib/setup/runContextSetupKeys";
 import { SetupChangedSincePreviousList } from "@/components/runs/SetupChangedSincePreviousList";
 import {
   CORNER_SPEED_LABELS,
@@ -564,14 +566,27 @@ export function RunDetailPanel({
      *
      * `undefined` means the snapshot is still being fetched, which is NOT the same as empty —
      * checking it would flash "no setup" onto every run for a moment.
+     *
+     * Empty means nothing on the CAR: the form writes today's tyre into every run's setup by
+     * itself, so a run logged without a setup still holds one value, and diffing that read every
+     * box of the previous run as changed.
      */
-    if (runSetupData !== undefined && Object.keys(normalizeSetupData(runSetupData)).length === 0) {
+    if (runSetupData !== undefined && !setupHasChassisValue(runSetupData)) {
       return { mode: "no_setup" as const, rows: [] as ReturnType<typeof setupRows> };
     }
     if (!run.carId || prevSetupData == null) {
       return { mode: "no_baseline" as const, rows: [] as ReturnType<typeof setupRows> };
     }
-    const changed = setupChangedRowsSincePrevious(runSetupData, prevSetupData);
+    /*
+     * Only what moved on the car. Today's tyre, additive and prep are picked on the Tires step and
+     * written into the setup by the form, and the sheet's header boxes (driver, date) are not the
+     * car either — the run form's "changes since loaded" and the car page leave them out too.
+     * Listed, a run whose setup held no tyre read "tires | — | [object Object]" against the run
+     * before it (test drive 2026-09-26).
+     */
+    const changed = setupChangedRowsSincePrevious(runSetupData, prevSetupData).filter(
+      (row) => !isRunToRunSetupNoiseKey(row.key)
+    );
     return { mode: "diff" as const, rows: changed };
   }, [run.carId, runSetupData, prevSetupData]);
   const ownRows = primaryLapRowsFromRun(run);
@@ -1384,6 +1399,8 @@ export function RunDetailPanel({
           <SetupChangedSincePreviousList
             rows={setupPreview.mode === "no_baseline" ? null : setupPreview.rows}
             runId={run.id}
+            // Owner-only, like every mutation here — so false means a teammate's run.
+            ownRun={allowRunMutations}
           />
         )}
         {/*

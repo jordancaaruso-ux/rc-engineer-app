@@ -1226,7 +1226,8 @@ export function RunFaces({
             ) : setupDiff.mode === "no_baseline" ? (
               <SetupChangedSincePreviousList rows={null} runId={run.id} />
             ) : (
-              <SetupChangedSincePreviousList rows={setupDiff.rows} runId={run.id} />
+              // Owner-only, like every mutation here — so false means a teammate's run.
+              <SetupChangedSincePreviousList rows={setupDiff.rows} runId={run.id} ownRun={allowRunMutations} />
             )}
           </Block>
 

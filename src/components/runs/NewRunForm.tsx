@@ -22,7 +22,8 @@ import {
 } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { chassisValueCount, setupHasChassisValue } from "@/lib/setup/runContextSetupKeys";
-import { setupChangesSinceLoaded } from "@/lib/setup/setupChangesSinceLoaded";
+import { setupChangesSinceLoaded, setupHasUnsavedChanges } from "@/lib/setup/setupChangesSinceLoaded";
+import type { SheetWords } from "@/lib/setup/sheetWords";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { RunSheetSetupFill } from "@/components/runs/RunSheetSetupFill";
 import { haptic } from "@/lib/haptics";
@@ -524,6 +525,16 @@ type NewRunDraftSnapshot = {
   setupData: SetupSnapshotData;
   setupBaselineSnapshotId: string | null;
   setupBaselineData: SetupSnapshotData | null;
+  /**
+   * The Setup step's source tab, and the run or saved setup picked on it. Without them a restored
+   * draft kept a saved setup's values but showed "Previous runs" (test drive 2026-09-26).
+   * Optional: older drafts don't have them.
+   */
+  setupSource?: SetupSource;
+  loadSetupSelection?: string;
+  loadOtherSetupSelection?: string;
+  /** That source was chosen for this car (`setupSourceChosenForRef`), so the landing default stays out. */
+  setupSourceChosen?: boolean;
   lapIngest: LapIngestFormValue;
   notes: string;
   raceClass: string;
@@ -578,6 +589,16 @@ function newRunLapIngestHasContent(v: LapIngestFormValue): boolean {
       (v.urlLapRows && v.urlLapRows.length > 0) ||
       (v.urlImportBlocks && v.urlImportBlocks.length > 0)
   );
+}
+
+/**
+ * The tyres on one line, as the Tires step and the Prefill card print them: the tyre alone on a
+ * single-tire car, and on a front/rear car both ends, front first — "F … / R not set" when only
+ * the front is logged. Empty when neither is.
+ */
+function tiresOneLine(front: string, rear: string): string {
+  if (!front) return rear;
+  return `F ${front} / R ${rear || "not set"}`;
 }
 
 /** Deep copy a setup snapshot so mutating `setupData` later doesn't drag the baseline along. */
@@ -994,6 +1015,11 @@ export function NewRunForm(props: {
   const [hasTeams, setHasTeams] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  /**
+   * The setup as the last "Save to this run" sent it. Null until one lands; until then the loaded
+   * setup (`setupBaselineData`) is what an edit is measured from. See `setupHasUnsavedEdits`.
+   */
+  const [setupAtLastSave, setSetupAtLastSave] = useState<SetupSnapshotData | null>(null);
   const [, startCopyTransition] = useTransition();
   const [status, setStatus] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -1076,14 +1102,15 @@ export function NewRunForm(props: {
           tireAgeKnown,
         })
       : "";
-    if (!frontTire.typeId) return rear;
-    const front = displayTireSelection({
-      tireTypeId: frontTire.typeId,
-      displayName: frontTire.typeName,
-      tireRunNumber: Math.max(1, frontTire.runsCompleted + 1),
-      tireAgeKnown: frontTire.ageKnown,
-    });
-    return `F ${front} / R ${rear || "not set"}`;
+    const front = frontTire.typeId
+      ? displayTireSelection({
+          tireTypeId: frontTire.typeId,
+          displayName: frontTire.typeName,
+          tireRunNumber: Math.max(1, frontTire.runsCompleted + 1),
+          tireAgeKnown: frontTire.ageKnown,
+        })
+      : "";
+    return tiresOneLine(front, rear);
   }, [tireTypeId, tireTypeName, runsCompleted, tireAgeKnown, frontTire]);
 
   const tireTypeIdRef = useRef(tireTypeId);
@@ -1729,6 +1756,14 @@ export function NewRunForm(props: {
         if (s.setupBaselineSnapshotId !== undefined)
           setSetupBaselineSnapshotId(s.setupBaselineSnapshotId);
         if (s.setupBaselineData !== undefined) setSetupBaselineData(s.setupBaselineData);
+        // The tab the setup came from, with it — not "Previous runs" over a saved setup's values.
+        if (s.setupSource === "previous_runs" || s.setupSource === "other" || s.setupSource === "new") {
+          setSetupSource(s.setupSource);
+          if (s.setupSourceChosen && s.carId) setupSourceChosenForRef.current = s.carId;
+        }
+        if (typeof s.loadSetupSelection === "string") setLoadSetupSelection(s.loadSetupSelection);
+        if (typeof s.loadOtherSetupSelection === "string")
+          setLoadOtherSetupSelection(s.loadOtherSetupSelection);
         if (s.lapIngest) setLapIngest(s.lapIngest);
         if (typeof s.notes === "string") setNotes(s.notes);
         if (typeof s.raceClass === "string") setRaceClass(s.raceClass);
@@ -1776,6 +1811,10 @@ export function NewRunForm(props: {
       setupData,
       setupBaselineSnapshotId,
       setupBaselineData,
+      setupSource,
+      loadSetupSelection,
+      loadOtherSetupSelection,
+      setupSourceChosen: Boolean(carId) && setupSourceChosenForRef.current === carId,
       lapIngest,
       notes,
       raceClass,
@@ -1827,6 +1866,9 @@ export function NewRunForm(props: {
     setupData,
     setupBaselineSnapshotId,
     setupBaselineData,
+    setupSource,
+    loadSetupSelection,
+    loadOtherSetupSelection,
     lapIngest,
     notes,
     raceClass,
@@ -1902,11 +1944,21 @@ export function NewRunForm(props: {
   } | null>(null);
   /** Which car the sheet section auto-expanded for — once each, see the fetch below. */
   const sheetAutoExpandedForRef = useRef<string | null>(null);
+  /**
+   * What this car's sheet calls its boxes and printed choices (`sheetWords.ts`), from the same
+   * request. Kept with the car it came for, so a car change never prints one chassis's words on
+   * another's setup while the new car's answer is on its way.
+   */
+  const [sheetWordsFor, setSheetWordsFor] = useState<{ carId: string; words: SheetWords | null } | null>(
+    null
+  );
+  const sheetWords = sheetWordsFor != null && sheetWordsFor.carId === carId ? sheetWordsFor.words : null;
 
   useEffect(() => {
     if (!carId) {
       setModelTemplate(null);
       setSheetChassis(null);
+      setSheetWordsFor(null);
       return;
     }
     let cancelled = false;
@@ -1918,9 +1970,11 @@ export function NewRunForm(props: {
           templateKey?: string | null;
           sheetMode?: boolean;
           setupSheetModelId?: string | null;
+          words?: SheetWords | null;
         }) => {
           if (cancelled) return;
           if (d.template) setModelTemplate(d.template);
+          setSheetWordsFor({ carId, words: d.words ?? null });
           setSheetChassis(
             d.sheetMode && d.setupSheetModelId
               ? {
@@ -2075,10 +2129,20 @@ export function NewRunForm(props: {
    * putting it back clears it (see `setupChangesSinceLoaded`).
    */
   const setupChangedRowsSinceBaseline = useMemo(
-    () => setupChangesSinceLoaded(setupData, setupBaselineData),
-    [setupData, setupBaselineData]
+    // In the sheet's own words, for the "Setup is from … with the following changes" list.
+    () => setupChangesSinceLoaded(setupData, setupBaselineData, sheetWords),
+    [setupData, setupBaselineData, sheetWords]
   );
   const setupChangeCountSinceBaseline = setupChangedRowsSinceBaseline.length;
+  /**
+   * Whether "Save to this run" beside the sheet has anything to save: the setup differs from what
+   * the last stay-save sent, or from what was loaded before one. Undoing an edit takes the button
+   * away again (test drive 2026-09-26: it stayed up after 1.3 → 1.4 → 1.3).
+   */
+  const setupHasUnsavedEdits = useMemo(
+    () => setupHasUnsavedChanges(setupData, setupAtLastSave ?? setupBaselineData),
+    [setupData, setupAtLastSave, setupBaselineData]
+  );
   /** Boxes on the run's setup that hold a value. Not the tyre the form writes in by itself:
    *  counting that ticked Setup and read "1 values" on runs with no setup at all. */
   const setupValueCount = useMemo(() => chassisValueCount(setupData), [setupData]);
@@ -3950,6 +4014,8 @@ export function NewRunForm(props: {
       }
       // A stay-save's minted run counts as "the run being edited" from then on — PUT, not POST.
       const effectiveEditId = editRun?.id ?? createdRunId;
+      // Held so a stay-save can remember exactly what it sent (`setupAtLastSave`).
+      const setupForSave = applyDerivedFieldsToSnapshot(setupData);
       const {
         run,
         tireStintId: savedStintId,
@@ -3996,7 +4062,7 @@ export function NewRunForm(props: {
           tireFitment: normalizeTireFitment(tireFitment),
           additiveTypeId: additiveTypeId || null,
           tirePrep: pruneTirePrepForSave(tirePrep),
-          setupData: applyDerivedFieldsToSnapshot(setupData),
+          setupData: setupForSave,
           setupBaselineSnapshotId,
           // Only an imported *document* has a document id. A library setup's option id is its
           // SetupSnapshot id, which must never be sent here — it would be written to
@@ -4151,6 +4217,8 @@ export function NewRunForm(props: {
       // a restored classic-mode draft updates this run instead of minting a twin). The chip
       // beside the sheet renders the "Saved ✓" beat; the haptic is the only other telling.
       if (opts?.stay) {
+        // What the run now holds, so "Save to this run" measures later edits from here.
+        setSetupAtLastSave(setupForSave);
         haptic("success");
         void todayDraftCtx?.refreshDraft();
         return;
@@ -4741,28 +4809,28 @@ export function NewRunForm(props: {
           {
             key: "tires",
             label: "Tires",
+            // A front/rear car's promise names both ends, front first, in the words the step prints
+            // once the tap lands. A last run with a front tyre and no rear read "Tires —" here and
+            // then filled that front (test drive 2026-09-26).
             value: lastRun
-              ? lastRun.tireTypeId || lastRun.tireType
-                ? [
-                    // A front/rear car's promise names both ends, front first — as the step does.
-                    lastRun.frontTireTypeId || lastRun.frontTireType
-                      ? `F ${displayTireSelection({
-                          tireTypeId: lastRun.frontTireTypeId ?? lastRun.frontTireType?.id ?? "",
-                          displayName: lastRun.frontTireType?.displayName,
-                          tireRunNumber: lastRun.frontTireRunNumber ?? undefined,
-                          tireAgeKnown: lastRun.frontTireAgeKnown ?? true,
-                        })} / R`
-                      : null,
-                    displayTireSelection({
-                      tireTypeId: lastRun.tireTypeId ?? lastRun.tireType?.id ?? "",
-                      displayName: lastRun.tireType?.displayName,
-                      tireRunNumber: lastRun.tireRunNumber,
-                      tireAgeKnown: lastRun.tireAgeKnown ?? true,
-                    }),
-                  ]
-                    .filter(Boolean)
-                    .join(" ")
-                : "—"
+              ? tiresOneLine(
+                  lastRun.frontTireTypeId || lastRun.frontTireType
+                    ? displayTireSelection({
+                        tireTypeId: lastRun.frontTireTypeId ?? lastRun.frontTireType?.id ?? "",
+                        displayName: lastRun.frontTireType?.displayName,
+                        tireRunNumber: lastRun.frontTireRunNumber ?? undefined,
+                        tireAgeKnown: lastRun.frontTireAgeKnown ?? true,
+                      })
+                    : "",
+                  lastRun.tireTypeId || lastRun.tireType
+                    ? displayTireSelection({
+                        tireTypeId: lastRun.tireTypeId ?? lastRun.tireType?.id ?? "",
+                        displayName: lastRun.tireType?.displayName,
+                        tireRunNumber: lastRun.tireRunNumber,
+                        tireAgeKnown: lastRun.tireAgeKnown ?? true,
+                      })
+                    : ""
+                ) || "—"
               : "…",
           },
           {
@@ -6106,6 +6174,7 @@ export function NewRunForm(props: {
                 onSaveToRun={() =>
                   saveRun(undefined, editingCompletedRun ? "completed" : "draft", { stay: true })
                 }
+                unsavedChanges={setupHasUnsavedEdits}
                 canSave={canSave}
                 saving={saving}
                 saveSuccess={saveSuccess}

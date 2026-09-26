@@ -927,6 +927,7 @@ export function SetupSheetModal({
                     rows={changedSincePrevious}
                     runId={run?.id ?? null}
                     maxRows={3}
+                    ownRun={!anchorIsPeers}
                   />
                 )}
                 {compareOpen && !editingNow ? (
