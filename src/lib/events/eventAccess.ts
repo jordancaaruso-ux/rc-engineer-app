@@ -1,3 +1,7 @@
 import "server-only";
 
-export { canEditSharedEventFields, type EventAccessUser } from "@/lib/events/eventAccessLogic";
+export {
+  canEditSharedEventFields,
+  isLiveRcMeeting,
+  type EventAccessUser,
+} from "@/lib/events/eventAccessLogic";

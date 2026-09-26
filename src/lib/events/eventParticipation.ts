@@ -5,6 +5,11 @@ import {
   isLegacyEventTrack,
   resolveEventTrackLabel,
 } from "@/lib/tracks/legacyTrackSnapshot";
+import {
+  resolveSessionGroupKeys,
+  type MeetingForGrouping,
+  type RunGroupZoneOptions,
+} from "@/lib/runs/buildRunHistoryGroups";
 
 export const EVENT_PARTICIPATION_TIRE_SELECT = {
   id: true,
@@ -210,6 +215,92 @@ export function mapEventForUser<
     pinnedAt: mine?.pinnedAt ?? null,
     hasLiveRcLink: Boolean(event.resultsSourceUrl?.trim() || event.practiceSourceUrl?.trim()),
   };
+}
+
+/**
+ * The meetings this driver is on whose days touch `from`–`to`, in the shape run grouping reads.
+ * Handed to `buildRunHistoryGroups` / `resolveSessionGroupKeys` so a meeting nobody picked for a
+ * run still holds the runs at its track on its days (test drive 2026-09-26, W1-07).
+ */
+export async function loadMeetingsForGrouping(input: {
+  userId: string;
+  from: Date;
+  to: Date;
+}): Promise<MeetingForGrouping[]> {
+  return prisma.event.findMany({
+    where: {
+      startDate: { lte: input.to },
+      endDate: { gte: input.from },
+      OR: [
+        { participations: { some: { userId: input.userId } } },
+        { runs: { some: { userId: input.userId } } },
+      ],
+    },
+    orderBy: { startDate: "desc" },
+    take: 200,
+    select: {
+      id: true,
+      name: true,
+      startDate: true,
+      endDate: true,
+      trackNameSnapshot: true,
+      track: { select: { name: true } },
+    },
+  });
+}
+
+/** Longest reach of the Sessions fold either side of a meeting (14 touching days), plus a day of zone. */
+const MEETING_FOLD_REACH_MS = 15 * 24 * 60 * 60 * 1000;
+
+/**
+ * How many of this driver's own runs sit in the meeting: the ones picked for it and the ones at
+ * its track on its days that were left on "Testing" (approved rule; W1-07: a club day's page read
+ * "0 runs linked" beside the four raced there that day). Decided by the fold Sessions groups by,
+ * over the driver's own runs only, so the page and Sessions can't disagree and nobody else's
+ * runs are ever counted.
+ */
+export async function countMyRunsInMeeting(input: {
+  event: { id: string; startDate: Date; endDate: Date };
+  userId: string;
+  zones: RunGroupZoneOptions;
+}): Promise<number> {
+  const from = new Date(input.event.startDate.getTime() - MEETING_FOLD_REACH_MS);
+  const to = new Date(input.event.endDate.getTime() + MEETING_FOLD_REACH_MS);
+  const [runs, meetings] = await Promise.all([
+    prisma.run.findMany({
+      where: {
+        userId: input.userId,
+        OR: [{ eventId: input.event.id }, { sortAt: { gte: from, lte: to } }],
+      },
+      take: 2000,
+      select: {
+        id: true,
+        userId: true,
+        eventId: true,
+        createdAt: true,
+        sortAt: true,
+        localTimeZone: true,
+        trackNameSnapshot: true,
+        track: { select: { name: true } },
+        event: {
+          select: {
+            name: true,
+            startDate: true,
+            endDate: true,
+            trackNameSnapshot: true,
+            track: { select: { name: true } },
+          },
+        },
+      },
+    }),
+    loadMeetingsForGrouping({ userId: input.userId, from, to }),
+  ]);
+  const key = `event-${input.event.id}`;
+  let count = 0;
+  for (const k of resolveSessionGroupKeys(runs, input.zones, meetings).values()) {
+    if (k === key) count += 1;
+  }
+  return count;
 }
 
 /** User-scoped events with per-user run counts (for dashboard / lists). */

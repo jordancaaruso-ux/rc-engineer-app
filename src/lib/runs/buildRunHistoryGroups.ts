@@ -21,6 +21,21 @@ export type RunForHistoryGroup = {
   } | null;
 };
 
+/**
+ * A meeting the reader is on, handed in so it holds the eventless runs at its track on its days
+ * even when no run in the list was picked for it. Without it a meeting only ever claimed a day
+ * through a run that carried it, so a club day made on Events and then raced on "Testing" read
+ * "0 runs" on its page and "Test day" in Sessions (test drive 2026-09-26, W1-07).
+ */
+export type MeetingForGrouping = {
+  id: string;
+  name: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  trackNameSnapshot?: string | null;
+  track?: { name: string } | null;
+};
+
 export type RunHistoryGroup<T extends RunForHistoryGroup = RunForHistoryGroup> = {
   id: string;
   title: string;
@@ -318,10 +333,18 @@ function eventDeclaredDays(event: RunForHistoryGroup["event"]): string[] {
  *
  * `sessionGroupKey` on its own still gives the unfolded key; this is the one the list and the
  * workbench's "2 of 8" count must both use, or they count different sessions.
+ *
+ * ## A meeting nobody picked still holds its day (approved rule, test drive 2026-09-26)
+ *
+ * `meetings` are the reader's own meetings. One that no run in the list carries claims its
+ * declared days at its track exactly as a carried one does, touching days included, so a club
+ * day made on Events and then raced on "Testing" is that meeting in Sessions and on its page.
+ * It has no runs of its own, so any meeting a run was picked for wins a shared day from it.
  */
 export function resolveSessionGroupKeys<T extends RunForHistoryGroup>(
   runs: readonly T[],
-  zones?: RunGroupZoneOptions
+  zones?: RunGroupZoneOptions,
+  meetings?: readonly MeetingForGrouping[]
 ): Map<string, string> {
   const keyByRunId = new Map<string, string>();
   const eventScopes = new Map<string, { tracks: Set<string>; days: Set<string>; count: number }>();
@@ -343,6 +366,14 @@ export function resolveSessionGroupKeys<T extends RunForHistoryGroup>(
     if (eventTrack) scope.tracks.add(`name:${eventTrack}`);
     scope.days.add(runLocalDayKey(run, zones));
     for (const day of eventDeclaredDays(run.event)) scope.days.add(day);
+  }
+  for (const meeting of meetings ?? []) {
+    const key = `event-${meeting.id}`;
+    if (eventScopes.has(key)) continue;
+    const track = (meeting.track?.name ?? meeting.trackNameSnapshot ?? "").trim().toLowerCase();
+    const days = eventDeclaredDays(meeting);
+    if (!track || days.length === 0) continue;
+    eventScopes.set(key, { tracks: new Set([`name:${track}`]), days: new Set(days), count: 0 });
   }
   if (eventScopes.size === 0) return keyByRunId;
 
@@ -405,10 +436,19 @@ export function resolveSessionGroupKeys<T extends RunForHistoryGroup>(
 export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
   runs: T[],
   timeZone?: string | null,
-  opts?: Pick<RunGroupZoneOptions, "ownerTimeZoneByUserId">
+  opts?: Pick<RunGroupZoneOptions, "ownerTimeZoneByUserId"> & {
+    /** The reader's meetings, so one no run was picked for still holds its day (see `resolveSessionGroupKeys`). */
+    meetings?: readonly MeetingForGrouping[];
+  }
 ): RunHistoryGroup<T>[] {
-  const zones: RunGroupZoneOptions = { ...opts, viewerTimeZone: timeZone };
-  const keyByRunId = resolveSessionGroupKeys(runs, zones);
+  const zones: RunGroupZoneOptions = {
+    ownerTimeZoneByUserId: opts?.ownerTimeZoneByUserId,
+    viewerTimeZone: timeZone,
+  };
+  const keyByRunId = resolveSessionGroupKeys(runs, zones, opts?.meetings);
+  const meetingByKey = new Map<string, MeetingForGrouping>(
+    (opts?.meetings ?? []).map((m) => [`event-${m.id}`, m])
+  );
   const byKey = new Map<string, T[]>();
   for (const run of runs) {
     const key = keyByRunId.get(run.id) ?? sessionGroupKey(run, zones);
@@ -419,18 +459,19 @@ export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
   const groups: RunHistoryGroup<T>[] = [];
   for (const [groupKey, groupRuns] of byKey) {
     // A folded group holds eventless runs too; the header must read off one that carries the
-    // event, whichever came first in the list.
-    const run = groupRuns.find((r) => r.eventId && r.event) ?? groupRuns[0]!;
+    // event, whichever came first in the list — or, when none does, the meeting that holds them.
+    const carrier = groupRuns.find((r) => r.eventId && r.event);
+    const run = carrier ?? groupRuns[0]!;
+    const event = carrier?.event ?? meetingByKey.get(groupKey) ?? null;
     const runZone = resolveRunLocalTimeZone(run, zones);
-    const isEvent = !!run.eventId && run.event;
-    const title = isEvent && run.event
-      ? run.event.name
+    const title = event
+      ? event.name
       : `Test day – ${formatGroupDate(runSessionSortInstant(run), runZone)}`;
-    const type: RunHistoryGroup["type"] = isEvent ? "Event" : "Testing";
-    const trackName = isEvent && run.event
-      ? (run.event.track?.name ?? run.event.trackNameSnapshot ?? run.track?.name ?? run.trackNameSnapshot ?? "—")
+    const type: RunHistoryGroup["type"] = event ? "Event" : "Testing";
+    const trackName = event
+      ? (event.track?.name ?? event.trackNameSnapshot ?? run.track?.name ?? run.trackNameSnapshot ?? "—")
       : (run.track?.name ?? run.trackNameSnapshot ?? "—");
-    const dateLabel = isEvent && run.event
+    const dateLabel = event
       ? (() => {
           // The declared range, widened to any day a run in the group actually landed on:
           // a folded Friday practice makes a "13 – 14 Sep" meeting a "12 – 14 Sep" one.
@@ -441,7 +482,7 @@ export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
           // before 10am in Brisbane back a day, so a club day held on the 26th read
           // "25 – 26 Sept 2026" (found 2026-09-26).
           const days = groupRuns.map((r) => runLocalDayKey(r, zones));
-          for (const declared of [run.event.startDate, run.event.endDate]) {
+          for (const declared of [event.startDate, event.endDate]) {
             const day = declared ? eventDayKey(declared, runZone) : null;
             if (day) days.push(day);
           }

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
-import { EventDateRangeField } from "@/components/events/EventDateRangeField";
+import { EventDateRangeField, formatEventDateRange } from "@/components/events/EventDateRangeField";
 
 type TrackOption = {
   id: string;
@@ -31,9 +31,18 @@ type Props = {
   initialMyRcmUrl: string | null;
   initialRaceClass: string | null;
   runCount: number;
+  /**
+   * May this driver change the meeting's shared fields (`canEditSharedEventFields`)? When not —
+   * a LiveRC meeting, or a teammate's — name, track and dates read as text, the links are not
+   * offered, and Save sends only the driver's own notes, which the server always takes from
+   * anyone on the meeting. Sending the shared fields along with them made every save fail
+   * for everyone but the maker (test drive 2026-09-26, W1-05).
+   */
+  canEditShared: boolean;
 };
 
 export function EventMetaEditor(props: Props) {
+  const { canEditShared } = props;
   const router = useRouter();
   const [tracks, setTracks] = useState<TrackOption[]>([]);
   const [favouriteTrackIds, setFavouriteTrackIds] = useState<string[]>([]);
@@ -53,6 +62,8 @@ export function EventMetaEditor(props: Props) {
   // flag it answers with an empty array rather than omitting the field, which reads like a
   // driver with no favourites instead of a question that was never asked.
   useEffect(() => {
+    // The track picker is only drawn for a driver who can re-point the meeting.
+    if (!canEditShared) return;
     let alive = true;
     fetch("/api/tracks?favouritesFirst=1", { cache: "no-store" })
       .then((r) => r.json())
@@ -65,7 +76,7 @@ export function EventMetaEditor(props: Props) {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [canEditShared]);
 
   /**
    * The catalog arrives from a client fetch, so for the first frame the picker has nothing to
@@ -83,16 +94,19 @@ export function EventMetaEditor(props: Props) {
 
   const hasLegacyTrack = Boolean(props.initialIsLegacyTrack && props.initialLegacyTrackLabel?.trim());
   const canSaveWithoutTrackLink = hasLegacyTrack && !trackId.trim();
+  const saveBlocked = canEditShared && !trackId.trim() && !canSaveWithoutTrackLink;
 
   async function save() {
     const trimmed = name.trim();
-    if (!trimmed) {
-      setMessage("Name is required.");
-      return;
-    }
-    if (!trackId.trim() && !hasLegacyTrack) {
-      setMessage("Select a track for this event.");
-      return;
+    if (canEditShared) {
+      if (!trimmed) {
+        setMessage("Name is required.");
+        return;
+      }
+      if (!trackId.trim() && !hasLegacyTrack) {
+        setMessage("Select a track for this event.");
+        return;
+      }
     }
 
     setSaving(true);
@@ -101,17 +115,21 @@ export function EventMetaEditor(props: Props) {
       const res = await fetch(`/api/events/${encodeURIComponent(props.eventId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: trimmed,
-          ...(trackId.trim() ? { trackId } : {}),
-          startDate,
-          endDate,
-          notes: notes.trim() || null,
-          practiceSourceUrl: practiceSourceUrl.trim() || null,
-          resultsSourceUrl: resultsSourceUrl.trim() || null,
-          myRcmUrl: myRcmUrl.trim() || null,
-          raceClass: raceClass.trim() || null,
-        }),
+        body: JSON.stringify(
+          canEditShared
+            ? {
+                name: trimmed,
+                ...(trackId.trim() ? { trackId } : {}),
+                startDate,
+                endDate,
+                notes: notes.trim() || null,
+                practiceSourceUrl: practiceSourceUrl.trim() || null,
+                resultsSourceUrl: resultsSourceUrl.trim() || null,
+                myRcmUrl: myRcmUrl.trim() || null,
+                raceClass: raceClass.trim() || null,
+              }
+            : { notes: notes.trim() || null }
+        ),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -145,6 +163,8 @@ export function EventMetaEditor(props: Props) {
           {props.runCount} run{props.runCount === 1 ? "" : "s"} linked to this event.
         </p>
       </div>
+      {canEditShared ? (
+      <>
       <div className="grid gap-3 md:grid-cols-2">
         <div className="min-w-0">
           <label className="block text-[11px] text-muted-foreground mb-1">Name *</label>
@@ -207,6 +227,14 @@ export function EventMetaEditor(props: Props) {
         }}
         triggerClassName="rounded-md border border-border bg-card"
       />
+      </>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          <ReadOnlyField label="Name" value={name} />
+          <ReadOnlyField label="Track" value={props.initialLegacyTrackLabel?.trim() || "—"} />
+          <ReadOnlyField label="Dates" value={formatEventDateRange(startDate, endDate) || "—"} />
+        </div>
+      )}
       <div>
         <label className="block text-[11px] text-muted-foreground mb-1">Notes (optional)</label>
         <input
@@ -216,6 +244,8 @@ export function EventMetaEditor(props: Props) {
           placeholder="Optional notes"
         />
       </div>
+      {canEditShared ? (
+      <>
       {/*
         Deliberately NOT inside the advanced block below. Everything in there is LiveRC plumbing
         that only matters when the track's own page isn't enough; this is the single field that
@@ -296,19 +326,20 @@ export function EventMetaEditor(props: Props) {
           </div>
         </div>
       </details>
+      </>
+      ) : null}
       <div className="flex items-center gap-2">
         <button
           type="button"
-          disabled={saving || (!trackId.trim() && !canSaveWithoutTrackLink)}
+          disabled={saving || saveBlocked}
           onClick={() => void save()}
           className={cn(
             buttonLinkClassName("primary"),
             "text-xs px-3 py-1.5",
-            (saving || (!trackId.trim() && !canSaveWithoutTrackLink)) &&
-              "opacity-70 pointer-events-none"
+            (saving || saveBlocked) && "opacity-70 pointer-events-none"
           )}
         >
-          {saving ? "Saving…" : "Save changes"}
+          {saving ? "Saving…" : canEditShared ? "Save changes" : "Save notes"}
         </button>
         {message ? (
           <span className={cn("text-xs", message === "Saved." ? "text-primary-ink" : "text-muted-foreground")}>
@@ -317,5 +348,15 @@ export function EventMetaEditor(props: Props) {
         ) : null}
       </div>
     </SurfaceCard>
+  );
+}
+
+/** A shared field this driver can't change, shown as what it holds rather than a dead box. */
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="mb-1 text-[11px] text-muted-foreground">{label}</div>
+      <p className="break-words text-sm text-foreground">{value}</p>
+    </div>
   );
 }

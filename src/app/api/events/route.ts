@@ -19,6 +19,12 @@ import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 export const dynamic = "force-dynamic";
 
+/** The UTC day a stored meeting date falls on, as a range: forms store UTC noon, older rows midnight. */
+function utcDayOf(d: Date): { gte: Date; lt: Date } {
+  const gte = new Date(`${eventDateToYmd(d)}T00:00:00.000Z`);
+  return { gte, lt: new Date(gte.getTime() + 86_400_000) };
+}
+
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json(
@@ -214,6 +220,44 @@ export async function POST(request: Request) {
           },
           { status: 409 }
         );
+      }
+    }
+
+    // The same meeting made twice by the same driver (a reload mid-run, then New event again) is
+    // the one they already have: same name, track and days, so the list never shows two identical
+    // rows (test drive 2026-09-26, W2-14). A meeting with a results link was answered above.
+    if (!resultsSourceUrl) {
+      const again = await prisma.event.findFirst({
+        where: {
+          userId,
+          trackId,
+          name: { equals: name, mode: "insensitive" },
+          startDate: utcDayOf(startDate),
+          endDate: utcDayOf(endDate),
+        },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      if (again) {
+        await ensureEventParticipation({
+          userId: userId,
+          eventId: again.id,
+          notes: body.notes,
+          controlledTireLabel,
+          controlledTireTypeId,
+          controlledAdditiveTypeId,
+        });
+        const existing = await prisma.event.findUnique({
+          where: { id: again.id },
+          include: EVENT_LIST_INCLUDE,
+        });
+        if (existing) {
+          revalidateAfterEventMutation(userId);
+          return NextResponse.json(
+            { event: mapEventForUser(existing, userId), reused: true },
+            { status: 200 }
+          );
+        }
       }
     }
 

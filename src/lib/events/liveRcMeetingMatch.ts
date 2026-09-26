@@ -17,10 +17,34 @@ import { addDaysToYmd } from "@/lib/events/joinableTeamEventLogic";
 export const TRACK_EVENTS_AHEAD_DAYS = 7;
 
 /**
+ * How far back the log-run event list still offers a LiveRC meeting, so Thursday's club night can
+ * be picked for a run logged on Saturday (test drive 2026-09-26, W3-04: Indoor Raceway's meeting
+ * of two days before could never be picked).
+ */
+export const TRACK_EVENTS_BEHIND_DAYS = 14;
+
+/**
  * How far back a hand-made event still gets matched to a LiveRC meeting that appeared late — a
  * Friday event for the weekend, found again on Monday when the driver logs the Sunday runs.
  */
 export const LINK_LOOKBACK_DAYS = 3;
+
+/**
+ * The longest a LiveRC row can run and still be a meeting. Clubs keep rows that span years to copy
+ * from or export with: Indoor Raceway lists "Template Event Copy Only Do Not Use" and "All
+ * Drivers For Exporting All Details Only" as 2022 to 2030, which read as "on today" every day and
+ * stopped every hand-made meeting there from ever finding the real one (W3-04). The Sessions fold
+ * walks at most the same 14 days of a meeting.
+ */
+export const MAX_LIVERC_MEETING_DAYS = 14;
+
+/**
+ * A row spanning more than `MAX_LIVERC_MEETING_DAYS` is a placeholder, not a meeting: never
+ * offered, never "on today", never matched, joined or folded into.
+ */
+export function isLiveRcPlaceholder(row: { startYmd: string; endYmd: string }): boolean {
+  return addDaysToYmd(row.startYmd, MAX_LIVERC_MEETING_DAYS - 1) < row.endYmd;
+}
 
 /** Inclusive YYYY-MM-DD ranges share at least one day. */
 export function ymdRangesOverlap(
@@ -38,27 +62,52 @@ export type OfferedLiveRcMeeting = LiveRcEventListRow & {
 };
 
 /**
- * The meetings worth offering in the event list: on today, or starting within the next
- * `aheadDays`. On today first, then soonest. A meeting the page lists twice is offered once.
+ * The meetings worth offering in the event list: on today, starting within the next `aheadDays`,
+ * or finished within the last `behindDays`. On today first, then soonest, then the most recent
+ * past one. A meeting the page lists twice is offered once; a placeholder never.
  */
 export function offeredLiveRcMeetings(
   rows: readonly LiveRcEventListRow[],
   todayYmd: string,
   aheadDays: number = TRACK_EVENTS_AHEAD_DAYS,
+  behindDays: number = TRACK_EVENTS_BEHIND_DAYS,
 ): OfferedLiveRcMeeting[] {
   const horizon = addDaysToYmd(todayYmd, aheadDays);
+  const since = addDaysToYmd(todayYmd, -behindDays);
   const seen = new Set<string>();
   const out: OfferedLiveRcMeeting[] = [];
   for (const row of rows) {
-    if (seen.has(row.eventId)) continue;
-    if (!ymdRangesOverlap(row.startYmd, row.endYmd, todayYmd, horizon)) continue;
+    if (seen.has(row.eventId) || isLiveRcPlaceholder(row)) continue;
+    if (!ymdRangesOverlap(row.startYmd, row.endYmd, since, horizon)) continue;
     seen.add(row.eventId);
     out.push({ ...row, onToday: row.startYmd <= todayYmd && row.endYmd >= todayYmd });
   }
+  const past = (m: OfferedLiveRcMeeting) => m.endYmd < todayYmd;
   return out.sort((a, b) => {
     if (a.onToday !== b.onToday) return a.onToday ? -1 : 1;
+    if (past(a) !== past(b)) return past(a) ? 1 : -1;
+    if (past(a)) return b.endYmd.localeCompare(a.endYmd) || a.name.localeCompare(b.name);
     return a.startYmd.localeCompare(b.startYmd) || a.name.localeCompare(b.name);
   });
+}
+
+/**
+ * LiveRC's meetings that share a day with `startYmd`–`endYmd`, earliest first, each once, never a
+ * placeholder. What the New event form points to before a driver makes their own copy (W1-10).
+ */
+export function liveRcMeetingsOnDays(
+  rows: readonly LiveRcEventListRow[],
+  startYmd: string,
+  endYmd: string,
+): LiveRcEventListRow[] {
+  const byId = new Map<string, LiveRcEventListRow>();
+  for (const row of rows) {
+    if (byId.has(row.eventId) || isLiveRcPlaceholder(row)) continue;
+    if (ymdRangesOverlap(row.startYmd, row.endYmd, startYmd, endYmd)) byId.set(row.eventId, row);
+  }
+  return [...byId.values()].sort(
+    (a, b) => a.startYmd.localeCompare(b.startYmd) || a.name.localeCompare(b.name),
+  );
 }
 
 /**
@@ -69,6 +118,7 @@ export function offeredLiveRcMeetings(
  * (a Mini-Z round beside the off-road club race) or listed one meeting twice (SA State Titles
  * 2026, listed as "Sep 11" and again as "Sep 12 to Sep 13") — guessing there could file a
  * driver's runs under the wrong meeting, so the event is left alone and the driver can pick.
+ * Placeholder rows spanning years are not meetings and never count as a second candidate.
  */
 export function liveRcMeetingForEvent(
   event: { startYmd: string; endYmd: string },
@@ -76,6 +126,7 @@ export function liveRcMeetingForEvent(
 ): LiveRcEventListRow | null {
   const byId = new Map<string, LiveRcEventListRow>();
   for (const row of rows) {
+    if (isLiveRcPlaceholder(row)) continue;
     if (ymdRangesOverlap(row.startYmd, row.endYmd, event.startYmd, event.endYmd)) {
       byId.set(row.eventId, row);
     }

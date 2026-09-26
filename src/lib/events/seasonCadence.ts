@@ -49,6 +49,30 @@ export function addDays(ymd: string, n: number): string {
   return new Date(utcOf(ymd).getTime() + n * 86_400_000).toISOString().slice(0, 10);
 }
 
+/**
+ * The day a run counts on for the season figures: its own, unless it is on a meeting and dated
+ * after that meeting ended — a past meeting logged later carries the day it was logged, so its
+ * runs landed in this year's venue records while the meeting sat in last year's (test drive
+ * 2026-09-26, W3-08). Those count on the meeting's first day. A practice run the day before a
+ * meeting, attached to it, keeps its own day.
+ */
+export function seasonDayOfRun(
+  runYmd: string,
+  meeting: { startYmd: string; endYmd: string } | null | undefined,
+): string {
+  return meeting && runYmd > meeting.endYmd ? meeting.startYmd : runYmd;
+}
+
+/**
+ * Runs at the venue before this day count as having run there, for the next meeting's card:
+ * the meeting's first day while it is still ahead, and the end of today once it has started, so
+ * runs already logged at it count (W1-23: day two of a driver's first meeting at a club still
+ * read "first visit").
+ */
+export function venueHistoryCutoffYmd(meeting: { startYmd: string }, todayYmd: string): string {
+  return meeting.startYmd > todayYmd ? meeting.startYmd : addDays(todayYmd, 1);
+}
+
 export function buildCadenceRead(allEvents: SeasonEventRow[], todayYmd: string): CadenceRead {
   const past = allEvents
     .filter((e) => e.status === "logged")

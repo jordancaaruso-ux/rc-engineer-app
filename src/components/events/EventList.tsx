@@ -8,10 +8,11 @@ import { cn } from "@/lib/utils";
 import { Eyebrow, HubRowTitle } from "@/components/ui/panel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { CollapsibleAddRow } from "@/components/assets/CollapsibleAddRow";
-import { formatEventDate } from "@/lib/formatDate";
+import { eventDateToYmd } from "@/lib/eventDateParse";
 import { formatLap } from "@/lib/runLaps";
 import { splitEventsForPicker } from "@/lib/events/splitEventsForPicker";
 import { EventAddForm, type TrackOption } from "@/components/events/EventAddForm";
+import { formatEventDateRange } from "@/components/events/EventDateRangeField";
 
 export type EventListItem = {
   id: string;
@@ -49,8 +50,8 @@ async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
   return data as T;
 }
 
-function splitEvents(events: EventListItem[]) {
-  return splitEventsForPicker(events);
+function splitEvents(events: EventListItem[], todayYmd?: string) {
+  return splitEventsForPicker(events, todayYmd);
 }
 
 /**
@@ -136,10 +137,12 @@ function EventSectionRows({
                     ) : null}
                   </span>
                 )}
+                {/* Calendar days, printed the way the meeting's own page prints them. A meeting's
+                    dates are days stored at UTC noon; formatted as instants in the phone's zone
+                    they read a day late in New Zealand, and the server's render disagreed with
+                    the phone's (test drive 2026-09-26, W2-05). */}
                 <span>
-                  {formatEventDate(ev.startDate)}
-                  {new Date(ev.endDate).getTime() !== new Date(ev.startDate).getTime() &&
-                    ` – ${formatEventDate(ev.endDate)}`}
+                  {formatEventDateRange(eventDateToYmd(ev.startDate), eventDateToYmd(ev.endDate))}
                 </span>
               </div>
               <EventEvidence stats={stats[ev.id]} />
@@ -159,11 +162,18 @@ export function EventList({
   tracks,
   favouriteTrackIds = [],
   stats = {},
+  todayYmd,
 }: {
   initialEvents: EventListItem[];
   tracks: TrackOption[];
   favouriteTrackIds?: string[];
   stats?: EventListStats;
+  /**
+   * Today in the driver's zone, from the server. Handed down rather than read off each clock:
+   * the server's (UTC) and the phone's disagree for half of a New Zealand day, and a meeting
+   * ending that day then sat under Upcoming on one and Past on the other.
+   */
+  todayYmd?: string;
 }) {
   const pathname = usePathname();
   const [events, setEvents] = useState<EventListItem[]>(initialEvents);
@@ -173,7 +183,7 @@ export function EventList({
   const [favouriteIds, setFavouriteIds] = useState<string[]>(favouriteTrackIds);
   const [addOpen, setAddOpen] = useState(false);
 
-  const { upcoming, past } = useMemo(() => splitEvents(events), [events]);
+  const { upcoming, past } = useMemo(() => splitEvents(events, todayYmd), [events, todayYmd]);
 
   /**
    * Same dataset as Log your run: user-scoped GET /api/tracks, refetched whenever user lands

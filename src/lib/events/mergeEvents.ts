@@ -2,6 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { findEventByTrackAndResultsUrl } from "@/lib/events/findEventForLiveRc";
 
 /**
+ * Where a merged-away meeting went, noted per driver who was on it: an `AppSetting` row keyed
+ * `eventMergedInto:<old id>` holding the id it joined. The old page reads it to send them on
+ * (test drive 2026-09-26, W1-11: a meeting that joined LiveRC's left its old address blank).
+ */
+const MERGED_INTO_KEY_PREFIX = "eventMergedInto:";
+
+/**
  * When setting resultsSourceUrl on an event, merge into an existing global row if one
  * already exists for the same track + LiveRC hub. Returns the surviving event id.
  */
@@ -24,7 +31,14 @@ export async function mergeEvents(input: { winnerId: string; loserId: string }):
   const { winnerId, loserId } = input;
   if (winnerId === loserId) return;
 
-  await prisma.$transaction(async (tx) => {
+  const driversOnLoser = await prisma.$transaction(async (tx) => {
+    // Who could open the loser's page (a participation row or a run), read before it goes.
+    const runOwners = await tx.run.findMany({
+      where: { eventId: loserId },
+      distinct: ["userId"],
+      select: { userId: true },
+    });
+
     await tx.run.updateMany({
       where: { eventId: loserId },
       data: { eventId: winnerId },
@@ -98,5 +112,45 @@ export async function mergeEvents(input: { winnerId: string; loserId: string }):
 
     await tx.eventParticipation.deleteMany({ where: { eventId: loserId } });
     await tx.event.delete({ where: { id: loserId } });
+    return [...new Set([...loserParts.map((p) => p.userId), ...runOwners.map((r) => r.userId)])];
   });
+
+  await rememberMergedEvent(driversOnLoser, loserId, winnerId);
+}
+
+/** Best effort, after the merge: a failure here only costs the old page its forwarding. */
+async function rememberMergedEvent(userIds: string[], loserId: string, winnerId: string) {
+  if (userIds.length === 0) return;
+  const key = `${MERGED_INTO_KEY_PREFIX}${loserId}`;
+  try {
+    await prisma.appSetting.createMany({
+      data: userIds.map((userId) => ({ userId, key, value: winnerId })),
+      skipDuplicates: true,
+    });
+  } catch (err) {
+    console.warn("[mergeEvents] could not note where the meeting went", loserId, err);
+  }
+}
+
+/**
+ * The meeting a merged-away one joined, as noted for this driver, following any later merge; null
+ * when nothing was noted or that one is gone too. The caller still checks the driver can open it.
+ */
+export async function findMergedEventFor(userId: string, eventId: string): Promise<string | null> {
+  let id = eventId;
+  try {
+    for (let hop = 0; hop < 4; hop += 1) {
+      const note = await prisma.appSetting.findUnique({
+        where: { userId_key: { userId, key: `${MERGED_INTO_KEY_PREFIX}${id}` } },
+        select: { value: true },
+      });
+      if (!note?.value) return null;
+      id = note.value;
+      const survivor = await prisma.event.findUnique({ where: { id }, select: { id: true } });
+      if (survivor) return survivor.id;
+    }
+  } catch (err) {
+    console.warn("[mergeEvents] could not read where the meeting went", eventId, err);
+  }
+  return null;
 }

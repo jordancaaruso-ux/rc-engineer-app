@@ -11,6 +11,8 @@ import {
   type InlineNewTrackRowHandle,
 } from "@/components/runs/InlineNewTrackRow";
 import { EventDateRangeField } from "@/components/events/EventDateRangeField";
+import { localTodayYmd } from "@/components/ui/DayRangeCalendar";
+import type { TrackListLiveRcMeeting } from "@/lib/events/trackEventGroups";
 
 export type TrackOption = {
   id: string;
@@ -24,6 +26,26 @@ export type TrackOption = {
   gripTags?: string[];
   layoutTags?: string[];
 };
+
+/** LiveRC's meetings at a track on some days (`GET /api/events/at-track`). Never links anything. */
+async function fetchLiveRcOnDays(
+  trackId: string,
+  startYmd: string,
+  endYmd: string
+): Promise<TrackListLiveRcMeeting[]> {
+  const q = new URLSearchParams({ trackId, start: startYmd, end: endYmd });
+  const res = await fetch(`/api/events/at-track?${q}`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const data = (await res.json().catch(() => ({}))) as { meetings?: TrackListLiveRcMeeting[] };
+  return Array.isArray(data.meetings) ? data.meetings : [];
+}
+
+/** Messages that report something done, drawn in the success ink. */
+const DONE_MESSAGES = new Set([
+  "Event created.",
+  "Joined LiveRC’s meeting.",
+  "You already have this meeting.",
+]);
 
 /**
  * The create-an-event form, lifted out of `EventList` unchanged so the desktop page can
@@ -108,6 +130,87 @@ export function EventAddForm({
   /** No track chosen yet is also a no: a timing URL guessed before the venue is guesswork. */
   const showTimingUrlFields = Boolean(selectedTrack) && !trackTimingLink;
 
+  /**
+   * The days the meeting will be made for. Untouched dates mean today on the device's own
+   * calendar, never `toISOString()`'s, which is still yesterday at 8 am in Australia.
+   */
+  const daysStart = startDate || localTodayYmd();
+  const daysEnd = endDate || daysStart;
+
+  /**
+   * LiveRC's meetings at the picked track on the picked days (test drive 2026-09-26, W1-10: a
+   * driver made their own "EMCC Cup" beside LiveRC's and nothing pointed them to it). While there
+   * is one, the form offers it first, the way an add-track form offers the club already here, and
+   * "No, make my own" brings Create back for those days. Asked only for a track with a LiveRC page.
+   */
+  const liveRcKey = selectedTrack?.liveRcUrl?.trim() ? `${trackId}|${daysStart}|${daysEnd}` : "";
+  const [liveRcAnswer, setLiveRcAnswer] = useState<{ key: string; meetings: TrackListLiveRcMeeting[] }>({
+    key: "",
+    meetings: [],
+  });
+  const [ownMeetingKey, setOwnMeetingKey] = useState<string | null>(null);
+  const liveRcOffer =
+    liveRcKey && liveRcAnswer.key === liveRcKey && ownMeetingKey !== liveRcKey ? liveRcAnswer.meetings : [];
+
+  useEffect(() => {
+    if (!liveRcKey || liveRcAnswer.key === liveRcKey) return;
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      fetchLiveRcOnDays(trackId, daysStart, daysEnd)
+        .then((meetings) => {
+          if (alive) setLiveRcAnswer({ key: liveRcKey, meetings });
+        })
+        .catch(() => {});
+    }, 300);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [liveRcKey, liveRcAnswer.key, trackId, daysStart, daysEnd]);
+
+  function resetForm() {
+    setName("");
+    setTrackId("");
+    setStartDate("");
+    setEndDate("");
+    setNotes("");
+    setPracticeSourceUrl("");
+    setResultsSourceUrl("");
+  }
+
+  /** "Use that one": join LiveRC's meeting, or make its event if nobody has picked it yet. */
+  async function joinLiveRcMeeting(meeting: TrackListLiveRcMeeting) {
+    setMessage(null);
+    setAdding(true);
+    try {
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: meeting.name,
+          trackId,
+          startDate: meeting.startYmd,
+          endDate: meeting.endYmd,
+          resultsSourceUrl: meeting.hubUrl,
+          notes: notes.trim() || null,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { event?: unknown; error?: string };
+      // 409 is the usual answer: another driver already picked LiveRC's meeting, and this joined it.
+      if (!(res.ok || res.status === 409) || !data.event) {
+        throw new Error(data.error ?? `Request failed (${res.status})`);
+      }
+      onCreated?.(data.event);
+      resetForm();
+      setMessage("Joined LiveRC’s meeting.");
+      router.refresh();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Couldn’t join that meeting");
+    } finally {
+      setAdding(false);
+    }
+  }
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
@@ -122,8 +225,17 @@ export function EventAddForm({
     setMessage(null);
     setAdding(true);
     try {
-      const start = startDate || new Date().toISOString().slice(0, 10);
-      const end = endDate || start;
+      // Never make a copy of LiveRC's meeting blind: a fast Create first shows the one there.
+      if (liveRcKey && ownMeetingKey !== liveRcKey) {
+        const meetings =
+          liveRcAnswer.key === liveRcKey
+            ? liveRcAnswer.meetings
+            : await fetchLiveRcOnDays(trackId, daysStart, daysEnd).catch(() => []);
+        setLiveRcAnswer({ key: liveRcKey, meetings });
+        if (meetings.length > 0) return;
+      }
+      const start = daysStart;
+      const end = daysEnd;
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,6 +256,7 @@ export function EventAddForm({
         event?: unknown;
         error?: string;
         existingEventId?: string;
+        reused?: boolean;
       };
       if (res.status === 409 && data.event) {
         onCreated?.(data.event);
@@ -155,14 +268,9 @@ export function EventAddForm({
         throw new Error(data.error ?? `Request failed (${res.status})`);
       }
       onCreated?.((data as { event: unknown }).event);
-      setName("");
-      setTrackId("");
-      setStartDate("");
-      setEndDate("");
-      setNotes("");
-      setPracticeSourceUrl("");
-      setResultsSourceUrl("");
-      setMessage("Event created.");
+      resetForm();
+      // The server hands back the one you already made with this name, track and days (W2-14).
+      setMessage(data.reused ? "You already have this meeting." : "Event created.");
       router.refresh();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to create event");
@@ -228,6 +336,32 @@ export function EventAddForm({
         }}
         triggerClassName="rounded-md border border-border bg-card"
       />
+      {liveRcOffer.length > 0 ? (
+        <div className="inset-panel-deep space-y-2 px-3 py-2.5">
+          {liveRcOffer.map((meeting) => (
+            <div key={meeting.hubUrl} className="space-y-1.5">
+              <p className="text-sm text-foreground">
+                LiveRC already has “{meeting.name}” on these days.
+              </p>
+              <button
+                type="button"
+                disabled={adding}
+                onClick={() => void joinLiveRcMeeting(meeting)}
+                className="max-w-full truncate rounded-lg primary-face bg-primary px-2.5 py-1.5 text-[11.5px] font-semibold text-primary-foreground transition hover:brightness-105 disabled:opacity-50"
+              >
+                {adding ? "Joining…" : "Use that one"}
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setOwnMeetingKey(liveRcKey)}
+            className="px-1 py-1.5 text-[11.5px] font-semibold text-foreground underline underline-offset-2"
+          >
+            No, make my own
+          </button>
+        </div>
+      ) : null}
       <div>
         <label className="block text-[11px] text-muted-foreground mb-1">Notes (optional)</label>
         <input
@@ -287,21 +421,24 @@ export function EventAddForm({
         <p className="mt-1 text-[11px] text-muted-foreground">Results come in as a file — this is where Import PDF sends you.</p>
       </div>
       <div className="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={adding || !trackId.trim()}
-          className={cn(
-            buttonLinkClassName("primary"),
-            (adding || !trackId.trim()) && "opacity-70 pointer-events-none"
-          )}
-        >
-          {adding ? "Creating…" : "Create event"}
-        </button>
+        {/* While LiveRC's meeting is offered above, a new one takes "No, make my own" first. */}
+        {liveRcOffer.length > 0 ? null : (
+          <button
+            type="submit"
+            disabled={adding || !trackId.trim()}
+            className={cn(
+              buttonLinkClassName("primary"),
+              (adding || !trackId.trim()) && "opacity-70 pointer-events-none"
+            )}
+          >
+            {adding ? "Creating…" : "Create event"}
+          </button>
+        )}
         {message && (
           <span
             className={cn(
               "text-xs",
-              message === "Event created." ? "text-primary-ink" : "text-muted-foreground"
+              DONE_MESSAGES.has(message) ? "text-primary-ink" : "text-muted-foreground"
             )}
           >
             {message}
