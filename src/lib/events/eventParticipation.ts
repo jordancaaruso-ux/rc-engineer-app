@@ -6,7 +6,7 @@ import {
   resolveEventTrackLabel,
 } from "@/lib/tracks/legacyTrackSnapshot";
 import {
-  resolveSessionGroupKeys,
+  meetingIdByRunId,
   type MeetingForGrouping,
   type RunGroupZoneOptions,
 } from "@/lib/runs/buildRunHistoryGroups";
@@ -253,6 +253,30 @@ export async function loadMeetingsForGrouping(input: {
 const MEETING_FOLD_REACH_MS = 15 * 24 * 60 * 60 * 1000;
 
 /**
+ * A run as the meeting fold reads it (`meetingIdByRunId`). One select for every count of a
+ * meeting's runs (its page, the Events list), so the reads can't drift apart.
+ */
+export const MEETING_FOLD_RUN_SELECT = {
+  id: true,
+  userId: true,
+  eventId: true,
+  createdAt: true,
+  sortAt: true,
+  localTimeZone: true,
+  trackNameSnapshot: true,
+  track: { select: { name: true } },
+  event: {
+    select: {
+      name: true,
+      startDate: true,
+      endDate: true,
+      trackNameSnapshot: true,
+      track: { select: { name: true } },
+    },
+  },
+} as const;
+
+/**
  * How many of this driver's own runs sit in the meeting: the ones picked for it and the ones at
  * its track on its days that were left on "Testing" (approved rule; W1-07: a club day's page read
  * "0 runs linked" beside the four raced there that day). Decided by the fold Sessions groups by,
@@ -273,32 +297,13 @@ export async function countMyRunsInMeeting(input: {
         OR: [{ eventId: input.event.id }, { sortAt: { gte: from, lte: to } }],
       },
       take: 2000,
-      select: {
-        id: true,
-        userId: true,
-        eventId: true,
-        createdAt: true,
-        sortAt: true,
-        localTimeZone: true,
-        trackNameSnapshot: true,
-        track: { select: { name: true } },
-        event: {
-          select: {
-            name: true,
-            startDate: true,
-            endDate: true,
-            trackNameSnapshot: true,
-            track: { select: { name: true } },
-          },
-        },
-      },
+      select: MEETING_FOLD_RUN_SELECT,
     }),
     loadMeetingsForGrouping({ userId: input.userId, from, to }),
   ]);
-  const key = `event-${input.event.id}`;
   let count = 0;
-  for (const k of resolveSessionGroupKeys(runs, input.zones, meetings).values()) {
-    if (k === key) count += 1;
+  for (const eventId of meetingIdByRunId(runs, input.zones, meetings).values()) {
+    if (eventId === input.event.id) count += 1;
   }
   return count;
 }

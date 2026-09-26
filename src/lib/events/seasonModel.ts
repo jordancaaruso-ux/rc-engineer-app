@@ -33,7 +33,8 @@ import {
   resolveEventTrackLocation,
   resolveEventTrackName,
 } from "@/lib/tracks/legacyTrackSnapshot";
-import { eventIdsInScopeForUser } from "@/lib/events/eventParticipation";
+import { eventIdsInScopeForUser, MEETING_FOLD_RUN_SELECT } from "@/lib/events/eventParticipation";
+import { meetingIdByRunId } from "@/lib/runs/buildRunHistoryGroups";
 import {
   addDays,
   buildCadenceRead,
@@ -70,6 +71,11 @@ function yearOf(ymd: string): number {
 
 type RunFacts = {
   eventId: string | null;
+  /**
+   * The meeting the run sits in: the one picked for it, or the one at its track on its days
+   * (`meetingIdByRunId`). What a meeting's runs and best lap are read from.
+   */
+  meetingId: string | null;
   trackId: string | null;
   /** Calendar day the run counts as, UTC — the axis every aggregate buckets on. */
   ymd: string;
@@ -89,11 +95,13 @@ export async function loadEventsSeasonModel(input: {
   todayYmd: string;
   /** The viewer's IANA timezone — every run's calendar day is taken in it, never in UTC. */
   timeZone: string;
-}): Promise<EventsSeasonModel> {
+  /** The driver's account zone (`User.timeZone`): a run logged before runs kept their own zone is read in it. */
+  userTimeZone?: string | null;
+}): Promise<EventsSeasonModel & { allEvents: SeasonEventRow[] }> {
   const todayYmd = input.todayYmd;
   const scopedIds = await eventIdsInScopeForUser(input.userId);
 
-  const [eventRows, runRows, openTestPlanCount] = await Promise.all([
+  const [eventRows, runRows, openTestPlanCount, foldRuns] = await Promise.all([
     scopedIds.length
       ? prisma.event.findMany({
           where: { id: { in: scopedIds } },
@@ -115,6 +123,7 @@ export async function loadEventsSeasonModel(input: {
       orderBy: { sortAt: "desc" },
       take: RUN_SCAN_CAP,
       select: {
+        id: true,
         eventId: true,
         trackId: true,
         createdAt: true,
@@ -133,7 +142,32 @@ export async function loadEventsSeasonModel(input: {
     prisma.actionItem.count({
       where: { userId: input.userId, listKind: "THINGS_TO_TRY", isArchived: false, isCompleted: false },
     }),
+    // Every run of the driver's, finished or not, as the meeting fold reads them: the same runs
+    // a meeting's own page counts (`countMyRunsInMeeting`). No lap data, so the cap costs little.
+    prisma.run.findMany({
+      where: { userId: input.userId },
+      orderBy: { sortAt: "desc" },
+      take: RUN_SCAN_CAP,
+      select: MEETING_FOLD_RUN_SELECT,
+    }),
   ]);
+
+  /* Which meeting each run sits in, and how many runs each meeting holds: the ones picked for it
+     and the ones at its track on its days left on "Testing", by the rule the meeting's page and
+     Sessions use. The list counted only finished runs picked for the meeting, so Henry's club day
+     read 4 runs on its page and nothing here (test drive 2026-09-26). The driver's own runs only. */
+  const meetingOfRun = meetingIdByRunId(
+    foldRuns,
+    {
+      ownerTimeZoneByUserId: { [input.userId]: input.userTimeZone ?? null },
+      viewerTimeZone: input.timeZone,
+    },
+    eventRows,
+  );
+  const runCountByMeeting = new Map<string, number>();
+  for (const meetingId of meetingOfRun.values()) {
+    runCountByMeeting.set(meetingId, (runCountByMeeting.get(meetingId) ?? 0) + 1);
+  }
 
   /* A meeting's days, for runs on it: every run's meeting is in scope, because a run is
      one of the things that puts a meeting there (`eventIdsInScopeForUser`). */
@@ -150,6 +184,8 @@ export async function loadEventsSeasonModel(input: {
     const stored = typeof r.bestLapSeconds === "number" ? r.bestLapSeconds : null;
     return {
       eventId: r.eventId,
+      // A run past the fold's read (a driver with thousands) keeps the meeting picked for it.
+      meetingId: meetingOfRun.get(r.id) ?? r.eventId,
       trackId: r.trackId,
       // In the viewer's zone, not UTC: a Bayside evening run (22:33Z on 31 July) is 1 August
       // in Brisbane, and the venue record said "31 JUL" beside a Sessions list saying
@@ -190,10 +226,10 @@ export async function loadEventsSeasonModel(input: {
 
   const runsByEvent = new Map<string, RunFacts[]>();
   for (const r of runs) {
-    if (!r.eventId) continue;
-    const list = runsByEvent.get(r.eventId);
+    if (!r.meetingId) continue;
+    const list = runsByEvent.get(r.meetingId);
     if (list) list.push(r);
-    else runsByEvent.set(r.eventId, [r]);
+    else runsByEvent.set(r.meetingId, [r]);
   }
 
   /* Lifetime pace history per venue, oldest first — the running personal best that the
@@ -247,7 +283,8 @@ export async function loadEventsSeasonModel(input: {
          old `Planned` badge, which described whether a LiveRC URL was pasted and so read
          `Planned` on a club day raced three months ago. */
       status: endYmd >= todayYmd ? "booked" : "logged",
-      runCount: eventRuns.length,
+      // Finished or not, as the meeting's page counts them; the best lap is off the finished ones.
+      runCount: runCountByMeeting.get(e.id) ?? eventRuns.length,
       bestLapSeconds,
       vsVenueSeconds:
         bestLapSeconds != null && priorBest != null ? bestLapSeconds - priorBest : null,
@@ -407,5 +444,8 @@ export async function loadEventsSeasonModel(input: {
     nextUp,
     cadence,
     todayYmd,
+    // Every season's rows, for the phone list: it has no year switch, and a meeting outside the
+    // timeline's year showed no runs beside a page that counted them.
+    allEvents,
   };
 }
