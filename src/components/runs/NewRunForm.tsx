@@ -524,6 +524,16 @@ type NewRunDraftSnapshot = {
   setupData: SetupSnapshotData;
   setupBaselineSnapshotId: string | null;
   setupBaselineData: SetupSnapshotData | null;
+  /**
+   * The Setup step's source tab, and the run or saved setup picked on it. Without them a restored
+   * draft kept a saved setup's values but showed "Previous runs" (test drive 2026-09-26).
+   * Optional: older drafts don't have them.
+   */
+  setupSource?: SetupSource;
+  loadSetupSelection?: string;
+  loadOtherSetupSelection?: string;
+  /** That source was chosen for this car (`setupSourceChosenForRef`), so the landing default stays out. */
+  setupSourceChosen?: boolean;
   lapIngest: LapIngestFormValue;
   notes: string;
   raceClass: string;
@@ -1745,6 +1755,14 @@ export function NewRunForm(props: {
         if (s.setupBaselineSnapshotId !== undefined)
           setSetupBaselineSnapshotId(s.setupBaselineSnapshotId);
         if (s.setupBaselineData !== undefined) setSetupBaselineData(s.setupBaselineData);
+        // The tab the setup came from, with it — not "Previous runs" over a saved setup's values.
+        if (s.setupSource === "previous_runs" || s.setupSource === "other" || s.setupSource === "new") {
+          setSetupSource(s.setupSource);
+          if (s.setupSourceChosen && s.carId) setupSourceChosenForRef.current = s.carId;
+        }
+        if (typeof s.loadSetupSelection === "string") setLoadSetupSelection(s.loadSetupSelection);
+        if (typeof s.loadOtherSetupSelection === "string")
+          setLoadOtherSetupSelection(s.loadOtherSetupSelection);
         if (s.lapIngest) setLapIngest(s.lapIngest);
         if (typeof s.notes === "string") setNotes(s.notes);
         if (typeof s.raceClass === "string") setRaceClass(s.raceClass);
@@ -1792,6 +1810,10 @@ export function NewRunForm(props: {
       setupData,
       setupBaselineSnapshotId,
       setupBaselineData,
+      setupSource,
+      loadSetupSelection,
+      loadOtherSetupSelection,
+      setupSourceChosen: Boolean(carId) && setupSourceChosenForRef.current === carId,
       lapIngest,
       notes,
       raceClass,
@@ -1843,6 +1865,9 @@ export function NewRunForm(props: {
     setupData,
     setupBaselineSnapshotId,
     setupBaselineData,
+    setupSource,
+    loadSetupSelection,
+    loadOtherSetupSelection,
     lapIngest,
     notes,
     raceClass,
