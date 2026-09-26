@@ -35,3 +35,20 @@ export function setupChangesSinceLoaded(
     (r) => r.changed && !isRunContextSetupKey(r.key) && !isDerivedSetupKey(r.key)
   );
 }
+
+/**
+ * Does the run's setup hold an edit that has not been saved? What the yellow "Save to this run"
+ * beside the sheet asks.
+ *
+ * It used to appear on the first touch of a box and stay: changing Anti Roll Bar (Front) 1.3 → 1.4
+ * and back cleared the change badge but left the button up (test drive 2026-09-26). It now asks
+ * the badge's question — compared as stored, so a box put back is no change — against the setup
+ * the server holds: as last saved, or as loaded before any save. With neither (a new blank sheet),
+ * every filled box is unsaved.
+ */
+export function setupHasUnsavedChanges(
+  current: SetupSnapshotData,
+  savedOrLoaded: SetupSnapshotData | null
+): boolean {
+  return setupChangesSinceLoaded(current, savedOrLoaded ?? {}).length > 0;
+}

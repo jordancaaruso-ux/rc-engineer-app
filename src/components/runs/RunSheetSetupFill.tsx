@@ -53,6 +53,7 @@ export function RunSheetSetupFill({
   seedSnapshotId,
   onValues,
   onSaveToRun,
+  unsavedChanges,
   canSave,
   saving,
   saveSuccess,
@@ -85,6 +86,12 @@ export function RunSheetSetupFill({
    * sheet's always-focused input holds the keyboard, so this row is the visible save.
    */
   onSaveToRun: () => void;
+  /**
+   * The run's setup differs from what was last saved (or loaded, before any save), compared as
+   * stored — the host's `setupHasUnsavedChanges`. A touch alone is not an edit: changing a box and
+   * putting it back left "Save to this run" up with nothing to save (test drive 2026-09-26).
+   */
+  unsavedChanges: boolean;
   canSave: boolean;
   saving: boolean;
   saveSuccess: boolean;
@@ -133,8 +140,9 @@ export function RunSheetSetupFill({
    */
   const [openedFrom, setOpenedFrom] = useState<Record<string, string>>(seedValues);
   /**
-   * Edits since the last successful save — what makes "Save to this run" appear. The surface
-   * skips its mount echo, so the first `handleChange` really is a driver touching a box.
+   * Touched since the last successful save — with `unsavedChanges`, what makes "Save to this run"
+   * appear. The surface skips its mount echo, so the first `handleChange` really is a driver
+   * touching a box.
    */
   const [dirtySinceSave, setDirtySinceSave] = useState(false);
   /*
@@ -247,8 +255,10 @@ export function RunSheetSetupFill({
    */
   const countLabel = `${filled} ${filled === 1 ? "box" : "boxes"} filled on ${chassisName}`;
 
-  /* The save cue stays up through its own feedback: edits pending, saving, or the saved beat. */
-  const showSave = dirtySinceSave || saving || justSaved;
+  /* The save cue stays up through its own feedback: edits pending, saving, or the saved beat. An
+     edit is pending only while the setup still differs; putting the box back takes it away. */
+  const pending = dirtySinceSave && unsavedChanges;
+  const showSave = pending || saving || justSaved;
 
   return (
     <div className="space-y-2">
@@ -265,7 +275,7 @@ export function RunSheetSetupFill({
                 "px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-60"
               )}
             >
-              {saving ? "Saving…" : dirtySinceSave ? "Save to this run" : "Saved ✓"}
+              {saving ? "Saving…" : pending ? "Save to this run" : "Saved ✓"}
             </button>
           ) : null}
           {open ? (

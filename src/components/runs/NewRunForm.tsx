@@ -22,7 +22,7 @@ import {
 } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { chassisValueCount, setupHasChassisValue } from "@/lib/setup/runContextSetupKeys";
-import { setupChangesSinceLoaded } from "@/lib/setup/setupChangesSinceLoaded";
+import { setupChangesSinceLoaded, setupHasUnsavedChanges } from "@/lib/setup/setupChangesSinceLoaded";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { RunSheetSetupFill } from "@/components/runs/RunSheetSetupFill";
 import { haptic } from "@/lib/haptics";
@@ -994,6 +994,11 @@ export function NewRunForm(props: {
   const [hasTeams, setHasTeams] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  /**
+   * The setup as the last "Save to this run" sent it. Null until one lands; until then the loaded
+   * setup (`setupBaselineData`) is what an edit is measured from. See `setupHasUnsavedEdits`.
+   */
+  const [setupAtLastSave, setSetupAtLastSave] = useState<SetupSnapshotData | null>(null);
   const [, startCopyTransition] = useTransition();
   const [status, setStatus] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -2079,6 +2084,15 @@ export function NewRunForm(props: {
     [setupData, setupBaselineData]
   );
   const setupChangeCountSinceBaseline = setupChangedRowsSinceBaseline.length;
+  /**
+   * Whether "Save to this run" beside the sheet has anything to save: the setup differs from what
+   * the last stay-save sent, or from what was loaded before one. Undoing an edit takes the button
+   * away again (test drive 2026-09-26: it stayed up after 1.3 → 1.4 → 1.3).
+   */
+  const setupHasUnsavedEdits = useMemo(
+    () => setupHasUnsavedChanges(setupData, setupAtLastSave ?? setupBaselineData),
+    [setupData, setupAtLastSave, setupBaselineData]
+  );
   /** Boxes on the run's setup that hold a value. Not the tyre the form writes in by itself:
    *  counting that ticked Setup and read "1 values" on runs with no setup at all. */
   const setupValueCount = useMemo(() => chassisValueCount(setupData), [setupData]);
@@ -3950,6 +3964,8 @@ export function NewRunForm(props: {
       }
       // A stay-save's minted run counts as "the run being edited" from then on — PUT, not POST.
       const effectiveEditId = editRun?.id ?? createdRunId;
+      // Held so a stay-save can remember exactly what it sent (`setupAtLastSave`).
+      const setupForSave = applyDerivedFieldsToSnapshot(setupData);
       const {
         run,
         tireStintId: savedStintId,
@@ -3996,7 +4012,7 @@ export function NewRunForm(props: {
           tireFitment: normalizeTireFitment(tireFitment),
           additiveTypeId: additiveTypeId || null,
           tirePrep: pruneTirePrepForSave(tirePrep),
-          setupData: applyDerivedFieldsToSnapshot(setupData),
+          setupData: setupForSave,
           setupBaselineSnapshotId,
           // Only an imported *document* has a document id. A library setup's option id is its
           // SetupSnapshot id, which must never be sent here — it would be written to
@@ -4151,6 +4167,8 @@ export function NewRunForm(props: {
       // a restored classic-mode draft updates this run instead of minting a twin). The chip
       // beside the sheet renders the "Saved ✓" beat; the haptic is the only other telling.
       if (opts?.stay) {
+        // What the run now holds, so "Save to this run" measures later edits from here.
+        setSetupAtLastSave(setupForSave);
         haptic("success");
         void todayDraftCtx?.refreshDraft();
         return;
@@ -6106,6 +6124,7 @@ export function NewRunForm(props: {
                 onSaveToRun={() =>
                   saveRun(undefined, editingCompletedRun ? "completed" : "draft", { stay: true })
                 }
+                unsavedChanges={setupHasUnsavedEdits}
                 canSave={canSave}
                 saving={saving}
                 saveSuccess={saveSuccess}
