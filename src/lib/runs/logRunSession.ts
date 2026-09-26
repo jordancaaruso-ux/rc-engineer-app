@@ -9,6 +9,7 @@
  * copy saved read "Race · Main" beside "Race" runs logged the same way.
  */
 import type { EntryCandidate } from "@/lib/runs/entryCandidate";
+import { defaultEventName } from "@/lib/events/liveRcMeetingMatch";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 
 export type UiSessionType = "PRACTICE" | "SEEDING" | "QUALIFYING" | "RACE" | "TESTING";
@@ -78,4 +79,24 @@ export function meetingSessionKind(
     meetingSessionType: meetingSessionType || "PRACTICE",
     sessionLabel: sessionLabel ?? null,
   });
+}
+
+// ---- The New event form's filled-in name ----
+
+/**
+ * The New event form's name once its dates move: the filled-in "Track · Sat 26 Sep" follows the
+ * first day, and a name the driver typed stays theirs. Null means leave the box alone.
+ */
+export function followDateEventName(input: {
+  name: string;
+  /** The name the form filled in itself; null once the driver typed their own. */
+  autoName: string | null;
+  trackName: string;
+  startYmd: string;
+}): string | null {
+  if (!input.autoName || input.name !== input.autoName) return null;
+  const track = input.trackName.trim();
+  if (!track || !/^\d{4}-\d{2}-\d{2}$/.test(input.startYmd)) return null;
+  const next = defaultEventName(track, input.startYmd);
+  return next === input.name ? null : next;
 }

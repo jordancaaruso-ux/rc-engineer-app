@@ -94,6 +94,7 @@ import {
 } from "@/components/runs/InlineNewTrackRow";
 import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEntry";
 import {
+  followDateEventName,
   meetingSessionKind,
 } from "@/lib/runs/logRunSession";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
@@ -3399,7 +3400,8 @@ export function NewRunForm(props: {
       setNewEventName(name);
       newEventNameAutoRef.current = null;
     } else if (!keptTyped) {
-      const filled = trackName ? defaultEventName(trackName, today) : "";
+      // The dates already picked, if any, name it: reopening must not put today back.
+      const filled = trackName ? defaultEventName(trackName, newEventStartDate || today) : "";
       setNewEventName(filled);
       newEventNameAutoRef.current = filled || null;
     }
@@ -5215,6 +5217,18 @@ export function NewRunForm(props: {
                     setNewEventStartDate(next.startYmd);
                     setNewEventEndDate(next.endYmd);
                     setEventError(null);
+                    // The filled-in name follows the first day; a name the driver typed stays.
+                    const followed = followDateEventName({
+                      name: newEventName,
+                      autoName: newEventNameAutoRef.current,
+                      trackName:
+                        tracksList.find((t) => t.id === (trackId.trim() || newEventTrackId))?.name ?? "",
+                      startYmd: next.startYmd,
+                    });
+                    if (followed) {
+                      setNewEventName(followed);
+                      newEventNameAutoRef.current = followed;
+                    }
                   }}
                 />
                 {/* Only when the chosen track points at nothing: laps are found from the track,
