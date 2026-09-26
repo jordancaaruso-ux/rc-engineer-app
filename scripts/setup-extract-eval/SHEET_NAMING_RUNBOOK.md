@@ -76,6 +76,13 @@ under 0.8. The PetitRC number check (`scripts/tmp/petitrc-pull/petitrc-check.cjs
 numbers fit and none that contradict them. Its two Cat PB vetoes were a unit mix-up: drivers write diff
 oil in thousands ("20" for 20,000 cSt).
 
+Three of those four (Cat PB, XB2'26, MTC2R) had no `page6.png`, so their tiles were the 3x page enlarged;
+`sheet-prep` now draws the 6x page itself. **Yokomo MS2.0** (after the character-map fix, 6x tiles):
+8 helpers, 2.22M raw, 18 min; 47 of 95 named at 0.8 (49%): nearly every box with a printed caption,
+plus 4 spacer boxes on the drawings, all at exactly 0.8 (check those first). Left blank: most boxes that
+print only "mm" (spacers on the drawings), the unlabelled chassis-plan weights and the notes boxes.
+PetitRC check: 9 fit, 0 contradicted.
+
 ## The method (v3, 2026-09-23): name whole drawings, not single boxes
 
 Earlier versions cropped each box around itself. On sheets whose boxes print only "SHIMS" or "mm",
@@ -179,8 +186,10 @@ figure an Agent result reports.
 
 ## Known gaps
 
-- **Japanese sheets render without their words.** `src/lib/setupDocuments/pdfServerRaster.ts` passes
-  no `cMapUrl`, so CJK text drops (Yokomo MS2.0 came out as blank heading bars). Fix before naming them.
+- **Japanese sheets rendered without their words** until 2026-09-26 (7ccdc2cc): the renderer passed no
+  `cMapUrl`, so a font that needs a character map failed to load and every caption set in it dropped
+  (Yokomo MS2.0, Destiny RX-10FF, Yokomo MS1.0FWD, Mugen MTC2 FWD, G-Force Genova). Work folders
+  prepped before that fix hold the captionless picture; prep them again before naming.
 - **Page one only.** `parseBlankAcroFormGeometry` reads page 1 (1 of 232 catalogued sheets has two).
 - **Results stay in files.** Writing `ready.json` into the app, and the reviewed names, is still owed.
 - **Resume is by hand.** A block whose helper died needs that one helper run again; `assemble`

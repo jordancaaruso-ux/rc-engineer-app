@@ -8,8 +8,9 @@
  *   npx dotenv-cli -e .env.local -- node --conditions=react-server --import tsx \
  *     scripts/setup-extract-eval/sheet-prep.ts --name="Xray X4'26" --work=<dir> [--batch=8]
  *
- * Writes into <dir>/<slug>/: blank.pdf, page.png, page-grid.jpg (for the layout helper),
- * manifest.json, crops/, batch-01.json…, sheet.json (what the assemble step needs).
+ * Writes into <dir>/<slug>/: blank.pdf, page.png, page6.png (6x, what the close-up tiles and block
+ * pictures are cut from), page-grid.jpg (for the layout helper), manifest.json, crops/,
+ * batch-01.json…, sheet.json (what the assemble step needs).
  */
 import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -58,6 +59,9 @@ async function main() {
 
   const page = await renderPdfFirstPageToPng(new Uint8Array(pdfBytes), { scale: 3 });
   writeFileSync(join(dir, "page.png"), page);
+  // sheet-tiles.cjs falls back to page.png when this is missing, and a tile then shows the 3x page
+  // enlarged (2026-09-26: three sheets named that way); small print reads better from a real 6x.
+  writeFileSync(join(dir, "page6.png"), await renderPdfFirstPageToPng(new Uint8Array(pdfBytes), { scale: 6 }));
   const meta = await import("sharp").then((m) => m.default(page).metadata());
   const W = meta.width ?? 0, H = meta.height ?? 0;
   writeFileSync(join(dir, "page-grid.jpg"), await gridOverlayJpeg(page, W, H));
