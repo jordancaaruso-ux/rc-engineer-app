@@ -78,21 +78,22 @@ export function RunLayoutPicker({
     { value: "CCW", label: "CCW" },
   ];
 
+  // One row under the track (founder pick "B", 2026-09-26): the layout box or "Add layout", then CW
+  // and CCW, at the size of the Near me and New track chips above it. It was three lines, with the
+  // words Layout and Direction on lines of their own, for two small optional choices. "No layout"
+  // stays the first entry in the box, so a driver whose layout isn't listed just leaves it there
+  // (the founder's one worry). Tapping the lit direction again clears it, so the separate Clear went.
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className="text-[11px] font-medium text-muted-foreground">Layout</label>
-        {inheritedFromEvent && layoutId ? (
-          <span className="text-[10px] text-muted-foreground">From event</span>
-        ) : null}
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
       {layouts.length === 0 ? (
         loading ? (
           <p className="text-[11px] text-muted-foreground leading-snug">Loading layouts…</p>
         ) : (
+          // `.btn-surface`'s look spelled out: it is unlayered CSS, so its 6px corners would beat
+          // the 8px the chips beside it wear.
           <Link
             href={`/tracks/${encodeURIComponent(trackId)}`}
-            className="btn-surface inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px]"
+            className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-border bg-surface-runna px-3 text-xs text-muted-foreground transition hover:bg-surface-runna-inset hover:text-foreground"
             aria-label="Add a layout on the track page"
             title="Add a layout"
           >
@@ -122,39 +123,29 @@ export function RunLayoutPicker({
           value={layoutId}
           onChange={onLayoutChange}
           options={layouts.map((l) => ({ value: l.id, label: l.name }))}
+          className="h-8 min-w-0 flex-1 py-0 text-[13px]"
         />
       )}
-
-      <div className="flex items-center gap-2">
-        <span className="text-[11px] font-medium text-muted-foreground">Direction</span>
-        <div className="inline-flex gap-1">
-          {directions.map((d) => {
-            const active = direction === d.value;
-            return (
-              <button
-                key={d.value}
-                type="button"
-                disabled={disabled}
-                onClick={() => onDirectionChange(active ? "" : d.value)}
-                className={cn(chipToggleClass(active), "px-3 py-1.5 text-[11px]")}
-                aria-pressed={active}
-              >
-                {d.label}
-              </button>
-            );
-          })}
-        </div>
-        {direction ? (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onDirectionChange("")}
-            className="text-[10px] text-muted-foreground hover:text-foreground"
-          >
-            Clear
-          </button>
-        ) : null}
+      <div role="group" aria-label="Direction" className="flex gap-1.5">
+        {directions.map((d) => {
+          const active = direction === d.value;
+          return (
+            <button
+              key={d.value}
+              type="button"
+              disabled={disabled}
+              onClick={() => onDirectionChange(active ? "" : d.value)}
+              className={cn(chipToggleClass(active), "min-h-8 rounded-lg px-3 text-xs")}
+              aria-pressed={active}
+            >
+              {d.label}
+            </button>
+          );
+        })}
       </div>
+      {inheritedFromEvent && layoutId ? (
+        <span className="text-[11px] text-muted-foreground">From event</span>
+      ) : null}
     </div>
   );
 }
