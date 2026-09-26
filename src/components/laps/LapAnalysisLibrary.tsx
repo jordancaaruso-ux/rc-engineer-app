@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Eyebrow } from "@/components/ui/panel";
+import { PhoneFoldCard } from "@/components/ui/PhoneFoldCard";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { MyRcmPdfImportCard } from "@/components/runs/MyRcmPdfImportCard";
 import { ActionToast } from "@/components/ui/ActionToast";
@@ -45,6 +46,14 @@ const PAGE_SIZE = 20;
 const IMPORT_BUTTON =
   "tap-active shrink-0 rounded-md border border-transparent primary-face bg-primary px-3.5 py-2 text-[13px] font-semibold leading-5 text-primary-foreground transition hover:brightness-105 disabled:opacity-50";
 
+/**
+ * What the folded upload row names on a phone: the three sites whose results come in through it,
+ * as tags in the MyRCM card's own style (founder pick "B", 2026-09-26, over the same names as words).
+ */
+const TIMING_SITES = ["LiveRC", "Speedhive", "MyRCM"] as const;
+const SITE_TAG =
+  "shrink-0 rounded border border-border bg-surface-runna-inset px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-foreground/80";
+
 type ImportResultRow =
   | { url: string; success: true; importedSessionId: string }
   | { url: string; success: false; error: string };
@@ -63,9 +72,15 @@ type ImportResultRow =
  */
 export function LapAnalysisLibrary({
   eventId,
+  importOpen = false,
   importSlot = null,
 }: {
   eventId?: string | null;
+  /**
+   * The upload row starts open on a phone. The page asks for it when the account has nothing
+   * imported yet: there is no list to make room for, and the doors are the whole page.
+   */
+  importOpen?: boolean;
   /**
    * Rendered in the import column, under the two upload doors. It is another way to bring a
    * session in, so it belongs beside them — below the sessions list a driver with a hundred
@@ -290,66 +305,93 @@ export function LapAnalysisLibrary({
     await runImport(urls);
   }
 
+  /*
+   * MyRCM has no link we may fetch, so its results arrive as the PDF the driver
+   * downloads. That door used to exist only inside the log-run wizard, which meant
+   * reading a MyRCM race you watched required pretending you had driven a run — the
+   * exact backwards-ness this page exists to undo.
+   *
+   * Drawn in two places, one of them hidden at any width: inside the upload fold on a phone,
+   * where it folds away with LiveRC and Speedhive, and as its own card on a computer, where it
+   * always stood. Moving one element between parents by width would need the width, which only
+   * arrives after hydration — and a card that jumps on every load.
+   */
+  const myRcmCard = (
+    <MyRcmPdfImportCard
+      pastedUrl={null}
+      openUrl={null}
+      hasImported={false}
+      alwaysOpen
+      onImported={(res) => {
+        void loadSessions();
+        router.push(`/laps/analysis?session=${encodeURIComponent(res.importedSessionId)}`);
+      }}
+    />
+  );
+
   return (
     /*
      * Two columns from `lg`: bringing a session in is a one-off act, and the list of
      * sessions is the thing you came for. Stacked, the import box and its MyRCM sibling
      * filled a desktop screen on their own and the list — the actual content — started
      * below the fold (founder call, 2026-08-27). Narrow stays stacked, import first,
-     * because on a phone there is no such thing as beside.
+     * because on a phone there is no such thing as beside — and there the doors fold to
+     * one row each, or the three of them filled the first screen and not one session
+     * showed (founder call, 2026-09-26).
      */
     <div className="lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start lg:gap-5">
       <div className="space-y-3">
-        <CardPanel contentClassName="space-y-2.5">
-          <Eyebrow>Upload a timing link</Eyebrow>
-          {/* One row, Import beside the box. It grows as you paste — a 3-row box that is empty
-              95% of the time was most of what made this card fill a screen. */}
-          <div className="flex items-start gap-2">
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={1}
-              placeholder="LiveRC or Speedhive link"
-              className="min-w-0 flex-1 resize-y rounded-md border border-border bg-background px-3 py-2 text-[13px] leading-5 text-foreground outline-none tabular-nums"
-              disabled={busy}
-              aria-label="Timing links, one per line"
-            />
-            <button type="button" disabled={busy} onClick={() => void onImport()} className={IMPORT_BUTTON}>
-              {busy ? "Importing…" : "Import"}
-            </button>
+        <PhoneFoldCard
+          label="Upload a timing link"
+          defaultOpen={importOpen}
+          peek={
+            <span className="flex flex-wrap items-center gap-1.5">
+              {TIMING_SITES.map((site) => (
+                <span key={site} className={SITE_TAG}>
+                  {site}
+                </span>
+              ))}
+            </span>
+          }
+        >
+          <div className="space-y-2.5">
+            {/* One row, Import beside the box. It grows as you paste — a 3-row box that is empty
+                95% of the time was most of what made this card fill a screen. */}
+            <div className="flex items-start gap-2">
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                rows={1}
+                placeholder="LiveRC or Speedhive link"
+                className="min-w-0 flex-1 resize-y rounded-md border border-border bg-background px-3 py-2 text-[13px] leading-5 text-foreground outline-none tabular-nums"
+                disabled={busy}
+                aria-label="Timing links, one per line"
+              />
+              <button type="button" disabled={busy} onClick={() => void onImport()} className={IMPORT_BUTTON}>
+                {busy ? "Importing…" : "Import"}
+              </button>
+            </div>
+            {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
+            {lastResults.some((r) => !r.success) ? (
+              <ul className="space-y-1 border-t border-border pt-2.5 text-[11px]">
+                {lastResults
+                  .filter((r): r is Extract<ImportResultRow, { success: false }> => !r.success)
+                  .map((r) => (
+                    <li key={r.url + r.error} className="flex flex-wrap gap-x-2">
+                      <span className="shrink-0 font-medium text-destructive">Failed</span>
+                      <span className="min-w-0 break-all text-muted-foreground">{r.url}</span>
+                      <span className="text-destructive">{r.error}</span>
+                    </li>
+                  ))}
+              </ul>
+            ) : null}
           </div>
-          {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
-          {lastResults.some((r) => !r.success) ? (
-            <ul className="space-y-1 border-t border-border pt-2.5 text-[11px]">
-              {lastResults
-                .filter((r): r is Extract<ImportResultRow, { success: false }> => !r.success)
-                .map((r) => (
-                  <li key={r.url + r.error} className="flex flex-wrap gap-x-2">
-                    <span className="shrink-0 font-medium text-destructive">Failed</span>
-                    <span className="min-w-0 break-all text-muted-foreground">{r.url}</span>
-                    <span className="text-destructive">{r.error}</span>
-                  </li>
-                ))}
-            </ul>
-          ) : null}
-        </CardPanel>
+          {/* Outside the spaced group: a hidden last child would leave the group's gap behind
+              the link row on a computer. */}
+          <div className="mt-2.5 lg:hidden">{myRcmCard}</div>
+        </PhoneFoldCard>
 
-        {/*
-         * MyRCM has no link we may fetch, so its results arrive as the PDF the driver
-         * downloads. That door used to exist only inside the log-run wizard, which meant
-         * reading a MyRCM race you watched required pretending you had driven a run — the
-         * exact backwards-ness this page exists to undo.
-         */}
-        <MyRcmPdfImportCard
-          pastedUrl={null}
-          openUrl={null}
-          hasImported={false}
-          alwaysOpen
-          onImported={(res) => {
-            void loadSessions();
-            router.push(`/laps/analysis?session=${encodeURIComponent(res.importedSessionId)}`);
-          }}
-        />
+        <div className="hidden lg:block">{myRcmCard}</div>
 
         {importSlot}
       </div>

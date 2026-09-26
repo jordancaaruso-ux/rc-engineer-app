@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CardPanel } from "@/components/ui/CardPanel";
-import { Eyebrow } from "@/components/ui/panel";
+import { PhoneFoldCard } from "@/components/ui/PhoneFoldCard";
 import { PracticeFieldBrowser } from "@/components/laps/PracticeFieldBrowser";
 import type { PracticeFieldSource } from "@/lib/practiceField/practiceField";
 import type { KnownCompetitor } from "@/lib/speedhive/knownCompetitors";
@@ -19,6 +18,9 @@ import type { KnownCompetitor } from "@/lib/speedhive/knownCompetitors";
  *
  * Nothing here fetches until asked. With no track that can be looked in, the card is not drawn:
  * nothing on it could work.
+ *
+ * On a phone it folds to its band, above the imported sessions it would otherwise push off the
+ * first screen (founder call, 2026-09-26); a computer shows it open beside the list as before.
  */
 export function CompetitorPracticePull({
   competitors,
@@ -38,8 +40,7 @@ export function CompetitorPracticePull({
   if (tracks.length === 0) return null;
 
   return (
-    <CardPanel contentClassName="space-y-3">
-      <Eyebrow>Someone else&apos;s practice</Eyebrow>
+    <PhoneFoldCard label="Someone else's practice" bodyClassName="space-y-3">
       <select
         value={trackId}
         onChange={(e) => setTrackId(e.target.value)}
@@ -66,6 +67,6 @@ export function CompetitorPracticePull({
           onOpenSession={(id) => router.push(`/laps/analysis?session=${encodeURIComponent(id)}`)}
         />
       ) : null}
-    </CardPanel>
+    </PhoneFoldCard>
   );
 }

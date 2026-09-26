@@ -404,7 +404,7 @@ export default async function LapAnalysisPage(props: {
    * at, created or favourited — because the catalog holds a thousand LiveRC clubs and a dropdown
    * of all of them is a dropdown nobody can use.
    */
-  const [competitors, timingTracks] = await Promise.all([
+  const [competitors, timingTracks, anyImport] = await Promise.all([
     getKnownCompetitorsSetting(user.id).then(parseKnownCompetitorsSetting),
     prisma.track.findMany({
       where: {
@@ -423,6 +423,11 @@ export default async function LapAnalysisPage(props: {
       take: 300,
       select: { id: true, name: true, liveRcUrl: true, speedhiveUrl: true },
     }),
+    // Whether the library holds anything at all: the rows its list reads, and one is enough.
+    prisma.importedLapTimeSession.findFirst({
+      where: { userId: user.id, hiddenAt: null },
+      select: { id: true },
+    }),
   ]);
 
   const practiceTracks = timingTracks
@@ -433,6 +438,8 @@ export default async function LapAnalysisPage(props: {
     <Shell title="Lap time analysis" backHref="/tools">
       <LapAnalysisLibrary
         eventId={eventId}
+        // On a phone the doors fold away to make room for the list; with no list yet, they stay open.
+        importOpen={!anyImport}
         importSlot={
           <CompetitorPracticePull
             competitors={competitors}
