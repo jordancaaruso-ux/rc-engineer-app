@@ -9,6 +9,8 @@ import {
   type TrackTimingUrlsFieldHandle,
 } from "@/components/tracks/TrackTimingUrlsField";
 import { SpeedhiveTrackFinder } from "@/components/tracks/SpeedhiveTrackFinder";
+import { useTrackLookalikes } from "@/components/tracks/useTrackLookalikes";
+import { TrackLookalikeRows } from "@/components/tracks/TrackLookalikeRows";
 
 const NO_TIMING_URLS: TrackTimingUrls = { liveRcUrl: null, speedhiveUrl: null };
 
@@ -75,6 +77,12 @@ export const InlineNewTrackRow = forwardRef<
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timingFieldRef = useRef<TrackTimingUrlsFieldHandle>(null);
+  // Near-copies (founder ruling 2026-09-26, option B): the club that is already here becomes the
+  // main button, and a new one takes "No, it's a different club" first.
+  const lookalikes = useTrackLookalikes(name, location, open);
+  const [pickedLookalikeId, setPickedLookalikeId] = useState<string | null>(null);
+  const lookalike =
+    lookalikes.hits.find((t) => t.id === pickedLookalikeId) ?? lookalikes.hits[0] ?? null;
 
   useImperativeHandle(ref, () => ({
     openWith: (seedName: string) => {
@@ -87,6 +95,9 @@ export const InlineNewTrackRow = forwardRef<
   async function create() {
     const trimmed = name.trim();
     if (!trimmed || busy) return;
+
+    // Never make a near-copy blind: a fast Enter first shows the club that is already here.
+    if (!lookalikes.isDifferentClub && (await lookalikes.checkNow()).length > 0) return;
 
     // Fold in a paste they never pressed Enter on, and catch a typo here rather than
     // saving a track that silently searches nothing.
@@ -145,8 +156,21 @@ export const InlineNewTrackRow = forwardRef<
     }
   }
 
+  function pickLookalike() {
+    if (!lookalike) return;
+    onCreated({
+      id: lookalike.id,
+      name: lookalike.name,
+      location: lookalike.location,
+      liveRcUrl: lookalike.liveRcUrl,
+      speedhiveUrl: lookalike.speedhiveUrl,
+    });
+    reset();
+  }
+
   function reset() {
     setOpen(false);
+    setPickedLookalikeId(null);
     setName("");
     setLocation("");
     setTimingUrls(NO_TIMING_URLS);
@@ -191,7 +215,14 @@ export const InlineNewTrackRow = forwardRef<
       />
       {/* Right under the name it searches for (founder pick 2026-09-26), not at the foot of the
           form. Gone once a Speedhive page is in, whether picked here or pasted below. */}
-      {timingUrls.speedhiveUrl ? null : (
+      {lookalikes.hits.length > 0 ? (
+        <TrackLookalikeRows
+          hits={lookalikes.hits}
+          selectedId={lookalike?.id ?? null}
+          onSelect={setPickedLookalikeId}
+        />
+      ) : null}
+      {timingUrls.speedhiveUrl || lookalikes.hits.length > 0 ? null : (
         <SpeedhiveTrackFinder
           block
           source={{ name, location }}
@@ -222,15 +253,34 @@ export const InlineNewTrackRow = forwardRef<
           {error}
         </p>
       ) : null}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => void create()}
-          disabled={busy || !name.trim()}
-          className="rounded-lg primary-face bg-primary px-2.5 py-1.5 text-[11.5px] font-semibold text-primary-foreground transition hover:brightness-105 disabled:opacity-50"
-        >
-          {busy ? "Adding…" : "Add track"}
-        </button>
+      <div className="flex flex-wrap items-center gap-2">
+        {lookalike ? (
+          <>
+            <button
+              type="button"
+              onClick={pickLookalike}
+              className="max-w-full truncate rounded-lg primary-face bg-primary px-2.5 py-1.5 text-[11.5px] font-semibold text-primary-foreground transition hover:brightness-105"
+            >
+              Use {lookalike.name}
+            </button>
+            <button
+              type="button"
+              onClick={lookalikes.differentClub}
+              className="px-1 py-1.5 text-[11.5px] font-semibold text-foreground underline underline-offset-2"
+            >
+              No, it’s a different club
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void create()}
+            disabled={busy || !name.trim()}
+            className="rounded-lg primary-face bg-primary px-2.5 py-1.5 text-[11.5px] font-semibold text-primary-foreground transition hover:brightness-105 disabled:opacity-50"
+          >
+            {busy ? "Adding…" : "Add track"}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => {

@@ -81,7 +81,7 @@ const ACRONYM_SKIP: ReadonlySet<string> = new Set(["the", "and", "of", "at", "in
  * find nothing. "RC" and a short capitalised token ("NSW") count whole — except in a name typed all
  * in capitals, where every word is capitalised and "HOT" is just a word.
  */
-function acronym(text: string | null | undefined): string {
+export function acronym(text: string | null | undefined): string {
   const raw = (text ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "");
   const shouting = raw === raw.toUpperCase();
   let out = "";

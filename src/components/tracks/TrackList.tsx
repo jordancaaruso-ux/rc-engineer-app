@@ -19,6 +19,8 @@ import {
   type TrackTimingUrlsFieldHandle,
 } from "@/components/tracks/TrackTimingUrlsField";
 import { SpeedhiveTrackFinder } from "@/components/tracks/SpeedhiveTrackFinder";
+import { useTrackLookalikes } from "@/components/tracks/useTrackLookalikes";
+import { TrackLookalikeRows } from "@/components/tracks/TrackLookalikeRows";
 
 const NO_TIMING_URLS: TrackTimingUrls = { liveRcUrl: null, speedhiveUrl: null };
 
@@ -87,6 +89,12 @@ export function TrackList({
   const [message, setMessage] = useState<string | null>(null);
   const [existingTrackId, setExistingTrackId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Near-copies (founder ruling 2026-09-26, option B): "Open <club>" leads while a club already
+  // here matches the name; a new one takes "No, it's a different club" first.
+  const lookalikes = useTrackLookalikes(name, location, showAddForm);
+  const [pickedLookalikeId, setPickedLookalikeId] = useState<string | null>(null);
+  const lookalike =
+    lookalikes.hits.find((t) => t.id === pickedLookalikeId) ?? lookalikes.hits[0] ?? null;
 
   useEffect(() => {
     setTracks(initialTracks);
@@ -233,6 +241,8 @@ export function TrackList({
       setMessage("Name is required.");
       return;
     }
+    // Never make a near-copy blind: a fast Enter first shows the club that is already here.
+    if (!lookalikes.isDifferentClub && (await lookalikes.checkNow()).length > 0) return;
     // Fold in a paste they never pressed Enter on, and refuse a typo before saving.
     const committed = timingFieldRef.current?.commit() ?? { ok: true as const, value: timingUrls };
     if (!committed.ok) {
@@ -367,8 +377,17 @@ export function TrackList({
                     placeholder="e.g. Silverstone National"
                     required
                   />
+                  {lookalikes.hits.length > 0 ? (
+                    <div className="mt-2">
+                      <TrackLookalikeRows
+                        hits={lookalikes.hits}
+                        selectedId={lookalike?.id ?? null}
+                        onSelect={setPickedLookalikeId}
+                      />
+                    </div>
+                  ) : null}
                   {/* Right under the name it searches for (founder pick 2026-09-26). */}
-                  {timingUrls.speedhiveUrl ? null : (
+                  {timingUrls.speedhiveUrl || lookalikes.hits.length > 0 ? null : (
                     <div className="mt-2">
                       <SpeedhiveTrackFinder
                         block
@@ -401,16 +420,34 @@ export function TrackList({
                 inputClassName="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none"
               />
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="submit"
-                  disabled={adding}
-                  className={cn(
-                    buttonLinkClassName("primary"),
-                    adding && "opacity-70 pointer-events-none"
-                  )}
-                >
-                  {adding ? "Adding…" : "Add track"}
-                </button>
+                {lookalike ? (
+                  <>
+                    <Link
+                      href={`/tracks/${lookalike.id}`}
+                      className={cn(buttonLinkClassName("primary"), "max-w-full truncate")}
+                    >
+                      Open {lookalike.name}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={lookalikes.differentClub}
+                      className="px-1 py-2 text-xs font-semibold text-foreground underline underline-offset-2"
+                    >
+                      No, it’s a different club
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={adding}
+                    className={cn(
+                      buttonLinkClassName("primary"),
+                      adding && "opacity-70 pointer-events-none"
+                    )}
+                  >
+                    {adding ? "Adding…" : "Add track"}
+                  </button>
+                )}
                 {message ? (
                   <span className={cn("text-xs", message === "Track added." ? "text-primary-ink" : "text-muted-foreground")}>
                     {message}
