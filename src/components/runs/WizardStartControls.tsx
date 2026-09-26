@@ -54,7 +54,7 @@ function prefillSummaryLine(rows: WizardPrefillRow[], loading: boolean): string 
     pick("track"),
     pick("session").replace(/^Event · /, ""),
     pick("tires").replace(/ · run /g, " run "),
-    setupCount ? `${setupCount} setup values` : "",
+    setupCount ? `${setupCount} setup value${setupCount === "1" ? "" : "s"}` : "",
   ].filter((p) => !EMPTY_PREFILL_VALUES.has(p));
   if (parts.length > 0) return parts.join(" · ");
   return loading ? "…" : "Nothing saved on it yet";

@@ -21,7 +21,7 @@ import {
   type SetupSnapshotData,
 } from "@/lib/runSetup";
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
-import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
+import { chassisValueCount, isRunContextSetupKey, setupHasChassisValue } from "@/lib/setup/runContextSetupKeys";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { RunSheetSetupFill } from "@/components/runs/RunSheetSetupFill";
@@ -96,6 +96,7 @@ import { deriveContinueEntry, type NewRunWizardEntry } from "@/lib/runs/wizardEn
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
 import {
   resolveSetupSourceDefault,
+  savedSetupToLoad,
   setupListState,
   type SetupSource,
 } from "@/lib/runs/setupSourceDefault";
@@ -844,10 +845,6 @@ export function NewRunForm(props: {
     if (!wizardActive || !r?.id) return "session";
     // An explicit deep link wins over the walk — see `wizardInitialStep`.
     if (props.wizardInitialStep) return props.wizardInitialStep;
-    const setupKeyCount =
-      r.setupSnapshot?.data && typeof r.setupSnapshot.data === "object"
-        ? Object.keys(r.setupSnapshot.data as object).length
-        : 0;
     return firstUnfinishedStep({
       session: Boolean(r.trackId ?? r.track?.id ?? r.event?.trackId),
       // Prep (additive + applications) lives on this step since 2026-09-16 and
@@ -856,7 +853,8 @@ export function NewRunForm(props: {
       // additive had a Prep step that never ticked, so every draft reopened on
       // an empty page.
       equipment: Boolean(r.tireTypeId ?? r.tireType?.id),
-      setup: setupKeyCount > 0,
+      // Same rule as the Setup tick: the tyre the form writes into the setup is not a setup.
+      setup: setupHasChassisValue(r.setupSnapshot?.data),
       // Shared with the Sessions row warning so "this run needs laps" and "the
       // wizard lands on Laps" can never disagree.
       laps: runHasLapTimes(r),
@@ -2031,6 +2029,9 @@ export function NewRunForm(props: {
     );
   }, [setupData, setupBaselineData]);
   const setupChangeCountSinceBaseline = setupChangedRowsSinceBaseline.length;
+  /** Boxes on the run's setup that hold a value. Not the tyre the form writes in by itself:
+   *  counting that ticked Setup and read "1 values" on runs with no setup at all. */
+  const setupValueCount = useMemo(() => chassisValueCount(setupData), [setupData]);
 
   /** Prior run on this car exists → seed a neutral "feel vs last run" on save. */
   const feelVsLastRunEligible = useMemo(() => {
@@ -2045,7 +2046,7 @@ export function NewRunForm(props: {
     setCompleteValidation((prev) => {
       if (!prev.show) return prev;
       const carOk = carRating != null && carRating >= 1 && carRating <= 10;
-      const setupOk = filledSetupValueCount(setupData) > 0;
+      const setupOk = chassisValueCount(setupData) > 0;
       if (carOk && setupOk) {
         return { show: false, carRating: false, additive: false, setup: false };
       }
@@ -2699,17 +2700,29 @@ export function NewRunForm(props: {
    * LogRunWizardHost). The old seed's blank-snapshot writes are gone for that reason: a non-null
    * `setupBaselineData` also ticked the wizard's Setup step green and swapped the card for a "New
    * blank setup" summary, both of which claimed a setup that was never chosen.
+   *
+   * Except on "Saved" (owner's call, test drive 2026-09-26): landing there also loads the car's
+   * saved setup, or a setup saved on the car never reached the run. Only setups with a value in
+   * them count here, so runs logged without a setup don't hold the face on "Previous runs".
    */
   const loadedForThisCar = Boolean(carId) && setupOptionsLoad?.carId === carId;
+  const pickerRunsWithASetup = useMemo(
+    () => pickerRuns.filter((r) => setupHasChassisValue(r.setupSnapshot?.data)).length,
+    [pickerRuns]
+  );
+  const savedSetupsWithValues = useMemo(
+    () => downloadedSetups.filter((d) => setupHasChassisValue(d.setupData)).length,
+    [downloadedSetups]
+  );
   const previousRunsState = setupListState({
     loadedForThisCar,
     ok: setupOptionsLoad?.runsOk ?? false,
-    count: pickerRuns.length,
+    count: pickerRunsWithASetup,
   });
   const savedSetupsState = setupListState({
     loadedForThisCar,
     ok: setupOptionsLoad?.savedOk ?? false,
-    count: downloadedSetups.length,
+    count: savedSetupsWithValues,
   });
 
   useEffect(() => {
@@ -2720,19 +2733,22 @@ export function NewRunForm(props: {
       isEditing,
       driverChoseForThisCar: setupSourceChosenForRef.current === carId,
       alreadyDefaultedForThisCar: setupSourceDefaultedForRef.current === carId,
-      sheetHasContent: setupBaselineData != null || filledSetupValueCount(setupData) > 0,
+      sheetHasContent: setupValueCount > 0,
     });
     if (!next) return;
     setupSourceDefaultedForRef.current = carId;
     if (next !== setupSource) setSetupSource(next);
+    const saved = next === "other" ? savedSetupToLoad(downloadedSetups) : null;
+    if (saved) applyDownloadedSetupOnly(saved.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- applyDownloadedSetupOnly reads this render's list
   }, [
     carId,
     previousRunsState,
     savedSetupsState,
     isEditing,
     setupSource,
-    setupData,
-    setupBaselineData,
+    setupValueCount,
+    downloadedSetups,
   ]);
 
   function handleSetupSourceChange(next: SetupSource) {
@@ -3677,8 +3693,7 @@ export function NewRunForm(props: {
       // later save is the gate biting twice: a catch-up run logged without a setup, then every
       // run the app filed beside it (each carrying that same empty sheet) refused on confirm
       // (found driving it, 2026-09-14).
-      const missingSetup =
-        !opts?.waiveSetup && !editingCompletedRun && filledSetupValueCount(setupData) === 0;
+      const missingSetup = !opts?.waiveSetup && !editingCompletedRun && setupValueCount === 0;
       if (missingCarRating || missingSetup) {
         const parts: string[] = [];
         if (missingCarRating) parts.push("rate the car 1–10");
@@ -4175,8 +4190,10 @@ export function NewRunForm(props: {
     // Prep rides on this step now, and it is optional — the compound is what
     // ticks it (see the draft-resume note above).
     equipment: { done: Boolean(tireTypeId) },
+    // Values only: a loaded setup with nothing in it, or the tyre the form writes into the
+    // setup, ticked this before anything was chosen (test drive 2026-09-26).
     setup: {
-      done: setupBaselineData != null || filledSetupValueCount(setupData) > 0,
+      done: setupValueCount > 0,
       attention: completeValidation.setup,
     },
     laps: { done: wizardLapsIn },
@@ -4357,17 +4374,18 @@ export function NewRunForm(props: {
     if (typeof lastRun.practiceDayUrl === "string" && lastRun.practiceDayUrl.trim()) {
       setPracticeDayUrl(lastRun.practiceDayUrl);
     }
-    // Setup — an explicit tap overrides anything picked so far (and a missing
-    // snapshot stays truly blank; derived-keys manufacture would fake out
-    // "setup attached").
-    setupTouchedByUserRef.current = false;
-    const nextSetup = lastRun.setupSnapshot?.data
-      ? setupSnapshotWithDerived(lastRun.setupSnapshot.data)
-      : ({} as SetupSnapshotData);
-    setSetupData(nextSetup);
-    setActiveSetupData(nextSetup, carId || null);
-    setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
-    setSetupBaselineData(cloneSetupSnapshot(nextSetup));
+    // Setup — an explicit tap overrides anything picked so far. A last run whose
+    // setup holds no value (just the tyre the form writes in) says nothing about
+    // the car, so it leaves the setup alone: it used to wipe the saved setup the
+    // Setup step had loaded, and the run went out with none (test drive 2026-09-26).
+    if (setupHasChassisValue(lastRun.setupSnapshot?.data)) {
+      setupTouchedByUserRef.current = false;
+      const nextSetup = setupSnapshotWithDerived(lastRun.setupSnapshot.data);
+      setSetupData(nextSetup);
+      setActiveSetupData(nextSetup, carId || null);
+      setSetupBaselineSnapshotId(lastRun.setupSnapshot?.id ?? null);
+      setSetupBaselineData(cloneSetupSnapshot(nextSetup));
+    }
 
     setWizardVenueSwapNote(venueNote);
     setWizardCarSwapNote(null);
@@ -4426,7 +4444,7 @@ export function NewRunForm(props: {
         setupBaselineSnapshotId != null &&
         setupBaselineSnapshotId === (lastRun?.setupSnapshot?.id ?? null) &&
         setupChangeCountSinceBaseline === 0 &&
-        filledSetupValueCount(setupData) > 0,
+        setupValueCount > 0,
     };
   })();
   /** Session identity pieces — shared by the map-sheet Session row and the
@@ -4486,13 +4504,13 @@ export function NewRunForm(props: {
           value:
             setupChangeCountSinceBaseline > 0
               ? `${setupChangeCountSinceBaseline} change${setupChangeCountSinceBaseline === 1 ? "" : "s"} from loaded`
-              : filledSetupValueCount(setupData) > 0
+              : setupValueCount > 0
                 ? "as loaded"
                 : "not attached",
           state:
             setupChangeCountSinceBaseline > 0
               ? "chg"
-              : filledSetupValueCount(setupData) > 0
+              : setupValueCount > 0
                 ? "ok"
                 : "miss",
           prefilled: wizardPrefilled.setup,
@@ -4582,12 +4600,17 @@ export function NewRunForm(props: {
           {
             key: "setup",
             label: "Setup",
+            // "as last run" only when it came off the last run: a tap on a run with no
+            // setup leaves the saved setup the Setup step loaded.
             value:
-              filledSetupValueCount(setupData) > 0
-                ? `${filledSetupValueCount(setupData)} values · ${
+              setupValueCount > 0
+                ? `${setupValueCount} value${setupValueCount === 1 ? "" : "s"} · ${
                     setupChangeCountSinceBaseline > 0
                       ? `${setupChangeCountSinceBaseline} changed`
-                      : "as last run"
+                      : setupBaselineSnapshotId != null &&
+                          setupBaselineSnapshotId === (lastRun?.setupSnapshot?.id ?? null)
+                        ? "as last run"
+                        : "as loaded"
                   }`
                 : "not attached",
             jump: "setup",
@@ -4663,12 +4686,12 @@ export function NewRunForm(props: {
             label: "Setup",
             // Count through the same derived pass the apply runs, so the
             // promise matches what actually lands (raw-key counts drift ±1).
+            // The tyre the form wrote into that setup is not a setup value.
             value: lastRun
-              ? lastRun.setupSnapshot?.data &&
-                typeof lastRun.setupSnapshot.data === "object" &&
-                Object.keys(lastRun.setupSnapshot.data as object).length > 0
-                ? `${Object.keys(setupSnapshotWithDerived(lastRun.setupSnapshot.data)).length} values · as last run`
-                : "none saved"
+              ? (() => {
+                  const n = chassisValueCount(setupSnapshotWithDerived(lastRun.setupSnapshot?.data));
+                  return n > 0 ? `${n} value${n === 1 ? "" : "s"} · as last run` : "none saved";
+                })()
               : "…",
           },
         ]
