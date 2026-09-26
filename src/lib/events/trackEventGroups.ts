@@ -56,6 +56,29 @@ export type TrackListLiveRcMeeting = {
 };
 
 /**
+ * One of the driver's own meetings that `/api/events/at-track` just joined to LiveRC's (its
+ * `linked` list), with what the run form needs to say so, e.g. `Your meeting "EMCC Cup" joined
+ * LiveRC's "EMCC CUP 25-27 Sept 2026"` (test drive 2026-09-26, W1-10: the meeting used to vanish
+ * into LiveRC's without a word).
+ */
+export type EventsAtTrackLink = {
+  /** The driver's meeting as it was. No longer exists when `merged`. */
+  eventId: string;
+  /** Its name before this read: what the driver typed, or the one the form filled in. */
+  name: string;
+  /** The meeting it is now: `eventId` itself when it took LiveRC's link, else the one it joined. */
+  intoEventId: string;
+  /** That meeting's name now. */
+  intoName: string;
+  /** LiveRC's name for the meeting, as the track's LiveRC events page lists it. */
+  liveRcName: string;
+  /** True when someone had already made LiveRC's meeting and the driver's joined it. */
+  merged: boolean;
+  /** LiveRC's name, when the driver's meeting kept its id and took it (it had the filled-in name). */
+  renamedTo: string | null;
+};
+
+/**
  * `loading` while the page is being read, `none` when the track has no LiveRC page at all,
  * `unavailable` when it has one that could not be read just now.
  */

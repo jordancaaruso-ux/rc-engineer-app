@@ -21,29 +21,9 @@ import {
   TRACK_EVENTS_AHEAD_DAYS,
 } from "@/lib/events/liveRcMeetingMatch";
 import { revalidateAfterEventMutation } from "@/lib/revalidateUser";
-import type { TrackListLiveRcMeeting } from "@/lib/events/trackEventGroups";
+import type { EventsAtTrackLink, TrackListLiveRcMeeting } from "@/lib/events/trackEventGroups";
 
-/**
- * One of the viewer's hand-made meetings this read matched to a LiveRC meeting: everything the
- * run form needs to say so, e.g. `Your meeting "EMCC Cup" joined LiveRC's "EMCC CUP 25-27 Sept
- * 2026"` (test drive 2026-09-26, W1-10: the meeting used to vanish without a word).
- */
-export type EventsAtTrackLink = {
-  /** The driver's meeting as it was. No longer exists when `merged`. */
-  eventId: string;
-  /** Its name before this read: what the driver typed, or the one the form filled in. */
-  name: string;
-  /** The meeting it is now: `eventId` itself when it took LiveRC's link, else the one it joined. */
-  intoEventId: string;
-  /** That meeting's name now. */
-  intoName: string;
-  /** LiveRC's name for the meeting, as the track's LiveRC events page lists it. */
-  liveRcName: string;
-  /** True when someone had already made LiveRC's meeting and the driver's joined it. */
-  merged: boolean;
-  /** LiveRC's name, when the driver's meeting kept its id and took it (it had the filled-in name). */
-  renamedTo: string | null;
-};
+export type { EventsAtTrackLink } from "@/lib/events/trackEventGroups";
 
 export type EventsAtTrackResult = {
   trackId: string;
