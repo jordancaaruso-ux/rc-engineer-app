@@ -5,6 +5,7 @@ import { Search, X } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptics";
+import { formatCount } from "@/lib/formatCount";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { HubRowTitle } from "@/components/ui/panel";
@@ -187,7 +188,7 @@ export function TireGaragePanel({
           autoCorrect="off"
           spellCheck={false}
           aria-label="Search tire types"
-          placeholder={`Search ${tireTypes.length.toLocaleString()} tire types`}
+          placeholder={`Search ${formatCount(tireTypes.length)} tire types`}
         />
         {search ? (
           <button

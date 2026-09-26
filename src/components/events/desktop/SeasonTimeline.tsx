@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatLap } from "@/lib/runLaps";
+import { formatCount } from "@/lib/formatCount";
 import {
   formatWheelTime,
   type SeasonEventRow,
@@ -290,7 +291,7 @@ function StatStrip({ strip }: { strip: SeasonStrip }) {
   }> = [
     { label: "Events", value: String(strip.events.value ?? 0), stat: strip.events, format: (n) => String(Math.round(n)) },
     { label: "Days on track", value: String(strip.daysOnTrack.value ?? 0), stat: strip.daysOnTrack, format: (n) => String(Math.round(n)) },
-    { label: "Laps", value: (strip.laps.value ?? 0).toLocaleString(), stat: strip.laps, format: (n) => Math.round(n).toLocaleString() },
+    { label: "Laps", value: formatCount(strip.laps.value ?? 0), stat: strip.laps, format: formatCount },
     { label: "Wheel time", value: formatWheelTime(strip.wheelSeconds.value ?? 0), stat: strip.wheelSeconds, format: formatWheelTime },
     { label: "Venues", value: String(strip.venues.value ?? 0), stat: strip.venues, format: (n) => String(Math.round(n)) },
     { label: "Season best", value: formatLap(strip.bestLapSeconds.value), stat: strip.bestLapSeconds, format: (n) => n.toFixed(3), pace: true },
