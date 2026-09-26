@@ -566,6 +566,50 @@ html[data-standalone="true"] .no-select {
 }
 
 /*
+ * The top edge of the installed iPhone app (2026-09-26).
+ *
+ * From iOS 26 an installed web app gets Liquid Glass's "scroll edge effect" across the top of
+ * the screen: a blur over the status bar that feathers ~35pt down into the page. iOS 27 made it
+ * heavy enough to smear the JRC pill, the page title and the avatar (founder, off his phone). It
+ * is not the old `black-translucent` install: a fresh icon on `default` still had it. Nothing in
+ * the app paints it, and no CSS property switches it off.
+ *
+ * What WebKit does instead, when it can: hit-test the top of the page 4px down, and if that lands
+ * in a `position: fixed` or sticky box at least 90% of the screen wide with an opaque background,
+ * fill the status bar with that box's colour and hide the blur (`LocalFrameView::
+ * fixedContainerEdges`, `-[WKWebView _shouldHideTopScrollPocket]`). This strip is that box. It is
+ * paper on paper, so it is invisible until something scrolls under it, and there the page now ends
+ * in a clean edge instead of a smear.
+ *
+ * Its height is `.page-header`'s below-md padding-top, the inset plus 0.75rem, so at rest it ends
+ * where the title's line box starts and covers nothing. Keep it over 10px past the inset: below
+ * that, WebKit stops reading the box's colour and samples pixels instead.
+ *
+ * iPhone only (the @supports is WebKit-on-iOS), installed web app only, phone widths only, and not
+ * inside the app-store shell, which is left as it was. z-index 29: above page content, under the
+ * compact title (30), the corner pills (40) and every sheet and scrim (50+).
+ */
+.ios-top-edge {
+  display: none;
+}
+
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 767.98px) {
+    html[data-standalone="true"]:not([data-native="true"]) .ios-top-edge {
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+      z-index: 29;
+      pointer-events: none;
+      background-color: var(--page-bg-base);
+    }
+  }
+}
+
+/*
  * PWA launch splash — hidden by default; shown only on installed (standalone)
  * launches. Because `data-standalone` is set pre-paint, this covers the cold-launch
  * gap; `PwaSplashDismiss` fades it then removes it.

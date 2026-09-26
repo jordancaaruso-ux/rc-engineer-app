@@ -96,6 +96,12 @@ export function AppShell({ children }: { children: ReactNode }) {
            * with the Log-run circle rendered in-row by BottomNav) and the
            * account avatar (Settings + account).
            */}
+          {/*
+           * The paper strip under the iPhone status bar, so iOS fills the bar with paper
+           * instead of blurring the top of the page. Out here with the other fixed chrome;
+           * `.ios-top-edge` in globals.css decides when it shows and why.
+           */}
+          <div className="ios-top-edge" aria-hidden="true" />
           <BottomNav />
           <MobileBrandMark />
           <MobileTitleCondenser />
