@@ -125,6 +125,29 @@ test("the day count in the fallback is real", () => {
   assert.equal(read.headline, "Your last day out was Boronia, 1 day ago.");
 });
 
+// Test drive 2026-09-26: "You've raced RC Madness 2 of the last 6 Sundays" when both were the
+// same Sunday — two meetings had been made for that one day.
+
+test("two meetings on one day are one day raced", () => {
+  const sunday = (n: number) =>
+    new Date(Date.UTC(2026, 7, 2) - (n - 1) * 7 * 86_400_000).toISOString().slice(0, 10);
+  const madness = { trackId: "madness", trackName: "RC Madness" };
+  const twoOnOneSunday = [
+    event({ ...madness, id: "club", startYmd: sunday(1) }),
+    event({ ...madness, id: "round", startYmd: sunday(1) }),
+  ];
+  assert.equal(
+    buildCadenceRead(twoOnOneSunday, TODAY).headline,
+    "Your last day out was RC Madness, 6 days ago.",
+    "one Sunday is one visit, not a rhythm"
+  );
+  const read = buildCadenceRead(
+    [...twoOnOneSunday, event({ ...madness, id: "earlier", startYmd: sunday(3) })],
+    TODAY
+  );
+  assert.equal(read.headline, "You've raced RC Madness 2 of the last 6 Sundays.");
+});
+
 // W3-08 (test drive 2026-09-26): a 2025 meeting logged in 2026 had its runs in 2026's venue
 // records ("0 laps, no timed laps" under 2025) while Recent Form showed its 19.630.
 

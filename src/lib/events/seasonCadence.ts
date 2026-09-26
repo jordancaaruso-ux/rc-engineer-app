@@ -117,16 +117,20 @@ export function buildCadenceRead(allEvents: SeasonEventRow[], todayYmd: string):
       const back = (todayDow - dow + 7) % 7;
       const lastOccurrence = addDays(todayYmd, -(back === 0 ? 7 : back));
       const windowStart = addDays(lastOccurrence, -7 * (CADENCE_WINDOW - 1));
-      const inWindow = hits.filter(
-        (e) => e.startYmd >= windowStart && e.startYmd <= lastOccurrence
-      );
-      if (inWindow.length < CADENCE_MIN_HITS) continue;
-      if (best && inWindow.length <= best.hits) continue;
+      // Days, not meetings: two meetings made for one Sunday are one Sunday raced (test drive
+      // 2026-09-26: "2 of the last 6 Sundays" counted a single Sunday twice).
+      const daysRaced = new Set(
+        hits
+          .filter((e) => e.startYmd >= windowStart && e.startYmd <= lastOccurrence)
+          .map((e) => e.startYmd)
+      ).size;
+      if (daysRaced < CADENCE_MIN_HITS) continue;
+      if (best && daysRaced <= best.hits) continue;
 
       const nextYmd = addDays(lastOccurrence, 7);
       best = {
-        hits: inWindow.length,
-        headline: `You've raced ${hits[0]!.trackName ?? "the same track"} ${inWindow.length} of the last ${CADENCE_WINDOW} ${WEEKDAY[dow]}s.`,
+        hits: daysRaced,
+        headline: `You've raced ${hits[0]!.trackName ?? "the same track"} ${daysRaced} of the last ${CADENCE_WINDOW} ${WEEKDAY[dow]}s.`,
         ymd: nextYmd,
         label: `${WEEKDAY[dow]} ${shortDate(nextYmd)}`,
       };
