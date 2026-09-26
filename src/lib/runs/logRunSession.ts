@@ -10,6 +10,8 @@
  */
 import type { EntryCandidate } from "@/lib/runs/entryCandidate";
 import { defaultEventName } from "@/lib/events/liveRcMeetingMatch";
+import { eventDateToYmd } from "@/lib/eventDateParse";
+import { formatRunDateWeekday, formatRunTimeOnly } from "@/lib/formatDate";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 
 export type UiSessionType = "PRACTICE" | "SEEDING" | "QUALIFYING" | "RACE" | "TESTING";
@@ -79,6 +81,58 @@ export function meetingSessionKind(
     meetingSessionType: meetingSessionType || "PRACTICE",
     sessionLabel: sessionLabel ?? null,
   });
+}
+
+// ---- When the car ran (a run typed in after the fact, test drive 2026-09-26) ----
+
+/** The earliest a run can be dated; the server refuses anything before it. */
+export const RUN_AT_MIN_INPUT = "2000-01-01T00:00";
+
+/** An instant as an `<input type="datetime-local">` value, on this device's clock. */
+export function toLocalDateTimeInput(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/**
+ * The instant a datetime-local value names, never later than `now`: a run can't have happened
+ * yet. Empty, half-typed, unreadable or before 2000 gives null, which callers ignore.
+ */
+export function runAtFromInput(value: string, now: Date = new Date()): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value.trim());
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]));
+  if (Number.isNaN(d.getTime()) || d.getFullYear() < 2000) return null;
+  return d.getTime() > now.getTime() ? new Date(now.getTime()) : d;
+}
+
+/**
+ * Where a run logged into a meeting that is already over lands when the driver picks no time:
+ * midday on the meeting's last day, this device's clock (the server's own default for the same
+ * case). Null while the meeting is on or ahead, where "now" is right.
+ */
+export function pastMeetingRunAt(
+  meetingEnd: string | Date | null | undefined,
+  todayYmd: string,
+): Date | null {
+  if (!meetingEnd) return null;
+  const endYmd = eventDateToYmd(meetingEnd);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endYmd) || endYmd >= todayYmd) return null;
+  const [y, m, d] = endYmd.split("-").map(Number);
+  return new Date(y!, m! - 1, d!, 12, 0, 0, 0);
+}
+
+function localDayNumber(d: Date): number {
+  return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000);
+}
+
+/** The When line: "Today, 5:04 PM", "Yesterday, 7:30 PM", else "Fri 25 Sept, 7:30 PM". */
+export function runWhenLabel(at: Date, now: Date = new Date()): string {
+  const time = formatRunTimeOnly(at);
+  const daysAgo = localDayNumber(now) - localDayNumber(at);
+  if (daysAgo === 0) return `Today, ${time}`;
+  if (daysAgo === 1) return `Yesterday, ${time}`;
+  return `${formatRunDateWeekday(at, null, now)}, ${time}`;
 }
 
 // ---- The New event form's filled-in name ----

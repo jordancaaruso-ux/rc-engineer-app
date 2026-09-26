@@ -5,10 +5,15 @@ import {
   followDateEventName,
   linkedMeetingNotice,
   meetingSessionKind,
+  pastMeetingRunAt,
+  runAtFromInput,
+  runWhenLabel,
   saveFailureMessage,
+  toLocalDateTimeInput,
   uiSessionToMeeting,
 } from "./logRunSession";
 import type { EntryCandidate } from "./entryCandidate";
+import { formatRunTimeOnly } from "@/lib/formatDate";
 
 const cand = (over: Partial<EntryCandidate>): EntryCandidate => ({
   runId: "r1", carId: "c1", carName: "A800", trackId: "t1", trackName: "Boronia",
@@ -50,6 +55,43 @@ test("meetingSessionKind: the ticked button's word leads, a race's own label fol
   assert.equal(meetingSessionKind("RACE", "Race 3"), "Race 3");
   assert.equal(meetingSessionKind("SEEDING"), "Seeding");
   assert.equal(meetingSessionKind(null), "Practice");
+});
+
+test("runAtFromInput: a picked time, never the future, never before 2000", () => {
+  const now = new Date(2026, 8, 26, 17, 4);
+  const friday = runAtFromInput("2026-09-25T19:30", now);
+  assert.ok(friday);
+  assert.equal(toLocalDateTimeInput(friday), "2026-09-25T19:30");
+  // Later today is still the future.
+  assert.equal(runAtFromInput("2026-09-26T21:00", now)?.getTime(), now.getTime());
+  assert.equal(runAtFromInput("2027-01-01T09:00", now)?.getTime(), now.getTime());
+  // Half-typed, empty and ancient values are ignored rather than read.
+  assert.equal(runAtFromInput("", now), null);
+  assert.equal(runAtFromInput("2026-09-2", now), null);
+  assert.equal(runAtFromInput("1999-12-31T23:00", now), null);
+});
+
+test("pastMeetingRunAt: a meeting that is over defaults to midday on its last day", () => {
+  const at = pastMeetingRunAt("2026-09-20T12:00:00.000Z", "2026-09-26");
+  assert.ok(at);
+  assert.equal(toLocalDateTimeInput(at), "2026-09-20T12:00");
+  assert.equal(toLocalDateTimeInput(pastMeetingRunAt("2026-09-25", "2026-09-26")!), "2026-09-25T12:00");
+  // On today or ahead: "now" stands.
+  assert.equal(pastMeetingRunAt("2026-09-26T12:00:00.000Z", "2026-09-26"), null);
+  assert.equal(pastMeetingRunAt("2026-09-27", "2026-09-26"), null);
+  assert.equal(pastMeetingRunAt(null, "2026-09-26"), null);
+  assert.equal(pastMeetingRunAt("not a date", "2026-09-26"), null);
+});
+
+test("runWhenLabel: today, yesterday, else the day", () => {
+  const now = new Date(2026, 8, 26, 17, 4);
+  assert.equal(runWhenLabel(now, now), `Today, ${formatRunTimeOnly(now)}`);
+  const lastNight = new Date(2026, 8, 25, 19, 30);
+  assert.equal(runWhenLabel(lastNight, now), `Yesterday, ${formatRunTimeOnly(lastNight)}`);
+  const lastWeek = new Date(2026, 8, 20, 12, 0);
+  const label = runWhenLabel(lastWeek, now);
+  assert.match(label, /^Sun 20 Sept?, /);
+  assert.ok(label.endsWith(formatRunTimeOnly(lastWeek)));
 });
 
 test("followDateEventName: the filled-in name follows the first day, a typed one stays", () => {

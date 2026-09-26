@@ -31,6 +31,8 @@ type WizardConditionsBandProps = {
    * band shows it instead of fetching — never re-look-up a past session's weather.
    */
   storedConditions?: RunConditions | null;
+  /** When the car ran, if the driver moved it off now: the preview reads that hour's weather. */
+  atIso?: string | null;
 };
 
 type Phase = "idle" | "loading" | "ready" | "failed";
@@ -70,6 +72,7 @@ export function WizardConditionsBand({
   trackTempC,
   onTrackTempChange,
   storedConditions,
+  atIso = null,
 }: WizardConditionsBandProps) {
   const [preview, setPreview] = useState<RunConditions | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -94,6 +97,7 @@ export function WizardConditionsBand({
           lat: String(coords.latitude),
           lon: String(coords.longitude),
         });
+        if (atIso) params.set("at", atIso);
         const res = await fetch(`/api/weather?${params.toString()}`);
         const data = (await res.json()) as { conditions?: RunConditions };
         if (!res.ok || !data.conditions) throw new Error("lookup failed");
@@ -104,7 +108,7 @@ export function WizardConditionsBand({
         setPhase("failed");
       }
     },
-    []
+    [atIso]
   );
 
   // Pinned track selected → preview it. No permission prompt: the coordinates
@@ -112,10 +116,10 @@ export function WizardConditionsBand({
   useEffect(() => {
     if (storedLine) return;
     if (!track || !hasPin || track.latitude == null || track.longitude == null) return;
-    const key = `${track.id}:${track.latitude.toFixed(3)},${track.longitude.toFixed(3)}`;
+    const key = `${track.id}:${track.latitude.toFixed(3)},${track.longitude.toFixed(3)}:${atIso ?? "now"}`;
     if (fetchedKeyRef.current === key) return;
     void fetchFor({ latitude: track.latitude, longitude: track.longitude }, key);
-  }, [storedLine, track, hasPin, fetchFor]);
+  }, [storedLine, track, hasPin, fetchFor, atIso]);
 
   const requestDeviceLocation = useCallback(async () => {
     setLocationError(null);
@@ -137,7 +141,7 @@ export function WizardConditionsBand({
     if (track && hasPin && track.latitude != null && track.longitude != null) {
       void fetchFor(
         { latitude: track.latitude, longitude: track.longitude },
-        `${track.id}:${track.latitude.toFixed(3)},${track.longitude.toFixed(3)}`
+        `${track.id}:${track.latitude.toFixed(3)},${track.longitude.toFixed(3)}:${atIso ?? "now"}`
       );
     } else if (deviceCoords) {
       void fetchFor(
@@ -147,7 +151,7 @@ export function WizardConditionsBand({
     } else {
       void requestDeviceLocation();
     }
-  }, [track, hasPin, deviceCoords, fetchFor, requestDeviceLocation]);
+  }, [track, hasPin, deviceCoords, fetchFor, requestDeviceLocation, atIso]);
 
   const previewLine = preview ? readoutLine(preview, units) : null;
   const line = storedLine ?? previewLine;

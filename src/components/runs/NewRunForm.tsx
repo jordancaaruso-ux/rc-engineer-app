@@ -97,8 +97,10 @@ import {
   followDateEventName,
   linkedMeetingNotice,
   meetingSessionKind,
+  pastMeetingRunAt,
   saveFailureMessage,
 } from "@/lib/runs/logRunSession";
+import { RunWhenField } from "@/components/runs/RunWhenField";
 import { planCarSwap, type CarSwapPlan } from "@/lib/runs/carSwap";
 import {
   resolveSetupSourceDefault,
@@ -533,6 +535,8 @@ type NewRunDraftSnapshot = {
   savedRunId?: string | null;
   /** A copied race's own label ("A Main"). Optional: older drafts don't have it. */
   sessionLabel?: string | null;
+  /** When the car ran, if the driver picked it (ISO). Optional: older drafts don't have it. */
+  runAtIso?: string | null;
 };
 
 /**
@@ -703,6 +707,8 @@ export function NewRunForm(props: {
   );
   /** "A Main" etc. for main-event sessions (wizard page 1 / LiveRC detection); persisted on save. */
   const [sessionLabel, setSessionLabel] = useState<string | null>(wizard?.sessionLabel ?? null);
+  /** When the car ran, once the driver moves it off "now" (a run typed in after the fact). */
+  const [runAt, setRunAt] = useState<Date | null>(null);
   const [meetingSessionCustom, setMeetingSessionCustom] = useState<string>(""); // when type is OTHER
   /**
    * Legacy run field; lap import uses track LiveRC URL. Kept for edit-run hydrate only.
@@ -1732,6 +1738,8 @@ export function NewRunForm(props: {
         // A stay-save already banked this content — later saves must update that run.
         if (typeof s.savedRunId === "string" && s.savedRunId) setCreatedRunId(s.savedRunId);
         if (typeof s.sessionLabel === "string") setSessionLabel(s.sessionLabel);
+        const savedRunAt = typeof s.runAtIso === "string" ? new Date(s.runAtIso) : null;
+        if (savedRunAt && !Number.isNaN(savedRunAt.getTime())) setRunAt(savedRunAt);
         // The wizard's blank entry must not overwrite the restored day (effect further down).
         wizardSessionAppliedRef.current = true;
       }
@@ -1776,6 +1784,7 @@ export function NewRunForm(props: {
       conditions,
       savedRunId: createdRunId,
       sessionLabel,
+      runAtIso: runAt ? runAt.toISOString() : null,
     };
     if (!newRunDraftHasContent(snapshot)) {
       try {
@@ -1826,6 +1835,7 @@ export function NewRunForm(props: {
     conditions,
     createdRunId,
     sessionLabel,
+    runAt,
   ]);
 
   const selectedCar = useMemo(() => carsList.find((c) => c.id === carId) ?? null, [carsList, carId]);
@@ -2179,6 +2189,20 @@ export function NewRunForm(props: {
     () => (needsEvent && eventId ? events.find((e) => e.id === eventId) ?? null : null),
     [needsEvent, eventId, events]
   );
+  /** A meeting that is already over: the run defaults to its day, not to now. */
+  const runAtMeetingDefault = useMemo(
+    () => (selectedEventForRun ? pastMeetingRunAt(selectedEventForRun.endDate, eventListTodayYmd) : null),
+    [selectedEventForRun, eventListTodayYmd]
+  );
+  /**
+   * When the car ran, as a new run will be saved: the racer's pick, else a finished meeting's day
+   * (which the server applies itself, so only a pick is sent), else null for now.
+   */
+  const runAtForSave = isEditing ? null : (runAt ?? runAtMeetingDefault);
+  /** Laps off a timing sheet with an on-track time: that time is the run's, and a pick is ignored. */
+  const whenFromTimingSheet =
+    lapIngest.sourceKind === "url" &&
+    (lapIngest.urlImportBlocks ?? []).some((b) => Boolean(b.sessionCompletedAtIso || b.sessionCompletedAtDbIso));
   /** The run's own track row — name + timing URLs for the lap-discovery panel. */
   const selectedRunTrack = useMemo(
     () => (trackId ? tracksList.find((t) => t.id === trackId) ?? null : null),
@@ -3805,10 +3829,12 @@ export function NewRunForm(props: {
         const sets = buildImportedLapSetsFromIngest(lapIngest);
         // Imported session times are track wall clock stored as-if-UTC; convert in the
         // device zone or the lookup reads the wrong side of the planet's clock.
-        const atIso = importedSessionWeatherInstantIso(
-          sets.find((s) => s.isPrimaryUser) ?? sets[0],
-          Intl.DateTimeFormat().resolvedOptions().timeZone
-        );
+        // No timing-sheet time: the time the driver gave the run, else now.
+        const atIso =
+          importedSessionWeatherInstantIso(
+            sets.find((s) => s.isPrimaryUser) ?? sets[0],
+            Intl.DateTimeFormat().resolvedOptions().timeZone
+          ) ?? runAtForSave?.toISOString();
         const params = new URLSearchParams({
           lat: String(weatherTrack.latitude),
           lon: String(weatherTrack.longitude),
@@ -4013,6 +4039,9 @@ export function NewRunForm(props: {
           conditions: isConditionsEmpty(conditionsForSave) ? null : conditionsForSave,
           sessionLabel:
             sessionType === "RACE_MEETING" && sessionLabel?.trim() ? sessionLabel.trim() : null,
+          // When the car ran, sent only when the racer picked it: absent means now, or the day
+          // of a meeting that is over (the server's default). A timing session's time wins.
+          runAtIso: isEditing ? undefined : runAt?.toISOString(),
           importedLapSets,
           // Every attached import, earliest on track first — the server takes the
           // first as the run's primary. Always sent, so removing one detaches it.
@@ -5429,6 +5458,18 @@ export function NewRunForm(props: {
           </div>
         </SurfaceCard>
       ) : null}
+      {/* When the car ran: a run typed in after the fact used to be dated by its save (test
+          drive 2026-09-26). New runs only; a saved run's time moves on its run page. */}
+      {wizardActive && !isEditing ? (
+        <div className="border-t border-border/60 pt-4">
+          <RunWhenField
+            value={runAt}
+            fallback={runAtMeetingDefault}
+            fromTimingSheet={whenFromTimingSheet}
+            onChange={setRunAt}
+          />
+        </div>
+      ) : null}
       {/* Wizard: say out loud that the weather logs itself, and carry the one
           reading no lookup can know (probe track temp). The band's own reading
           is a preview only — the stored weather is still fetched at Run
@@ -5442,6 +5483,7 @@ export function NewRunForm(props: {
               setConditions((prev) => ({ ...prev, trackTempC: next }))
             }
             storedConditions={conditions.source != null ? conditions : null}
+            atIso={whenFromTimingSheet ? null : (runAtForSave?.toISOString() ?? null)}
           />
         </div>
       ) : null}

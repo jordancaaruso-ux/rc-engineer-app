@@ -67,6 +67,7 @@ import { ShareRunButton } from "@/components/share/ShareRunButton";
 import { runHasLaps, runIsShareable } from "@/lib/share/shareCardModel";
 import { formatRunSessionDisplay } from "@/lib/runSession";
 import { InlineValueEdit } from "@/components/runs/InlineValueEdit";
+import { RunWhenInlineEdit } from "@/components/runs/RunWhenField";
 import { InlinePickEdit, type InlinePickOption } from "@/components/runs/InlinePickEdit";
 import { RunTireEndsBlock } from "@/components/runs/RunTireEndsBlock";
 import { isSplitTireRun } from "@/lib/tires/runTireEnds";
@@ -754,6 +755,13 @@ export function RunDetailPanel({
 
   const runInstant = resolveRunDisplayInstant(run);
   const dateTimeLabel = formatRunDateTime(runInstant, displayTimeZone);
+  /** Set only for a run with no timing-sheet time, the one kind whose date/time can be moved. */
+  const handLoggedRunInstantIso =
+    !run.importedLapTimeSessionId &&
+    (run.importedLapSets?.length ?? 0) === 0 &&
+    !Number.isNaN(runInstant.getTime())
+      ? runInstant.toISOString()
+      : null;
   // No laps and no setup means the picture would be a title and nothing else — so no button.
   const shareable = runIsShareable(run, Boolean(run.setupSnapshot?.id));
   const shareLabel = [
@@ -1048,9 +1056,14 @@ export function RunDetailPanel({
         {/*
           ============================== WHAT A CORRECTION MAY NOT TOUCH ==============================
 
-          Date/time, track, session and event are all read-only, in edit mode and out of it.
+          Track, session and event are read-only, in edit mode and out of it. So is the date/time of
+          a run whose laps came off a timing sheet: that sheet's clock is the truth.
 
-          The first two never moved. The other two did until 2026-08-21, and the founder took them
+          A run typed in by hand is the one exception (owner's pick, 2026-09-26): it was stamped
+          when it was saved, so last night's practice logged this morning sat on today with no way
+          to move it. Its date/time is corrected here, like the Log run form's "When" line.
+
+          Track never moved. Session and event did until 2026-08-21, and the founder took them
           back on the ground that they are not corrections at all — they are the run's IDENTITY.
           An event re-homes the session into a different meeting, taking its track, its field and its
           place in the day with it; the session label is stamped by the timing sheet the run came off,
@@ -1061,7 +1074,20 @@ export function RunDetailPanel({
           rather than kept "just in case" — there is no longer a door for it to guard.
         */}
         <StatWellGrid cols={2} smCols={3}>
-          <StatWellCell label="Date / time" value={dateTimeLabel} />
+          <StatWellCell
+            label="Date / time"
+            value={
+              canEdit && handLoggedRunInstantIso ? (
+                <RunWhenInlineEdit
+                  label={dateTimeLabel}
+                  valueIso={handLoggedRunInstantIso}
+                  onSave={(iso) => corrections.saveFields({ runAtIso: iso })}
+                />
+              ) : (
+                dateTimeLabel
+              )
+            }
+          />
           {trackDisplay ? <StatWellCell label="Track" value={trackDisplay} /> : null}
           <StatWellCell label="Session" value={sessionLabelDisplay} />
           <StatWellCell
