@@ -207,7 +207,7 @@ async function linkHandMadeEventsToLiveRc(input: {
         });
         continue;
       }
-      const renamedTo = isDefaultEventName(ev.name, [input.track.name, ev.trackNameSnapshot], startYmd)
+      const renamedTo = isDefaultEventName(ev.name, [input.track.name, ev.trackNameSnapshot])
         ? meeting.name
         : null;
       // The meeting's days join the event's: a Saturday event linked to a Friday-to-Sunday meeting

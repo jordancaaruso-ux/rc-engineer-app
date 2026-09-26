@@ -156,17 +156,27 @@ export function defaultEventName(trackName: string, ymd: string): string {
   return `${trackName.trim()} · ${shortDayLabel(ymd)}`;
 }
 
+/** The day in a placeholder name, any day: "Sat 26 Sep" (`shortDayLabel`). */
+const DAY_LABEL_RE = new RegExp(`^(?:${DOW.join("|")}) (?:[1-9]|[12]\\d|3[01]) (?:${MON.join("|")})$`);
+
 /**
- * True when `name` is still the placeholder for this event's first day at one of the given track
- * names (the track as it is now, and as the event recorded it — a catalog rename must not turn a
- * placeholder into something that looks chosen).
+ * True when `name` is still a placeholder the form filled in, "<track> · <day>", at one of the
+ * given track names (the track as it is now, and as the event recorded it — a catalog rename must
+ * not turn a placeholder into something that looks chosen).
+ *
+ * Any day counts, not only the event's own first day. Before the filled-in name followed the dates
+ * (test drive 2026-09-26), a meeting moved to another day kept the day it was first filled in for:
+ * "Indoor Raceway · Sat 26 Sep" on a meeting held on the 24th. Nobody chose that name either, so
+ * LiveRC's name still replaces it.
  */
 export function isDefaultEventName(
   name: string,
   trackNames: ReadonlyArray<string | null | undefined>,
-  startYmd: string,
 ): boolean {
   const n = name.trim();
   if (!n) return false;
-  return trackNames.some((t) => Boolean(t?.trim()) && n === defaultEventName(t!, startYmd));
+  return trackNames.some((t) => {
+    const prefix = `${t?.trim() ?? ""} · `;
+    return prefix !== " · " && n.startsWith(prefix) && DAY_LABEL_RE.test(n.slice(prefix.length));
+  });
 }
