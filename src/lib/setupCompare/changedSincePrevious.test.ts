@@ -65,3 +65,18 @@ test("a plain number, with or without a unit, still compares as a number", () =>
   // …and a real change still is.
   assert.deepEqual(changes({ some_gap: "5.4 mm" }, { some_gap: "5.6 mm" }), ["some_gap: 5.4 <- 5.6"]);
 });
+
+// ---- an object is never printed as text (test drive 2026-09-26) ----
+
+test("a tyre prints as its name and run, never as [object Object]", () => {
+  // Jack's run from a saved setup held no tyre; the run before held one.
+  const tyre = { tireTypeId: "t1", displayName: "AKA Array Super Soft", tireRunNumber: 5, tireAgeKnown: true };
+  assert.deepEqual(changes({ box_1: "4" }, { box_1: "3", tires: tyre }), [
+    "box_1: 4 <- 3",
+    "tires: — <- AKA Array Super Soft · run 5",
+  ]);
+});
+
+test("the text an old String(object) write left in a box reads as a blank", () => {
+  assert.deepEqual(changes({ box_2: "[object Object]" }, { box_2: "5" }), ["box_2: — <- 5"]);
+});
