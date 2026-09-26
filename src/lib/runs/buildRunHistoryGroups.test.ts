@@ -529,3 +529,69 @@ test("resolveSessionGroupKeys gives the count query the same folded key as the l
   // The plain per-run key is unchanged — it is the unfolded answer.
   assert.match(sessionGroupKey(rows[1]!), /^day-2026-09-05-/);
 });
+
+test("a meeting's dates are the days it ran, whatever zone the server is in", () => {
+  // Found 2026-09-26: on a UTC server (Vercel) a one-day club day with a run before 10am
+  // in Brisbane read "25 – 26 Sept 2026", and "26 – 26 Sept 2026" on a Sydney machine.
+  const clubDay = {
+    name: "Bayside Club Day",
+    startDate: new Date("2026-09-26T12:00:00Z"),
+    endDate: new Date("2026-09-26T12:00:00Z"),
+    track: { name: "Bayside" },
+  };
+  const titles = {
+    name: "State Titles",
+    startDate: new Date("2026-09-30T12:00:00Z"),
+    endDate: new Date("2026-10-01T12:00:00Z"),
+    track: { name: "Bayside" },
+  };
+  // Older rows store the day at UTC midnight. A real one read "22 – 23 May" live.
+  const older = {
+    name: "Bayside Clubday",
+    startDate: new Date("2026-05-23T00:00:00Z"),
+    endDate: new Date("2026-05-23T00:00:00Z"),
+    track: { name: "Bayside" },
+  };
+  // Seeded meetings carry real instants: here Brisbane midnight to the end of the day.
+  const seeded = {
+    name: "Seeded Club Day",
+    startDate: new Date("2026-09-26T14:00:00Z"),
+    endDate: new Date("2026-09-27T13:59:59Z"),
+    track: { name: "Bayside" },
+  };
+  const run = (id: string, iso: string, eventId: string, event: typeof clubDay) => ({
+    id,
+    userId: "u1",
+    createdAt: new Date(iso),
+    sortAt: new Date(iso),
+    eventId,
+    localTimeZone: "Australia/Brisbane",
+    trackNameSnapshot: "Bayside",
+    track: { name: "Bayside" },
+    event,
+  });
+  const runs = [
+    run("q2", "2026-09-26T09:35:00+10:00", "club", clubDay),
+    run("q3", "2026-09-26T10:20:00+10:00", "club", clubDay),
+    run("t1", "2026-09-30T08:10:00+10:00", "titles", titles),
+    run("t2", "2026-10-01T15:40:00+10:00", "titles", titles),
+    run("o1", "2026-05-23T08:30:00+10:00", "older", older),
+    run("s1", "2026-09-27T09:00:00+10:00", "seeded", seeded),
+  ];
+  // Restored by value: deleting TZ does not put Node back on the machine's zone.
+  const machineZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  try {
+    for (const serverZone of ["UTC", "Australia/Sydney", "America/Los_Angeles"]) {
+      process.env.TZ = serverZone;
+      const labels = Object.fromEntries(
+        buildRunHistoryGroups(runs, "Australia/Brisbane").map((g) => [g.id, g.dateLabel])
+      );
+      assert.match(labels["event-club"] ?? "", /^26 Sept? 2026$/, serverZone);
+      assert.match(labels["event-titles"] ?? "", /^30 Sept? – 1 Oct 2026$/, serverZone);
+      assert.equal(labels["event-older"], "23 May 2026", serverZone);
+      assert.match(labels["event-seeded"] ?? "", /^27 Sept? 2026$/, serverZone);
+    }
+  } finally {
+    process.env.TZ = machineZone;
+  }
+});

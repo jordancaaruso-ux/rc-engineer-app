@@ -228,6 +228,41 @@ export function formatRunDayLabel(dayKey: string): string {
   }).format(date);
 }
 
+/**
+ * The calendar day (YYYY-MM-DD) an event's declared start or end names.
+ *
+ * Every form in the app stores a date at UTC noon (`parseEventDateYmd`), and older rows sit at
+ * UTC midnight; for those the UTC date IS the day, in every zone. Any other time is a real
+ * instant (demo and seeded meetings carry "now" shifted, or local midnight), and an instant's
+ * day is the driver's, as a run's is. Read as UTC dates, those pushed a Brisbane meeting's
+ * start back a day. The fold (`eventDeclaredDays`) still reads UTC dates; the two agree on
+ * every date the app writes.
+ */
+function eventDayKey(declared: Date | string, zone: string | null): string | null {
+  const at = new Date(declared);
+  if (Number.isNaN(at.getTime())) return null;
+  const clock = at.toISOString().slice(11, 23);
+  const dateOnly = clock === "12:00:00.000" || clock === "00:00:00.000";
+  return dateKey(at, dateOnly ? null : zone);
+}
+
+/**
+ * A meeting's dates from its first and last YYYY-MM-DD day keys, with shared parts said
+ * once so a range stays on one line: "26 Sept 2026", "26 – 28 Jun 2026",
+ * "28 Jun – 1 Jul 2026", "30 Dec 2026 – 2 Jan 2027". Printed at UTC noon in UTC, like
+ * `formatRunDayLabel`, because the keys are already calendar days.
+ */
+function formatDayKeyRange(first: string, last: string): string {
+  const label = (dayKey: string) => formatGroupDate(`${dayKey}T12:00:00Z`, "UTC");
+  const endLabel = label(last);
+  if (first === last) return endLabel;
+  if (first.slice(0, 7) === last.slice(0, 7)) return `${Number(first.slice(8, 10))} – ${endLabel}`;
+  if (first.slice(0, 4) === last.slice(0, 4)) {
+    return `${label(first).replace(/\s\d{4}$/, "")} – ${endLabel}`;
+  }
+  return `${label(first)} – ${endLabel}`;
+}
+
 /** Whole calendar days between two YYYY-MM-DD keys; 1 means they touch. */
 export function dayKeyDistance(a: string, b: string): number {
   const ms = Math.abs(Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`));
@@ -399,24 +434,19 @@ export function buildRunHistoryGroups<T extends RunForHistoryGroup>(
       ? (() => {
           // The declared range, widened to any day a run in the group actually landed on:
           // a folded Friday practice makes a "13 – 14 Sep" meeting a "12 – 14 Sep" one.
-          const instants = groupRuns.map((r) => runSessionSortInstant(r).getTime());
-          const declaredStart = run.event.startDate ? new Date(run.event.startDate).getTime() : Number.NaN;
-          const declaredEnd = run.event.endDate ? new Date(run.event.endDate).getTime() : Number.NaN;
-          const start = new Date(Math.min(...instants, ...(Number.isNaN(declaredStart) ? [] : [declaredStart])));
-          const end = new Date(Math.max(...instants, ...(Number.isNaN(declaredEnd) ? [] : [declaredEnd])));
-          if (dateKey(start) === dateKey(end)) return formatGroupDate(start);
-          // Compact shared segments so multi-day ranges stay on one line:
-          // "26 – 28 Jun 2026" / "28 Jun – 1 Jul 2026".
-          const startLabel = formatGroupDate(start);
-          const endLabel = formatGroupDate(end);
-          const sameYear = start.getFullYear() === end.getFullYear();
-          if (sameYear && start.getMonth() === end.getMonth()) {
-            return `${start.getDate()} – ${endLabel}`;
+          //
+          // Compared as calendar DAYS, never as instants. A run's day is the driver's own
+          // (`runLocalDayKey`, the rule that grouped it); an event's is `eventDayKey`.
+          // Comparing raw instants on a UTC server dragged every one-day meeting with a run
+          // before 10am in Brisbane back a day, so a club day held on the 26th read
+          // "25 – 26 Sept 2026" (found 2026-09-26).
+          const days = groupRuns.map((r) => runLocalDayKey(r, zones));
+          for (const declared of [run.event.startDate, run.event.endDate]) {
+            const day = declared ? eventDayKey(declared, runZone) : null;
+            if (day) days.push(day);
           }
-          if (sameYear) {
-            return `${startLabel.replace(/\s\d{4}$/, "")} – ${endLabel}`;
-          }
-          return `${startLabel} – ${endLabel}`;
+          days.sort();
+          return formatDayKeyRange(days[0]!, days[days.length - 1]!);
         })()
       : formatGroupDate(runSessionSortInstant(run), runZone);
     groups.push({
