@@ -51,6 +51,7 @@
     "test:events-season": "npx tsx src/lib/events/seasonTimeline.test.ts && npx tsx src/lib/events/seasonCadence.test.ts",
     "test:event-access": "npx tsx --test src/lib/events/eventAccess.test.ts",
     "test:event-joinable": "npx tsx --test src/lib/events/joinableTeamEventLogic.test.ts",
+    "test:track-events": "npx tsx --test src/lib/events/liveRcMeetingMatch.test.ts src/lib/events/trackEventGroups.test.ts src/lib/lapWatch/liveRcEventList.test.ts",
     "test:weather": "npx tsx src/lib/weather/weather.test.ts",
     "test:units": "npx tsx --test src/lib/units/unitSystem.test.ts",
     "test:condition-signature": "npx tsx src/lib/trackConditionSignature.test.ts",

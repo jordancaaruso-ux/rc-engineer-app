@@ -19,7 +19,7 @@ export async function mergeEventIntoExistingByResultsUrl(input: {
   return { merged: true, eventId: existing.id };
 }
 
-/** Repoint runs, sessions, participations from loser → winner; delete loser. */
+/** Repoint runs, sessions, participations and debriefs from loser → winner; delete loser. */
 export async function mergeEvents(input: { winnerId: string; loserId: string }): Promise<void> {
   const { winnerId, loserId } = input;
   if (winnerId === loserId) return;
@@ -33,6 +33,25 @@ export async function mergeEvents(input: { winnerId: string; loserId: string }):
       where: { linkedEventId: loserId },
       data: { linkedEventId: winnerId },
     });
+
+    // A debrief is keyed by its Sessions group, and the loser's runs now group under the winner.
+    // Move each one across unless the driver already wrote one there; that one stays where it is
+    // and is still found by its day and track (see MeetingDebrief).
+    const loserDebriefs = await tx.meetingDebrief.findMany({
+      where: { eventId: loserId },
+      select: { id: true, userId: true },
+    });
+    for (const debrief of loserDebriefs) {
+      const clash = await tx.meetingDebrief.findUnique({
+        where: { userId_meetingKey: { userId: debrief.userId, meetingKey: `event-${winnerId}` } },
+        select: { id: true },
+      });
+      if (clash) continue;
+      await tx.meetingDebrief.update({
+        where: { id: debrief.id },
+        data: { eventId: winnerId, meetingKey: `event-${winnerId}` },
+      });
+    }
 
     const loserParts = await tx.eventParticipation.findMany({
       where: { eventId: loserId },

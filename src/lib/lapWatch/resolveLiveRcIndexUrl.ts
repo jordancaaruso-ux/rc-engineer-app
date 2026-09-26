@@ -137,6 +137,28 @@ export async function resolveRaceEventHubUrl(origin: string): Promise<ResolveLiv
 }
 
 /**
+ * A track's LiveRC events page, parsed: every meeting the club has set up, posted-ahead ones
+ * included. Shares its five-minute hold with `resolveRaceEventHubsForDay`, so the log-run event
+ * list and the lap step read the page once between them.
+ *
+ * An empty parse of a page that loaded is treated as a failure, not "no meetings": it has only
+ * ever meant LiveRC changed its layout, and saying "nothing on today" then would be a lie.
+ */
+export async function fetchLiveRcEventList(
+  origin: string,
+): Promise<{ ok: true; events: LiveRcEventListRow[] } | { ok: false }> {
+  const cacheKey = `events:${origin}`;
+  const cached = cacheGet<LiveRcEventListRow[]>(cacheKey);
+  if (cached) return { ok: true, events: cached };
+  const fetched = await fetchUrlText(`${origin}/events/`);
+  if (!fetched.ok) return { ok: false };
+  const events = parseLiveRcEventListHtml(fetched.text, fetched.finalUrl ?? `${origin}/events/`);
+  if (events.length === 0) return { ok: false };
+  cacheSet(cacheKey, events);
+  return { ok: true, events };
+}
+
+/**
  * Every LiveRC meeting that could hold races on `ymd` (the track's date) — never just the one the
  * dashboard calls current. A driver importing last weekend at a club that has raced since used to
  * get nothing, because only the newest meeting was ever opened. The current meeting is always

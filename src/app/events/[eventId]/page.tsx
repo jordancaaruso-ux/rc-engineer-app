@@ -96,8 +96,6 @@ export default async function EventDetailPage(props: {
             initialStartDate={event.startDate}
             initialEndDate={event.endDate}
             initialNotes={event.notes}
-            initialControlledTireTypeId={event.controlledTireTypeId}
-            initialControlledAdditiveTypeId={event.controlledAdditiveTypeId}
             initialPracticeSourceUrl={event.practiceSourceUrl}
             initialResultsSourceUrl={event.resultsSourceUrl}
             initialMyRcmUrl={event.myRcmUrl}

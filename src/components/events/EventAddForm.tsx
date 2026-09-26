@@ -4,15 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import {
   InlineNewTrackRow,
   type InlineCreatedTrack,
   type InlineNewTrackRowHandle,
 } from "@/components/runs/InlineNewTrackRow";
-import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
-import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 import { EventDateRangeField } from "@/components/events/EventDateRangeField";
 
 export type TrackOption = {
@@ -72,10 +69,6 @@ export function EventAddForm({
   const [resultsSourceUrl, setResultsSourceUrl] = useState("");
   /** Where this meeting lives on MyRCM. A destination for the driver, never a page we fetch. */
   const [myRcmUrl, setMyRcmUrl] = useState("");
-  const [tireControlled, setTireControlled] = useState(false);
-  const [controlledTireTypeId, setControlledTireTypeId] = useState("");
-  const [controlAdditiveEnabled, setControlAdditiveEnabled] = useState(false);
-  const [controlledAdditiveTypeId, setControlledAdditiveTypeId] = useState("");
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -145,10 +138,6 @@ export function EventAddForm({
           // NOT gated on `showTimingUrlFields`: that switch asks whether the track already has a
           // page we can scan, and no amount of LiveRC makes a MyRCM meeting importable.
           myRcmUrl: myRcmUrl.trim() || null,
-          controlledTireTypeId: tireControlled ? controlledTireTypeId.trim() || null : null,
-          controlledAdditiveTypeId: controlAdditiveEnabled
-            ? controlledAdditiveTypeId.trim() || null
-            : null,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -173,10 +162,6 @@ export function EventAddForm({
       setNotes("");
       setPracticeSourceUrl("");
       setResultsSourceUrl("");
-      setTireControlled(false);
-      setControlledTireTypeId("");
-      setControlAdditiveEnabled(false);
-      setControlledAdditiveTypeId("");
       setMessage("Event created.");
       router.refresh();
     } catch (err) {
@@ -300,57 +285,6 @@ export function EventAddForm({
           placeholder="Your class page on MyRCM"
         />
         <p className="mt-1 text-[11px] text-muted-foreground">Results come in as a file — this is where Import PDF sends you.</p>
-      </div>
-      <div className="space-y-1.5">
-        <label className="block text-[11px] text-muted-foreground">Tire</label>
-        <SegmentedControl<"open" | "controlled">
-          ariaLabel="Event tire — open or controlled"
-          size="sm"
-          value={tireControlled ? "controlled" : "open"}
-          onChange={(v) => {
-            const on = v === "controlled";
-            setTireControlled(on);
-            if (!on) setControlledTireTypeId("");
-          }}
-          options={[
-            { value: "open", label: "Open" },
-            { value: "controlled", label: "Controlled" },
-          ]}
-        />
-        {tireControlled ? (
-          <TireTypeCombobox
-            value={controlledTireTypeId}
-            onChange={setControlledTireTypeId}
-            placeholder="Select control tire type…"
-            aria-label="Event control tire type"
-          />
-        ) : null}
-      </div>
-      <div className="space-y-1.5">
-        <label className="block text-[11px] text-muted-foreground">Additive</label>
-        <SegmentedControl<"open" | "controlled">
-          ariaLabel="Event additive — open or controlled"
-          size="sm"
-          value={controlAdditiveEnabled ? "controlled" : "open"}
-          onChange={(v) => {
-            const on = v === "controlled";
-            setControlAdditiveEnabled(on);
-            if (!on) setControlledAdditiveTypeId("");
-          }}
-          options={[
-            { value: "open", label: "Open" },
-            { value: "controlled", label: "Controlled" },
-          ]}
-        />
-        {controlAdditiveEnabled ? (
-          <AdditiveTypeCombobox
-            value={controlledAdditiveTypeId}
-            onChange={setControlledAdditiveTypeId}
-            placeholder="Select control additive…"
-            aria-label="Event control additive type"
-            allowInlineCreate={false}
-          />
-        ) : null}
       </div>
       <div className="flex items-center gap-2">
         <button

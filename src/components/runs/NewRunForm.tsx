@@ -38,8 +38,6 @@ import { TrackCombobox } from "@/components/runs/TrackCombobox";
 import { RunLayoutPicker } from "@/components/runs/RunLayoutPicker";
 import { displayTireSelection } from "@/lib/tires/tireSelectionValue";
 import type { LastRunTires } from "@/lib/tires/tireStintValue";
-import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
-import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { RunTireSelectionPanel, type TireStintValue } from "@/components/runs/RunTireSelectionPanel";
 import { tireProfileForDiscipline } from "@/lib/cars/tireProfile";
@@ -112,6 +110,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { AutoGrowTextarea } from "@/components/ui/AutoGrowTextarea";
 import { Switch } from "@/components/ui/Switch";
 import { splitEventsForPicker } from "@/lib/events/splitEventsForPicker";
+import { eventDateToYmd } from "@/lib/eventDateParse";
 import { normalizeLapTimes } from "@/lib/runLaps";
 import type { LapRow } from "@/lib/lapAnalysis";
 import { primaryLapRowsFromRun } from "@/lib/lapAnalysis";
@@ -144,12 +143,14 @@ import { CarHandlingRatingQuickPick } from "@/components/runs/CarHandlingRatingQ
 import { trackHasMarkedLocation } from "@/lib/location/coordinates";
 import { TrackNearbySuggestions } from "@/components/runs/TrackNearbySuggestions";
 import {
-  EventAtTrackPrompt,
-  eventAtTrackDismissKey,
-  type EventAtTrackDetection,
+  buildTrackEventGroups,
+  hubUrlFromOptionValue,
   type JoinableTeamEvent,
-} from "@/components/runs/EventAtTrackPrompt";
-import { defaultEventDatesForLiveRcDetection } from "@/lib/lapWatch/liveRcMeetingDates";
+  type TrackListLiveRcMeeting,
+  type TrackLiveRcStatus,
+} from "@/lib/events/trackEventGroups";
+import { defaultEventName } from "@/lib/events/liveRcMeetingMatch";
+import { localTodayYmd } from "@/lib/lapWatch/liveRcMeetingDates";
 import { getCurrentPosition, GeolocationRequestError } from "@/lib/location/getCurrentPosition";
 import { RunConditionsSection } from "@/components/runs/RunConditionsSection";
 import { WizardConditionsBand } from "@/components/runs/WizardConditionsBand";
@@ -720,11 +721,6 @@ export function NewRunForm(props: {
   const [tireStintId, setTireStintId] = useState<string | null>(null);
   /** False when the driver said "not sure how many runs" (e.g. a set they were given). */
   const [tireAgeKnown, setTireAgeKnown] = useState<boolean>(true);
-  /** Compound the picker should activate (event spec tire); never forces a selection. */
-  const [preferredTireType, setPreferredTireType] = useState<{
-    id: string;
-    displayName: string;
-  } | null>(null);
   const [runsCompleted, setRunsCompleted] = useState<number>(0);
   /** Front/rear cars: the front tire. The flat tire state above is then the REAR. */
   const [frontTire, setFrontTire] = useState<TireEndState>(EMPTY_TIRE_END);
@@ -754,10 +750,8 @@ export function NewRunForm(props: {
   const [newEventDirection, setNewEventDirection] = useState<"" | "CW" | "CCW">("");
   const [newEventStartDate, setNewEventStartDate] = useState("");
   const [newEventEndDate, setNewEventEndDate] = useState("");
-  const [newEventTireControlled, setNewEventTireControlled] = useState(false);
-  const [newEventControlledTireTypeId, setNewEventControlledTireTypeId] = useState("");
-  const [newEventControlAdditiveEnabled, setNewEventControlAdditiveEnabled] = useState(false);
-  const [newEventControlledAdditiveTypeId, setNewEventControlledAdditiveTypeId] = useState("");
+  /** The name the New event form filled in itself, so reopening refreshes it but never a typed one. */
+  const newEventNameAutoRef = useRef<string | null>(null);
   /**
    * The meeting's own timing URLs, read from the selected event and never typed here.
    *
@@ -774,9 +768,6 @@ export function NewRunForm(props: {
    * from beside the Import PDF button where it is actually used, not from this step.
    */
   const [eventMyRcmUrl, setEventMyRcmUrl] = useState("");
-  const [eventControlledTireTypeId, setEventControlledTireTypeId] = useState("");
-  const [eventControlAdditiveEnabled, setEventControlAdditiveEnabled] = useState(false);
-  const [eventControlledAdditiveTypeId, setEventControlledAdditiveTypeId] = useState("");
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [eventError, setEventError] = useState<string | null>(null);
   const [eventsLoading, setEventsLoading] = useState(false);
@@ -1208,9 +1199,19 @@ export function NewRunForm(props: {
   const trackPickedManuallyRef = useRef(false);
   /** True once the user has hand-picked a layout/direction; suppresses event auto-fill. */
   const layoutPickedManuallyRef = useRef(false);
-  const [eventAtTrack, setEventAtTrack] = useState<EventAtTrackDetection | null>(null);
-  const [eventAtTrackBusy, setEventAtTrackBusy] = useState(false);
-  const dismissedEventAtTrackRef = useRef<Set<string>>(new Set());
+  /**
+   * What LiveRC has on at the picked track, for the event list (`/api/events/at-track`). Keyed by
+   * the track it was read for, so a slow answer for the previous track is never shown for this
+   * one. `todayYmd` is the track's own day, which the list groups around.
+   */
+  const [trackEvents, setTrackEvents] = useState<{
+    trackId: string;
+    todayYmd: string | null;
+    status: TrackLiveRcStatus;
+    meetings: TrackListLiveRcMeeting[];
+  } | null>(null);
+  /** The LiveRC meeting whose event is being made (or joined) after a tap in the list. */
+  const [addingLiveRcEvent, setAddingLiveRcEvent] = useState<string | null>(null);
   /**
    * Latest picked track, for the events effect: it runs off `needsEvent` alone (adding `trackId` to
    * its deps would refetch and re-auto-select on every track change), so its closure would other-
@@ -2085,6 +2086,48 @@ export function NewRunForm(props: {
     () => splitEventsForPicker(events),
     [events]
   );
+  /** Today at the picked track once the list has read it (its own clock), else this device's day. */
+  const eventListTodayYmd =
+    trackEvents && trackEvents.trackId === trackId.trim() && trackEvents.todayYmd
+      ? trackEvents.todayYmd
+      : localTodayYmd();
+  /**
+   * The event list for the picked track: On today · Coming up · Later · Earlier here, from our own
+   * events, the team's and LiveRC's (`buildTrackEventGroups`). Null with no track yet, when the list
+   * falls back to every event (below) and picking one sets the track, as it always has.
+   */
+  const trackEventGroups = useMemo(() => {
+    const tid = trackId.trim();
+    if (!tid) return null;
+    const read = trackEvents && trackEvents.trackId === tid ? trackEvents : null;
+    return buildTrackEventGroups({
+      trackId: tid,
+      todayYmd: eventListTodayYmd,
+      events,
+      joinable: joinableEvents,
+      liveRc: read ? { status: read.status, meetings: read.meetings } : { status: "none", meetings: [] },
+    });
+  }, [trackId, trackEvents, eventListTodayYmd, events, joinableEvents]);
+  const allEventGroups = useMemo(
+    () =>
+      [
+        {
+          label: "Upcoming",
+          options: eventSelectGroups.upcoming.map((ev) => ({
+            value: ev.id,
+            label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
+          })),
+        },
+        {
+          label: "Past",
+          options: eventSelectGroups.past.map((ev) => ({
+            value: ev.id,
+            label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
+          })),
+        },
+      ].filter((g) => g.options.length > 0),
+    [eventSelectGroups]
+  );
 
   const selectedEventForRun = useMemo(
     () => (needsEvent && eventId ? events.find((e) => e.id === eventId) ?? null : null),
@@ -2113,12 +2156,12 @@ export function NewRunForm(props: {
     return track.liveRcUrl?.trim() || track.speedhiveUrl?.trim() ? null : track;
   }, [eventId, events, tracksList]);
   const newEventTrackNeedingTiming = useMemo(() => {
-    const track = newEventTrackId
-      ? tracksList.find((t) => t.id === newEventTrackId) ?? null
-      : null;
+    // The event is at the run's track when one is picked; the form's own picker otherwise.
+    const tid = trackId.trim() || newEventTrackId;
+    const track = tid ? tracksList.find((t) => t.id === tid) ?? null : null;
     if (!track) return null;
     return track.liveRcUrl?.trim() || track.speedhiveUrl?.trim() ? null : track;
-  }, [newEventTrackId, tracksList]);
+  }, [trackId, newEventTrackId, tracksList]);
   /**
    * Ask for the track's timing page here, or leave it to the lap step?
    *
@@ -2166,30 +2209,22 @@ export function NewRunForm(props: {
     },
     [eventId]
   );
-  /** Event day + event with a track: run track follows the event (picker disabled). */
-  const trackLockedToEvent = Boolean(selectedEventForRun?.trackId);
-
-  // Event-mandated controlled tire / additive. When set, the run's Tires step is
-  // locked to them (chosen at the event, not overridable in a run). Both derive
-  // purely from the selected event's config.
-  const specTireType = useMemo(
-    () =>
-      needsEvent && eventId && eventControlledTireTypeId.trim() && preferredTireType
-        ? preferredTireType
-        : null,
-    [needsEvent, eventId, eventControlledTireTypeId, preferredTireType]
-  );
-  const controlAdditive = useMemo(() => {
-    const id = eventControlledAdditiveTypeId.trim();
-    if (!(needsEvent && eventId && eventControlAdditiveEnabled && id)) return null;
-    return { id, displayName: additiveTypesById[id]?.displayName ?? "Control additive" };
-  }, [
-    needsEvent,
-    eventId,
-    eventControlAdditiveEnabled,
-    eventControlledAdditiveTypeId,
-    additiveTypesById,
-  ]);
+  /**
+   * Classic form, Event day, event with a track: the run's track follows the event (picker
+   * disabled). Not in the wizard since Track moved above the event (founder 2026-09-26): there the
+   * track is chosen first and the event list is that track's, so the picker stays open, and
+   * changing the track lets go of an event at the old one (`releaseEventForTrack`).
+   */
+  const trackLockedToEvent = !wizardActive && Boolean(selectedEventForRun?.trackId);
+  /**
+   * A track picked by hand in the wizard: an event selected at a different track no longer applies.
+   * Without this the "keep the track following the event" effect would put the old track back.
+   */
+  const releaseEventForTrack = (nextTrackId: string) => {
+    if (!wizardActive || !eventId) return;
+    const ev = events.find((e) => e.id === eventId);
+    if (ev?.trackId && ev.trackId !== nextTrackId) setEventId("");
+  };
 
   /**
    * Per-card completion for the floating progress rail. Required = the exact
@@ -2316,31 +2351,6 @@ export function NewRunForm(props: {
     setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
     setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
     setEventMyRcmUrl(ev.myRcmUrl?.trim() ?? "");
-    setEventControlledTireTypeId(ev.controlledTireTypeId?.trim() ?? ev.controlledTireType?.id ?? "");
-    const nextControlledAdditiveId =
-      ev.controlledAdditiveTypeId?.trim() ?? ev.controlledAdditiveType?.id ?? "";
-    setEventControlAdditiveEnabled(Boolean(nextControlledAdditiveId));
-    setEventControlledAdditiveTypeId(nextControlledAdditiveId);
-    if (sessionType === "RACE_MEETING" && ev.controlledTireTypeId) {
-      // Spec-tire event: steer the picker to that compound. Never forces NEW — the
-      // driver's most recent set of the spec compound is usually the right pick.
-      const display = ev.controlledTireType?.displayName ?? ev.controlledTireLabel ?? "";
-      if (display) {
-        setPreferredTireType({ id: ev.controlledTireTypeId, displayName: display });
-      }
-    }
-    if (sessionType === "RACE_MEETING" && nextControlledAdditiveId) {
-      setAdditiveTypeId(nextControlledAdditiveId);
-      if (ev.controlledAdditiveType) {
-        setAdditiveTypesById((prev) => ({
-          ...prev,
-          [ev.controlledAdditiveType!.id]: {
-            id: ev.controlledAdditiveType!.id,
-            displayName: ev.controlledAdditiveType!.displayName,
-          },
-        }));
-      }
-    }
   }
 
   function parseEventFromApi(raw: Record<string, unknown>): EventOption {
@@ -2360,6 +2370,9 @@ export function NewRunForm(props: {
       id: String(raw.id),
       name: String(raw.name),
       trackId: (raw.trackId as string | null) ?? null,
+      trackLayoutId: (raw.trackLayoutId as string | null) ?? null,
+      trackDirection:
+        raw.trackDirection === "CW" || raw.trackDirection === "CCW" ? raw.trackDirection : null,
       startDate: start,
       endDate: end,
       notes: (raw.notes as string | null) ?? null,
@@ -2376,92 +2389,58 @@ export function NewRunForm(props: {
   }
 
   /**
-   * `forceNew` is the "Make my own" path: ignore the event we matched and create one from the
-   * LiveRC name instead. Only offered for the weak same-track-this-week match AND only when LiveRC
-   * actually named a meeting, so posting the results URL here cannot collide with an existing event
-   * that already carries it.
+   * A LiveRC row in the event list: make the meeting's event, or join it when someone already
+   * has. `POST /api/events` with the meeting's link does both — a 409 is "already there, and
+   * you're on it now". The event takes LiveRC's name and the dates the club listed.
    */
-  async function confirmEventAtTrack(forceNew = false) {
-    if (!eventAtTrack || !trackId.trim()) return;
-    setEventAtTrackBusy(true);
+  async function addLiveRcEvent(hubUrl: string) {
+    const tid = trackId.trim();
+    const meeting =
+      trackEvents && trackEvents.trackId === tid
+        ? trackEvents.meetings.find((m) => m.hubUrl === hubUrl) ?? null
+        : null;
+    if (!tid || !meeting) return;
+    setAddingLiveRcEvent(hubUrl);
     setEventError(null);
     try {
-      const det = eventAtTrack;
-      // Saying yes IS the decision that this is an event day — the detection itself no longer
-      // makes it, because a match booked for later in the week must not reclassify a test run.
-      setSessionType("RACE_MEETING");
-      if (det.matchedEventId && !forceNew) {
-        let ev = events.find((e) => e.id === det.matchedEventId);
-        if (!ev) {
-          // Not in our list because we are not on it yet — a teammate's event, or one matched by
-          // results URL. Joining is what makes it ours to select.
-          const joinRes = await fetch(`/api/events/${det.matchedEventId}/join`, {
-            method: "POST",
-          });
-          const joinData = (await joinRes.json().catch(() => ({}))) as {
-            error?: string;
-            event?: Record<string, unknown>;
-          };
-          if (!joinRes.ok || !joinData.event) {
-            throw new Error(joinData.error ?? "Could not join the matching event.");
-          }
-          const joined = parseEventFromApi(joinData.event);
-          ev = joined;
-          setEvents((prev) =>
-            prev.some((e) => e.id === joined.id) ? prev : [joined, ...prev]
-          );
-          setJoinableEvents((prev) => prev.filter((j) => j.id !== joined.id));
-        }
-        applyEventOption(ev);
-      } else {
-        // Only reachable with a LiveRC meeting in hand — the prompt hides both create paths
-        // otherwise, because there would be no name and no results URL to build an event from.
-        if (!det.eventHubUrl || !det.eventLabel) {
-          throw new Error("Nothing to create an event from.");
-        }
-        const { startYmd, endYmd } = defaultEventDatesForLiveRcDetection();
-        const res = await fetch("/api/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: det.eventLabel,
-            trackId: trackId.trim(),
-            startDate: startYmd,
-            endDate: endYmd,
-            resultsSourceUrl: det.eventHubUrl,
-          }),
-        });
-        const data = (await res.json().catch(() => ({}))) as {
-          error?: string;
-          existingEventId?: string;
-          event?: Record<string, unknown>;
-        };
-        if (res.status === 409 && data.existingEventId && data.event) {
-          const existing = parseEventFromApi(data.event);
-          setEvents((prev) => {
-            if (prev.some((e) => e.id === existing.id)) return prev;
-            return [existing, ...prev];
-          });
-          applyEventOption(existing);
-        } else if (!res.ok) {
-          throw new Error(data.error ?? `Could not create event (${res.status})`);
-        } else if (data.event) {
-          const created = parseEventFromApi(data.event);
-          setEvents((prev) => [created, ...prev]);
-          applyEventOption(created);
-          setStatus(
-            forceNew
-              ? "Your own event created — selected."
-              : "Event created from LiveRC — selected."
-          );
-        } else {
-          throw new Error("Invalid response when creating event.");
-        }
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: meeting.name,
+          trackId: tid,
+          trackLayoutId: trackLayoutId || null,
+          trackDirection: trackDirection || null,
+          startDate: meeting.startYmd,
+          endDate: meeting.endYmd,
+          resultsSourceUrl: meeting.hubUrl,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        event?: Record<string, unknown> | null;
+      };
+      if (!(res.ok || res.status === 409) || !data.event) {
+        throw new Error(data.error ?? `Could not add that event (${res.status})`);
       }
-      dismissedEventAtTrackRef.current.add(eventAtTrackDismissKey(trackId.trim(), det));
-      setEventAtTrack(null);
+      const ev = parseEventFromApi(data.event);
+      setEvents((prev) =>
+        prev.some((e) => e.id === ev.id) ? prev.map((e) => (e.id === ev.id ? ev : e)) : [ev, ...prev]
+      );
+      setJoinableEvents((prev) => prev.filter((j) => j.id !== ev.id));
+      setTrackEvents((prev) =>
+        prev && prev.trackId === tid
+          ? {
+              ...prev,
+              meetings: prev.meetings.map((m) => (m.hubUrl === hubUrl ? { ...m, eventId: ev.id } : m)),
+            }
+          : prev
+      );
+      applyEventOption(ev);
+    } catch (e) {
+      setEventError(e instanceof Error ? e.message : "Could not add that event.");
     } finally {
-      setEventAtTrackBusy(false);
+      setAddingLiveRcEvent(null);
     }
   }
 
@@ -2525,115 +2504,78 @@ export function NewRunForm(props: {
     };
   }, [trackId, needsEvent, editingCompletedRun, events]);
 
+  /** The picked track's LiveRC page, as a string, so saving any other track field never refetches. */
+  const pickedTrackLiveRcUrl = useMemo(
+    () => tracksList.find((t) => t.id === trackId.trim())?.liveRcUrl?.trim() ?? "",
+    [tracksList, trackId]
+  );
+
   /**
-   * "Is there an event here I should be on?"
+   * What's on at the picked track, for the event list: LiveRC's meetings today and in the next week.
    *
-   * Runs for EVERY track, not just the ones with a LiveRC page. It used to bail out right here when
-   * a track carried no LiveRC URL, which meant a teammate's event at a club track — or any event at
-   * a MyRCM or Speedhive track, or a test day with no timing at all — could never be offered. The
-   * server now answers from our own bookings first and treats LiveRC as an optional extra.
+   * Replaces the "Racing at '…'?" pop-up (founder 2026-09-26: Track moves above Day type and the
+   * list does that job). The pop-up's LiveRC half read the track's LiveRC front page for a link to
+   * the running meeting, and those pages no longer carry one, so it never fired; the events page
+   * this reads lists every meeting the club has set up. Asked on every track pick, not only on an
+   * Event day, so the list is ready the moment Event is tapped — the same one read per pick the
+   * pop-up made.
+   *
+   * The same read links a hand-made event of ours to the LiveRC meeting posted after it. When it
+   * did, our events reload, and a selected event that was folded into the meeting's own follows it.
    */
   useEffect(() => {
-    if (editingCompletedRun || trackLockedToEvent) {
-      setEventAtTrack(null);
-      return;
-    }
     const tid = trackId.trim();
-    if (!tid) {
-      setEventAtTrack(null);
+    if (!tid || editingCompletedRun) {
+      setTrackEvents(null);
       return;
     }
-    const track = tracksList.find((t) => t.id === tid);
-    const selected = eventId ? events.find((e) => e.id === eventId) : null;
-    // Already filed under an event at this track that names its own meeting — nothing left to ask.
-    if (selected?.trackId === tid && selected.resultsSourceUrl?.trim()) {
-      setEventAtTrack(null);
-      return;
-    }
-
+    const hasLiveRc = Boolean(pickedTrackLiveRcUrl);
+    setTrackEvents({ trackId: tid, todayYmd: null, status: hasLiveRc ? "loading" : "none", meetings: [] });
     let alive = true;
+    const failed = () =>
+      setTrackEvents({ trackId: tid, todayYmd: null, status: hasLiveRc ? "unavailable" : "none", meetings: [] });
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
-          const res = await fetch("/api/events/detect-at-track", {
+          const res = await fetch("/api/events/at-track", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ trackId: tid }),
           });
           const data = (await res.json().catch(() => ({}))) as {
-            detected?: boolean;
-            eventLabel?: string | null;
-            eventHubUrl?: string | null;
-            matchedEventId?: string | null;
-            matchedEventName?: string | null;
-            matchedEventOwnerName?: string | null;
-            matchedIsPlanned?: boolean;
-            matchedIsOnToday?: boolean;
-            matchedStartDate?: string | null;
-            matchedEndDate?: string | null;
-            trackName?: string;
+            todayYmd?: string;
+            liveRc?: { status?: TrackLiveRcStatus; meetings?: TrackListLiveRcMeeting[] };
+            linked?: Array<{ eventId: string; intoEventId: string }>;
           };
           if (!alive) return;
-          if (!res.ok || !data.detected) {
-            setEventAtTrack(null);
+          if (!res.ok) {
+            failed();
             return;
           }
-          // The event we would offer is the one already selected — asking again is noise.
-          if (data.matchedEventId && data.matchedEventId === eventId) {
-            setEventAtTrack(null);
-            return;
-          }
-          const next: EventAtTrackDetection = {
-            eventLabel: data.eventLabel?.trim() || null,
-            eventHubUrl: data.eventHubUrl?.trim() || null,
-            matchedEventId: data.matchedEventId ?? null,
-            matchedEventName: data.matchedEventName ?? null,
-            matchedEventOwnerName: data.matchedEventOwnerName ?? null,
-            matchedIsPlanned: Boolean(data.matchedIsPlanned),
-            matchedIsOnToday: data.matchedIsOnToday !== false,
-            matchedStartDate: data.matchedStartDate ?? null,
-            matchedEndDate: data.matchedEndDate ?? null,
-            trackName: data.trackName ?? track?.name ?? null,
-          };
-          // Nothing nameable came back from either half of the answer.
-          if (!next.matchedEventId && !next.eventLabel) {
-            setEventAtTrack(null);
-            return;
-          }
-          if (dismissedEventAtTrackRef.current.has(eventAtTrackDismissKey(tid, next))) {
-            setEventAtTrack(null);
-            return;
-          }
-          /**
-           * Deliberately does NOT flip the day type — the prompt asks, and the answer decides.
-           *
-           * It used to flip straight to a race meeting on detection, which quietly destroyed the
-           * prompt it was trying to support: `needsEvent` turning true makes the events effect
-           * below auto-select the first *upcoming* event, that event's track then overrides the
-           * one just picked, and `trackLockedToEvent` clears the detection. Driven at a track with
-           * a teammate's event on today, the wizard ended up on an unrelated event three days out,
-           * at a different track, with no prompt ever shown. `confirmEventAtTrack` sets the day
-           * type once the driver has actually said yes.
-           */
-          setEventAtTrack(next);
+          setTrackEvents({
+            trackId: tid,
+            todayYmd: data.todayYmd ?? null,
+            status: data.liveRc?.status ?? (hasLiveRc ? "unavailable" : "none"),
+            meetings: Array.isArray(data.liveRc?.meetings) ? data.liveRc.meetings : [],
+          });
+          const linked = Array.isArray(data.linked) ? data.linked : [];
+          if (linked.length === 0) return;
+          const list = await jsonFetch<{ events: EventOption[] }>("/api/events", { cache: "no-store" }).catch(
+            () => null
+          );
+          if (!alive || !list) return;
+          setEvents(list.events ?? []);
+          setEventId((current) => linked.find((l) => l.eventId === current)?.intoEventId ?? current);
         } catch {
-          if (alive) setEventAtTrack(null);
+          if (alive) failed();
         }
       })();
-    }, 500);
-
+    }, 300);
     return () => {
       alive = false;
       window.clearTimeout(timer);
     };
-  }, [
-    trackId,
-    tracksList,
-    editingCompletedRun,
-    trackLockedToEvent,
-    eventId,
-    events,
-  ]);
+  }, [trackId, editingCompletedRun, pickedTrackLiveRcUrl]);
 
   useEffect(() => {
     trackIdRef.current = trackId;
@@ -3221,21 +3163,24 @@ export function NewRunForm(props: {
         if (!alive) return;
         const all = list ?? [];
         setEvents(all);
-        const { upcoming } = splitEventsForPicker(all);
+        const today = localTodayYmd();
+        const { upcoming } = splitEventsForPicker(all, today);
         setEventId((current) => {
           if (current) return current;
           /**
-           * Auto-pick only from events at the track already chosen.
+           * Auto-pick only an event that is on TODAY, at the track already chosen.
            *
            * An event with a track OVERRIDES the run's track (`trackLockedToEvent`), so the old
            * unconditional `upcoming[0]` quietly moved you: pick your local club, switch to an Event
            * day, and the wizard filed you at whatever track your next booked meeting happens to be
-           * at. It also swallowed the join prompt, which clears itself once the track is locked.
-           * With no track picked yet there is nothing to contradict, so the first upcoming event is
-           * still the best guess.
+           * at. It then still picked a meeting days away at the right track (2026-09-26): a
+           * Saturday practice run filed under a meeting a week out. The list shows those under
+           * "Coming up"; choosing one is the driver's call.
            */
           const tid = trackIdRef.current.trim();
-          const pool = tid ? upcoming.filter((e) => e.trackId === tid) : upcoming;
+          const pool = upcoming.filter(
+            (e) => (!tid || e.trackId === tid) && eventDateToYmd(e.startDate) <= today
+          );
           if (pool.length > 0) return pool[0]!.id;
           return "";
         });
@@ -3299,10 +3244,6 @@ export function NewRunForm(props: {
     if (!needsEvent || !eventId) {
       setEventPracticeTimingUrl("");
       setEventRaceTimingUrl("");
-      setEventControlledTireTypeId("");
-      setEventControlAdditiveEnabled(false);
-      setEventControlledAdditiveTypeId("");
-      setPreferredTireType(null);
       return;
     }
     const ev = events.find((e) => e.id === eventId);
@@ -3310,32 +3251,6 @@ export function NewRunForm(props: {
     setEventPracticeTimingUrl(ev.practiceSourceUrl?.trim() ?? "");
     setEventRaceTimingUrl(ev.resultsSourceUrl?.trim() ?? "");
     setEventMyRcmUrl(ev.myRcmUrl?.trim() ?? "");
-    const nextControlledTireId = ev.controlledTireTypeId?.trim() ?? ev.controlledTireType?.id ?? "";
-    setEventControlledTireTypeId(nextControlledTireId);
-    // Steer the tire picker to the spec compound and power the Spec/Open pill.
-    // (Manual event selection never ran applyEventOption, so this was the missing
-    // hydration that kept the pill from showing.)
-    if (nextControlledTireId) {
-      const display =
-        ev.controlledTireType?.displayName ?? ev.controlledTireLabel ?? "Spec tire";
-      setPreferredTireType({ id: nextControlledTireId, displayName: display });
-    } else {
-      setPreferredTireType(null);
-    }
-    const nextControlledAdditiveId =
-      ev.controlledAdditiveTypeId?.trim() ?? ev.controlledAdditiveType?.id ?? "";
-    setEventControlAdditiveEnabled(Boolean(nextControlledAdditiveId));
-    setEventControlledAdditiveTypeId(nextControlledAdditiveId);
-    // Cache the control additive's name so the Control/Open pill reads it.
-    if (nextControlledAdditiveId && ev.controlledAdditiveType) {
-      setAdditiveTypesById((prev) => ({
-        ...prev,
-        [ev.controlledAdditiveType!.id]: {
-          id: ev.controlledAdditiveType!.id,
-          displayName: ev.controlledAdditiveType!.displayName,
-        },
-      }));
-    }
   }, [needsEvent, eventId, events]);
 
   function applyCopyFromPreview() {
@@ -3460,9 +3375,27 @@ export function NewRunForm(props: {
     return () => setBridgeRef.current?.(null);
   }, []);
 
-  /** Opens the New event form, carrying a name typed into the event list's search. */
+  /**
+   * Opens the New event form. With a track picked, the event is at that track and the name comes
+   * filled in as the track and the day ("Radio Racing Cars SA · Sat 26 Sep"), so an untouched form
+   * is one tap (founder 2026-09-26). A name typed into the list's search wins; a name the driver
+   * typed earlier is kept. The dates start on today, the track's today once the list knows it.
+   */
   function openNewEventPanel(name: string) {
-    if (name) setNewEventName(name);
+    const tid = trackId.trim();
+    const today = eventListTodayYmd;
+    const trackName = tid ? tracksList.find((t) => t.id === tid)?.name?.trim() ?? "" : "";
+    const keptTyped = newEventName.trim() && newEventName !== newEventNameAutoRef.current;
+    if (name) {
+      setNewEventName(name);
+      newEventNameAutoRef.current = null;
+    } else if (!keptTyped) {
+      const filled = trackName ? defaultEventName(trackName, today) : "";
+      setNewEventName(filled);
+      newEventNameAutoRef.current = filled || null;
+    }
+    if (!newEventStartDate) setNewEventStartDate(today);
+    if (!newEventEndDate) setNewEventEndDate(today);
     setShowNewEventPanel(true);
     setStatus(null);
     setEventError(null);
@@ -3476,7 +3409,10 @@ export function NewRunForm(props: {
       setEventError("Event name is required.");
       return;
     }
-    if (!newEventTrackId) {
+    // The run's track, picked above, is the event's; the form only asks when there isn't one.
+    const runTrackId = trackId.trim();
+    const eventTrackId = runTrackId || newEventTrackId;
+    if (!eventTrackId) {
       setEventError("Select the track for this event.");
       return;
     }
@@ -3484,22 +3420,20 @@ export function NewRunForm(props: {
     setStatus(null);
     setCreatingEvent(true);
     try {
-      const start = newEventStartDate || new Date().toISOString().slice(0, 10);
+      // The device's calendar day, never `toISOString()`'s: that is UTC, which is still yesterday
+      // at 8 am race morning in Australia.
+      const start = newEventStartDate || eventListTodayYmd;
       const end = newEventEndDate || start;
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          trackId: newEventTrackId || null,
-          trackLayoutId: newEventLayoutId || null,
-          trackDirection: newEventDirection || null,
+          trackId: eventTrackId,
+          trackLayoutId: (runTrackId ? trackLayoutId : newEventLayoutId) || null,
+          trackDirection: (runTrackId ? trackDirection : newEventDirection) || null,
           startDate: start,
           endDate: end,
-          controlledTireTypeId: newEventControlledTireTypeId.trim() || null,
-          controlledAdditiveTypeId: newEventControlAdditiveEnabled
-            ? newEventControlledAdditiveTypeId.trim() || null
-            : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -3519,13 +3453,10 @@ export function NewRunForm(props: {
       setEvents(list);
       setEventId(created.id);
       setNewEventName("");
+      newEventNameAutoRef.current = null;
       setNewEventTrackId("");
       setNewEventStartDate("");
       setNewEventEndDate("");
-      setNewEventTireControlled(false);
-      setNewEventControlledTireTypeId("");
-      setNewEventControlAdditiveEnabled(false);
-      setNewEventControlledAdditiveTypeId("");
       setShowNewEventPanel(false);
       setStatus("Event created — selected.");
     } catch (err) {
@@ -4092,39 +4023,6 @@ export function NewRunForm(props: {
       setSaveSuccess(true);
       setStatus(isEditing ? "Changes saved." : "Run saved.");
 
-      if (sessionType === "RACE_MEETING" && needsEvent && eventId) {
-        /*
-         * Tire rules only. The meeting's timing URLs used to ride along here, written back from
-         * boxes on this step; they are gone (founder 2026-09-03) and writing them from state
-         * would only mean a save could blank a URL the Events page had set.
-         */
-        const c = eventControlledTireTypeId.trim() || null;
-        const a = eventControlAdditiveEnabled ? eventControlledAdditiveTypeId.trim() || null : null;
-        void fetch(`/api/events/${encodeURIComponent(eventId)}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            controlledTireTypeId: c,
-            controlledAdditiveTypeId: a,
-          }),
-        })
-          .then((res) => {
-            if (!res.ok) return;
-            setEvents((prev) =>
-              prev.map((e) =>
-                e.id === eventId
-                  ? {
-                      ...e,
-                      controlledTireTypeId: c,
-                      controlledAdditiveTypeId: a,
-                    }
-                  : e
-              )
-            );
-          })
-          .catch(() => {});
-      }
-
       // A stay-save banks the run and hands the page straight back: no navigation, no
       // autosave teardown (the snapshot keeps refreshing, now carrying `savedRunId` so even
       // a restored classic-mode draft updates this run instead of minting a twin). The chip
@@ -4256,7 +4154,6 @@ export function NewRunForm(props: {
       tirePrep={tirePrep}
       onTirePrepChange={setTirePrep}
       highlightMissing={completeValidation.additive}
-      controlAdditive={controlAdditive}
     />
   );
 
@@ -4790,6 +4687,7 @@ export function NewRunForm(props: {
                     onChange={(id) => {
                       trackPickedManuallyRef.current = true;
                       wizardCtxTouchedRef.current = true;
+                      releaseEventForTrack(id);
                       setTrackId(id);
                       // Layout belongs to a track; clear it so a stale layout from the
                       // previous track can't be submitted, and re-allow event auto-fill.
@@ -4838,6 +4736,7 @@ export function NewRunForm(props: {
                           );
                           trackPickedManuallyRef.current = true;
                           wizardCtxTouchedRef.current = true;
+                          releaseEventForTrack(t.id);
                           setTrackId(t.id);
                           setTrackLayoutId("");
                           setTrackDirection("");
@@ -4865,6 +4764,7 @@ export function NewRunForm(props: {
                     suggestions={trackId.trim() ? [] : nearbyTrackSuggestions.slice(0, 3)}
                     onSelect={(id) => {
                       trackPickedManuallyRef.current = true;
+                      releaseEventForTrack(id);
                       setTrackId(id);
                       setTrackLayoutId("");
                       setTrackDirection("");
@@ -5076,6 +4976,12 @@ export function NewRunForm(props: {
           </select>
         </div>
       ) : null}
+      {/* Track second, right under Car (founder 2026-09-26: Car, Track, Day type, Session,
+          Conditions). The event list below is about this track, so the track comes first. The
+          classic mode keeps it as the Run-details "Track" face. */}
+      {wizardActive ? (
+        <div className="border-t border-border/60 pt-4">{trackPanelJsx}</div>
+      ) : null}
       <SurfaceCard
         variant="panel"
         bare={wizardActive}
@@ -5133,12 +5039,6 @@ export function NewRunForm(props: {
                     : meetingSessionType.charAt(0) +
                       meetingSessionType.slice(1).toLowerCase()}
                 </span>
-                {eventControlledTireTypeId.trim() ? (
-                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">Spec tire set</span>
-                ) : null}
-                {eventControlAdditiveEnabled && eventControlledAdditiveTypeId.trim() ? (
-                  <span className="min-w-0 truncate text-[11px] text-muted-foreground">Spec additive set</span>
-                ) : null}
               </div>
             )}
           </div>
@@ -5159,21 +5059,6 @@ export function NewRunForm(props: {
           </div>
         )}
       </SurfaceCard>
-
-      {eventAtTrack && !editingCompletedRun && !trackLockedToEvent ? (
-        <EventAtTrackPrompt
-          detection={eventAtTrack}
-          busy={eventAtTrackBusy}
-          onConfirm={() => confirmEventAtTrack()}
-          onCreateOwn={() => confirmEventAtTrack(true)}
-          onDismiss={() => {
-            dismissedEventAtTrackRef.current.add(
-              eventAtTrackDismissKey(trackId.trim(), eventAtTrack)
-            );
-            setEventAtTrack(null);
-          }}
-        />
-      ) : null}
 
       {needsEvent && (sessionExpanded || !isDraft) ? (
         <SurfaceCard
@@ -5207,6 +5092,13 @@ export function NewRunForm(props: {
               onChange={(next) => {
                 wizardCtxTouchedRef.current = true;
                 setEventError(null);
+                // A LiveRC row has no event behind it yet: tapping it makes the meeting's event, or
+                // joins it when another driver already made it.
+                const hub = hubUrlFromOptionValue(next);
+                if (hub) {
+                  void addLiveRcEvent(hub);
+                  return;
+                }
                 // A "Your team" row is not mine yet — selecting it is the act of joining, and the id
                 // only becomes selectable once the server says yes.
                 const joinable = joinableEvents.find((j) => j.id === next);
@@ -5216,46 +5108,13 @@ export function NewRunForm(props: {
                 }
                 setEventId(next);
               }}
-              groups={[
-                ...(joinableEvents.length > 0
-                  ? [
-                      {
-                        label: "Your team — tap to join",
-                        options: joinableEvents.map((ev) => ({
-                          value: ev.id,
-                          label: `${ev.name}${ev.ownerName ? ` · ${ev.ownerName}` : ""} · ${formatEventDate(ev.startDate)} · ${
-                            ev.isOnToday ? "on today" : formatEventRelativeLabel(ev)
-                          }`,
-                        })),
-                      },
-                    ]
-                  : []),
-                ...(eventSelectGroups.upcoming.length > 0
-                  ? [
-                      {
-                        label: "Upcoming",
-                        options: eventSelectGroups.upcoming.map((ev) => ({
-                          value: ev.id,
-                          label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
-                        })),
-                      },
-                    ]
-                  : []),
-                ...(eventSelectGroups.past.length > 0
-                  ? [
-                      {
-                        label: "Past",
-                        options: eventSelectGroups.past.map((ev) => ({
-                          value: ev.id,
-                          label: `${ev.name} · ${formatEventDate(ev.startDate)} · ${formatEventRelativeLabel(ev)}`,
-                        })),
-                      },
-                    ]
-                  : []),
-              ]}
+              groups={trackEventGroups ?? allEventGroups}
             />
             {showNewEventPanel ? (
               <div className="inset-panel p-3 space-y-2">
+                {/* The event is at the run's track, picked above; the form asks only when there is
+                    none yet (the classic form, or Event tapped before Track). */}
+                {trackId.trim() ? null : (
                 <div className="inset-panel-deep p-2">
                   <Eyebrow dot="muted" className="mb-1">Track (required)</Eyebrow>
                   {/* The same picker and "New track" chip as the run's own Track step. This was a
@@ -5308,8 +5167,10 @@ export function NewRunForm(props: {
                     </div>
                   ) : null}
                 </div>
+                )}
                 <input
                   className="form-control w-full px-3 py-2 text-sm"
+                  aria-label="Event name"
                   placeholder="Event name (e.g. TITC 2026)"
                   value={newEventName}
                   onChange={(e) => setNewEventName(e.target.value)}
@@ -5341,64 +5202,13 @@ export function NewRunForm(props: {
                     }
                   />
                 ) : null}
-                <div className="space-y-1.5">
-                  <label className="block ui-label-meta">Tire</label>
-                  <SegmentedControl<"open" | "controlled">
-                    ariaLabel="Event tire — open or controlled"
-                    size="sm"
-                    value={newEventTireControlled ? "controlled" : "open"}
-                    onChange={(v) => {
-                      const on = v === "controlled";
-                      setNewEventTireControlled(on);
-                      if (!on) setNewEventControlledTireTypeId("");
-                    }}
-                    options={[
-                      { value: "open", label: "Open" },
-                      { value: "controlled", label: "Controlled" },
-                    ]}
-                  />
-                  {newEventTireControlled ? (
-                    <TireTypeCombobox
-                      value={newEventControlledTireTypeId}
-                      onChange={setNewEventControlledTireTypeId}
-                      placeholder="Select control tire type…"
-                      aria-label="Event control tire type"
-                    />
-                  ) : null}
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block ui-label-meta">Additive</label>
-                  <SegmentedControl<"open" | "controlled">
-                    ariaLabel="Event additive — open or controlled"
-                    size="sm"
-                    value={newEventControlAdditiveEnabled ? "controlled" : "open"}
-                    onChange={(v) => {
-                      const on = v === "controlled";
-                      setNewEventControlAdditiveEnabled(on);
-                      if (!on) setNewEventControlledAdditiveTypeId("");
-                    }}
-                    options={[
-                      { value: "open", label: "Open" },
-                      { value: "controlled", label: "Controlled" },
-                    ]}
-                  />
-                  {newEventControlAdditiveEnabled ? (
-                    <AdditiveTypeCombobox
-                      value={newEventControlledAdditiveTypeId}
-                      onChange={setNewEventControlledAdditiveTypeId}
-                      placeholder="Select control additive…"
-                      aria-label="Event control additive type"
-                      allowInlineCreate={false}
-                    />
-                  ) : null}
-                </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    disabled={creatingEvent || !newEventName.trim() || !newEventTrackId}
+                    disabled={creatingEvent || !newEventName.trim() || !(trackId.trim() || newEventTrackId)}
                     className={cn(
                       buttonLinkClassName("primary"),
-                      (creatingEvent || !newEventName.trim() || !newEventTrackId) &&
+                      (creatingEvent || !newEventName.trim() || !(trackId.trim() || newEventTrackId)) &&
                         "opacity-60 pointer-events-none"
                     )}
                     onClick={(e) => createEvent(e)}
@@ -5438,6 +5248,9 @@ export function NewRunForm(props: {
           {joiningEventId ? (
             <p className="text-[11px] text-muted-foreground">Joining event…</p>
           ) : null}
+          {addingLiveRcEvent ? (
+            <p className="text-[11px] text-muted-foreground">Adding event…</p>
+          ) : null}
           {eventsLoading ? (
             <p className="text-[11px] text-muted-foreground">Loading events…</p>
           ) : null}
@@ -5464,35 +5277,6 @@ export function NewRunForm(props: {
                   }
                 />
               ) : null}
-              {/* Open vs Controlled is event config — set when the event is created
-                  (New event panel or the Events page). Read-only here; a controlled
-                  event locks the run's Tires step to it. */}
-              <div className="rounded-md border border-border bg-secondary/60 px-3 py-2 text-[11px] text-muted-foreground space-y-0.5">
-                <div>
-                  Tire:{" "}
-                  {eventControlledTireTypeId.trim() ? (
-                    <span className="font-medium text-foreground">
-                      Controlled ·{" "}
-                      {preferredTireType?.displayName ??
-                        selectedEventForRun?.controlledTireType?.displayName ??
-                        selectedEventForRun?.controlledTireLabel ??
-                        "set"}
-                    </span>
-                  ) : (
-                    <span className="font-medium text-foreground">Open</span>
-                  )}
-                </div>
-                <div>
-                  Additive:{" "}
-                  {controlAdditive ? (
-                    <span className="font-medium text-foreground">
-                      Controlled · {controlAdditive.displayName}
-                    </span>
-                  ) : (
-                    <span className="font-medium text-foreground">Open</span>
-                  )}
-                </div>
-              </div>
             </div>
           ) : null}
 
@@ -5521,11 +5305,6 @@ export function NewRunForm(props: {
             />
           </div>
         </SurfaceCard>
-      ) : null}
-      {/* Wizard: Track completes the unified Session card (the classic mode
-          keeps this content as the Run-details "Track" face). */}
-      {wizardActive ? (
-        <div className="border-t border-border/60 pt-4">{trackPanelJsx}</div>
       ) : null}
       {/* Wizard: say out loud that the weather logs itself, and carry the one
           reading no lookup can know (probe track temp). The band's own reading
@@ -5722,8 +5501,6 @@ export function NewRunForm(props: {
                 // stint here as well would race that commit.
                 setCopyTireWarning(null);
               }}
-              preferredTireType={preferredTireType}
-              specTireType={specTireType}
               value={{ runsCompleted, ageKnown: tireAgeKnown, stintId: tireStintId }}
               onChange={applyTireStint}
               carId={carId}
@@ -5767,8 +5544,7 @@ export function NewRunForm(props: {
             prepUnfolded ||
             Boolean(additiveTypeId) ||
             tirePrepHasContent(tirePrep) ||
-            completeValidation.additive ||
-            controlAdditive ? (
+            completeValidation.additive ? (
               prepPanelJsx
             ) : (
               <div className="flex items-center justify-between gap-3">

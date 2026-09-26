@@ -82,6 +82,8 @@ export type LiveRcEventListRow = {
   startYmd: string;
   /** Same as `startYmd` for a one-day meeting. */
   endYmd: string;
+  /** The "# Entries" column: 0 for a meeting posted ahead that nobody has entered yet. */
+  entries?: number | null;
 };
 
 const MONTHS: Record<string, number> = {
@@ -127,6 +129,7 @@ export function parseLiveRcEventListHtml(html: string, pageUrl: string): LiveRcE
     const readable = dateCell.clone().find(".hidden").remove().end().text().replace(/\s+/g, " ");
     const endText = readable.split(/\bto\b/i)[1] ?? "";
     const endYmd = ymdFromLiveRcDateText(endText);
+    const entriesText = cells.eq(2).text().trim();
 
     seen.add(eventId);
     out.push({
@@ -135,6 +138,7 @@ export function parseLiveRcEventListHtml(html: string, pageUrl: string): LiveRcE
       name: link.text().replace(/\s+/g, " ").trim(),
       startYmd,
       endYmd: endYmd && endYmd >= startYmd ? endYmd : startYmd,
+      entries: /^\d+$/.test(entriesText) ? Number(entriesText) : null,
     });
   });
   return out;

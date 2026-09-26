@@ -335,14 +335,11 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
     typeof body.frontTireTypeId === "string" && body.frontTireTypeId.trim()
       ? body.frontTireTypeId.trim()
       : null;
-  const needsParticipationCheck =
-    loggingComplete && Boolean(body.eventId) && body.sessionType === "RACE_MEETING";
-
   /*
    * One wave instead of eight sequential round trips.
    *
    * Every lookup here is derived from `body` alone — baseline snapshot, PDF links, tire
-   * type, additive type, event participation, car, track — so none of them had a reason
+   * type, additive type, car, track — so none of them had a reason
    * to queue behind the others. At ~16ms per round trip that was roughly 130ms of a run
    * save spent purely waiting on the network.
    *
@@ -352,7 +349,7 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
    * The car row is read ONCE. It used to be fetched twice from the same table by the
    * same key — once for the setup-sheet keys, once for the name.
    */
-  const [baselineRow, pdfLinks, tireType, additiveType, participation, carRow, track, frontTireType] =
+  const [baselineRow, pdfLinks, tireType, additiveType, carRow, track, frontTireType] =
     await Promise.all([
       baselineId
         ? prisma.setupSnapshot.findFirst({
@@ -377,12 +374,6 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
         ? prisma.additiveType.findUnique({
             where: { id: additiveTypeId },
             select: { id: true, displayName: true },
-          })
-        : null,
-      needsParticipationCheck && body.eventId
-        ? prisma.eventParticipation.findUnique({
-            where: { userId_eventId: { userId: params.userId, eventId: body.eventId } },
-            select: { controlledAdditiveTypeId: true },
           })
         : null,
       prisma.car.findFirst({
@@ -512,13 +503,6 @@ async function createOrUpdateRun(params: { userId: string; body: RunUpsertBody; 
 
   if (additiveTypeId && !additiveType) {
     return NextResponse.json({ error: "Additive type not found" }, { status: 400 });
-  }
-
-  if (needsParticipationCheck && participation?.controlledAdditiveTypeId && !additiveTypeId) {
-    return NextResponse.json(
-      { error: "This event requires an additive selection to complete the run." },
-      { status: 400 }
-    );
   }
 
   // Tire-prep sequence is the source of truth; keep the legacy Int in sync as a

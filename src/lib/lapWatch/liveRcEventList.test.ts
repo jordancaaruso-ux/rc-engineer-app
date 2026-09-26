@@ -49,6 +49,7 @@ test("reads every meeting with its dates", () => {
   );
   assert.equal(rows[1]!.eventHubUrl, "https://rrcsa.liverc.com/results/?p=view_event&id=517768");
   assert.equal(rows[1]!.name, "RCRA 2026 EP State Titles");
+  assert.equal(rows[1]!.entries, 57);
 });
 
 const ev = (eventId: string, startYmd: string, endYmd = startYmd): LiveRcEventListRow => ({

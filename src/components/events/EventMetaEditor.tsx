@@ -6,10 +6,7 @@ import { eventDateToYmd } from "@/lib/eventDateParse";
 import { cn } from "@/lib/utils";
 import { buttonLinkClassName } from "@/components/ui/ButtonLink";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { TrackCombobox } from "@/components/runs/TrackCombobox";
-import { TireTypeCombobox } from "@/components/tires/TireTypeCombobox";
-import { AdditiveTypeCombobox } from "@/components/additives/AdditiveTypeCombobox";
 import { EventDateRangeField } from "@/components/events/EventDateRangeField";
 
 type TrackOption = {
@@ -29,8 +26,6 @@ type Props = {
   initialStartDate: string | Date;
   initialEndDate: string | Date;
   initialNotes: string | null;
-  initialControlledTireTypeId: string | null;
-  initialControlledAdditiveTypeId: string | null;
   initialPracticeSourceUrl: string | null;
   initialResultsSourceUrl: string | null;
   initialMyRcmUrl: string | null;
@@ -47,16 +42,6 @@ export function EventMetaEditor(props: Props) {
   const [startDate, setStartDate] = useState(eventDateToYmd(props.initialStartDate));
   const [endDate, setEndDate] = useState(eventDateToYmd(props.initialEndDate));
   const [notes, setNotes] = useState(props.initialNotes ?? "");
-  const [tireControlled, setTireControlled] = useState(
-    Boolean(props.initialControlledTireTypeId)
-  );
-  const [controlledTireTypeId, setControlledTireTypeId] = useState(props.initialControlledTireTypeId ?? "");
-  const [controlAdditiveEnabled, setControlAdditiveEnabled] = useState(
-    Boolean(props.initialControlledAdditiveTypeId)
-  );
-  const [controlledAdditiveTypeId, setControlledAdditiveTypeId] = useState(
-    props.initialControlledAdditiveTypeId ?? ""
-  );
   const [practiceSourceUrl, setPracticeSourceUrl] = useState(props.initialPracticeSourceUrl ?? "");
   const [resultsSourceUrl, setResultsSourceUrl] = useState(props.initialResultsSourceUrl ?? "");
   const [myRcmUrl, setMyRcmUrl] = useState(props.initialMyRcmUrl ?? "");
@@ -122,8 +107,6 @@ export function EventMetaEditor(props: Props) {
           startDate,
           endDate,
           notes: notes.trim() || null,
-          controlledTireTypeId: tireControlled ? controlledTireTypeId.trim() || null : null,
-          controlledAdditiveTypeId: controlAdditiveEnabled ? controlledAdditiveTypeId.trim() || null : null,
           practiceSourceUrl: practiceSourceUrl.trim() || null,
           resultsSourceUrl: resultsSourceUrl.trim() || null,
           myRcmUrl: myRcmUrl.trim() || null,
@@ -232,59 +215,6 @@ export function EventMetaEditor(props: Props) {
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Optional notes"
         />
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="space-y-1.5">
-          <label className="block text-[11px] text-muted-foreground">Tire</label>
-          <SegmentedControl<"open" | "controlled">
-            ariaLabel="Event tire — open or controlled"
-            size="sm"
-            value={tireControlled ? "controlled" : "open"}
-            onChange={(v) => {
-              const on = v === "controlled";
-              setTireControlled(on);
-              if (!on) setControlledTireTypeId("");
-            }}
-            options={[
-              { value: "open", label: "Open" },
-              { value: "controlled", label: "Controlled" },
-            ]}
-          />
-          {tireControlled ? (
-            <TireTypeCombobox
-              value={controlledTireTypeId}
-              onChange={setControlledTireTypeId}
-              placeholder="Select control tire type…"
-              aria-label="Event control tire type"
-            />
-          ) : null}
-        </div>
-        <div className="space-y-1.5">
-          <label className="block text-[11px] text-muted-foreground">Additive</label>
-          <SegmentedControl<"open" | "controlled">
-            ariaLabel="Event additive — open or controlled"
-            size="sm"
-            value={controlAdditiveEnabled ? "controlled" : "open"}
-            onChange={(v) => {
-              const on = v === "controlled";
-              setControlAdditiveEnabled(on);
-              if (!on) setControlledAdditiveTypeId("");
-            }}
-            options={[
-              { value: "open", label: "Open" },
-              { value: "controlled", label: "Controlled" },
-            ]}
-          />
-          {controlAdditiveEnabled ? (
-            <AdditiveTypeCombobox
-              value={controlledAdditiveTypeId}
-              onChange={setControlledAdditiveTypeId}
-              placeholder="Select control additive…"
-              aria-label="Event control additive type"
-              allowInlineCreate={false}
-            />
-          ) : null}
-        </div>
       </div>
       {/*
         Deliberately NOT inside the advanced block below. Everything in there is LiveRC plumbing

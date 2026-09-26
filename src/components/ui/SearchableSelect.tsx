@@ -8,6 +8,8 @@ import { PICKER_SEARCH_THRESHOLD, type OptionSection } from "@/lib/search/option
 export type SearchableSelectOption = {
   value: string;
   label: string;
+  /** Second line under the label in the sheet (dates, whose event); the native list ignores it. */
+  detail?: string | null;
   disabled?: boolean;
   /** Matched by search but never shown — codes, aliases, a driver's name. */
   keywords?: string;

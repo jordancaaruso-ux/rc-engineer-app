@@ -1,0 +1,96 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import type { LiveRcEventListRow } from "@/lib/lapWatch/liveRcIndexHtmlParse";
+import {
+  defaultEventName,
+  isDefaultEventName,
+  liveRcMeetingForEvent,
+  offeredLiveRcMeetings,
+  shortDayLabel,
+} from "@/lib/events/liveRcMeetingMatch";
+
+const row = (eventId: string, startYmd: string, endYmd = startYmd, name = eventId): LiveRcEventListRow => ({
+  eventHubUrl: `https://emcc.liverc.com/results/?p=view_event&id=${eventId}`,
+  eventId,
+  name,
+  startYmd,
+  endYmd,
+  entries: null,
+});
+
+/** EMCC's LiveRC events page on 26 Sep 2026: the Cup running, five race days posted ahead. */
+const EMCC = [
+  row("cup", "2026-09-25", "2026-09-27", "EMCC CUP 25-27 Sept 2026"),
+  row("r1110", "2026-10-11"),
+  row("r2510", "2026-10-25"),
+  row("r0811", "2026-11-08"),
+  row("r1309", "2026-09-13"),
+];
+
+test("offers what is on today first, then the next week, and nothing further out", () => {
+  const offered = offeredLiveRcMeetings(EMCC, "2026-09-26", 7);
+  assert.deepEqual(
+    offered.map((m) => [m.eventId, m.onToday]),
+    [["cup", true]],
+  );
+  const month = offeredLiveRcMeetings(EMCC, "2026-09-26", 30);
+  assert.deepEqual(
+    month.map((m) => m.eventId),
+    ["cup", "r1110", "r2510"],
+  );
+});
+
+test("a club day tomorrow is coming up, not on today", () => {
+  const offered = offeredLiveRcMeetings([row("club", "2026-10-04")], "2026-10-03", 7);
+  assert.equal(offered.length, 1);
+  assert.equal(offered[0]!.onToday, false);
+});
+
+test("a meeting the page lists twice is offered once", () => {
+  const offered = offeredLiveRcMeetings([row("a", "2026-09-26"), row("a", "2026-09-26")], "2026-09-26");
+  assert.equal(offered.length, 1);
+});
+
+test("a hand-made event for the day finds the one meeting LiveRC posted later", () => {
+  const rows = [row("ep", "2026-09-26", "2026-09-26", "EP Championship 26/09/26"), row("old", "2026-09-19")];
+  assert.equal(liveRcMeetingForEvent({ startYmd: "2026-09-26", endYmd: "2026-09-26" }, rows)?.eventId, "ep");
+});
+
+test("a Saturday event matches a Friday-to-Sunday meeting, and a weekend event a Saturday one", () => {
+  assert.equal(liveRcMeetingForEvent({ startYmd: "2026-09-26", endYmd: "2026-09-26" }, EMCC)?.eventId, "cup");
+  const sat = [row("sat", "2026-09-26")];
+  assert.equal(liveRcMeetingForEvent({ startYmd: "2026-09-25", endYmd: "2026-09-27" }, sat)?.eventId, "sat");
+});
+
+test("nothing on LiveRC for those dates leaves the event alone", () => {
+  assert.equal(liveRcMeetingForEvent({ startYmd: "2026-09-20", endYmd: "2026-09-20" }, EMCC), null);
+});
+
+test("two meetings on the day is a guess, so no match (SA State Titles was listed twice)", () => {
+  const rows = [
+    row("titles-2026", "2026-09-11", "2026-09-11", "RCRA 2026 EP State Titles"),
+    row("titles-2025", "2026-09-12", "2026-09-13", "RCRA 2025 EP State Titles"),
+  ];
+  assert.equal(liveRcMeetingForEvent({ startYmd: "2026-09-11", endYmd: "2026-09-13" }, rows), null);
+  // One day of it is not ambiguous.
+  assert.equal(liveRcMeetingForEvent({ startYmd: "2026-09-13", endYmd: "2026-09-13" }, rows)?.eventId, "titles-2025");
+});
+
+test("the placeholder name reads like the track and the day", () => {
+  assert.equal(shortDayLabel("2026-09-26"), "Sat 26 Sep");
+  assert.equal(shortDayLabel("2026-11-01"), "Sun 1 Nov");
+  assert.equal(defaultEventName("Radio Racing Cars SA", "2026-09-26"), "Radio Racing Cars SA · Sat 26 Sep");
+});
+
+test("only a kept placeholder counts as default, under the track's old or new name", () => {
+  const name = defaultEventName("Radio racing cars sa", "2026-09-26");
+  assert.equal(isDefaultEventName(name, ["Radio Racing Cars SA", "Radio racing cars sa"], "2026-09-26"), true);
+  assert.equal(isDefaultEventName(name, ["Radio Racing Cars SA"], "2026-09-26"), false);
+  assert.equal(isDefaultEventName("Club champs R8", ["Radio Racing Cars SA"], "2026-09-26"), false);
+  // Same words, different day: the driver renamed nothing, but it is not this event's placeholder.
+  assert.equal(
+    isDefaultEventName(defaultEventName("Radio Racing Cars SA", "2026-09-27"), ["Radio Racing Cars SA"], "2026-09-26"),
+    false,
+  );
+});

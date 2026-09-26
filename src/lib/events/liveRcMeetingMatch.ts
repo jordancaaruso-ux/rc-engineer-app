@@ -1,0 +1,121 @@
+import type { LiveRcEventListRow } from "@/lib/lapWatch/liveRcIndexHtmlParse";
+import { addDaysToYmd } from "@/lib/events/joinableTeamEventLogic";
+
+/**
+ * Which LiveRC meeting is this? The pure half of "a driver made an event, then LiveRC posted it".
+ *
+ * Most clubs only put a meeting on LiveRC once the race director sets it up, usually on the
+ * morning: on 19 Aug 2026 only 67 of 1,075 active LiveRC tracks listed anything ahead. So the
+ * first practice run of a race day is often logged against an event the driver made by hand, and
+ * LiveRC's own row turns up an hour later. These rules decide when that hand-made event IS
+ * LiveRC's meeting, so the app links the two instead of offering a second event for the same
+ * day (founder 2026-09-26: "if someone creates an event and then a new one appears on LiveRC, we'd
+ * have to make that situation work").
+ */
+
+/** How far ahead the log-run event list looks. The window team events already use. */
+export const TRACK_EVENTS_AHEAD_DAYS = 7;
+
+/**
+ * How far back a hand-made event still gets matched to a LiveRC meeting that appeared late — a
+ * Friday event for the weekend, found again on Monday when the driver logs the Sunday runs.
+ */
+export const LINK_LOOKBACK_DAYS = 3;
+
+/** Inclusive YYYY-MM-DD ranges share at least one day. */
+export function ymdRangesOverlap(
+  aStart: string,
+  aEnd: string,
+  bStart: string,
+  bEnd: string,
+): boolean {
+  return aStart <= bEnd && bStart <= aEnd;
+}
+
+export type OfferedLiveRcMeeting = LiveRcEventListRow & {
+  /** Today (the track's day) falls inside the dates the club listed. */
+  onToday: boolean;
+};
+
+/**
+ * The meetings worth offering in the event list: on today, or starting within the next
+ * `aheadDays`. On today first, then soonest. A meeting the page lists twice is offered once.
+ */
+export function offeredLiveRcMeetings(
+  rows: readonly LiveRcEventListRow[],
+  todayYmd: string,
+  aheadDays: number = TRACK_EVENTS_AHEAD_DAYS,
+): OfferedLiveRcMeeting[] {
+  const horizon = addDaysToYmd(todayYmd, aheadDays);
+  const seen = new Set<string>();
+  const out: OfferedLiveRcMeeting[] = [];
+  for (const row of rows) {
+    if (seen.has(row.eventId)) continue;
+    if (!ymdRangesOverlap(row.startYmd, row.endYmd, todayYmd, horizon)) continue;
+    seen.add(row.eventId);
+    out.push({ ...row, onToday: row.startYmd <= todayYmd && row.endYmd >= todayYmd });
+  }
+  return out.sort((a, b) => {
+    if (a.onToday !== b.onToday) return a.onToday ? -1 : 1;
+    return a.startYmd.localeCompare(b.startYmd) || a.name.localeCompare(b.name);
+  });
+}
+
+/**
+ * The one LiveRC meeting a hand-made event stands for, or null.
+ *
+ * Only an unambiguous match counts: exactly one meeting whose listed dates share a day with the
+ * event's. None means LiveRC hasn't got it (yet). Two means the club runs two meetings that day
+ * (a Mini-Z round beside the off-road club race) or listed one meeting twice (SA State Titles
+ * 2026, listed as "Sep 11" and again as "Sep 12 to Sep 13") — guessing there could file a
+ * driver's runs under the wrong meeting, so the event is left alone and the driver can pick.
+ */
+export function liveRcMeetingForEvent(
+  event: { startYmd: string; endYmd: string },
+  rows: readonly LiveRcEventListRow[],
+): LiveRcEventListRow | null {
+  const byId = new Map<string, LiveRcEventListRow>();
+  for (const row of rows) {
+    if (ymdRangesOverlap(row.startYmd, row.endYmd, event.startYmd, event.endYmd)) {
+      byId.set(row.eventId, row);
+    }
+  }
+  return byId.size === 1 ? [...byId.values()][0]! : null;
+}
+
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
+/** "2026-09-26" → "Sat 26 Sep". Fixed English on purpose: it is also stored, inside event names. */
+export function shortDayLabel(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return ymd;
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  return `${DOW[dt.getUTCDay()]} ${d} ${MON[m - 1]}`;
+}
+
+/**
+ * The name the New event form fills in: "Radio Racing Cars SA · Sat 26 Sep".
+ *
+ * A placeholder the driver can keep or type over. Kept, it is recognisable later
+ * (`isDefaultEventName`), so when LiveRC posts the meeting the event can take LiveRC's name
+ * without ever overwriting one the driver chose.
+ */
+export function defaultEventName(trackName: string, ymd: string): string {
+  return `${trackName.trim()} · ${shortDayLabel(ymd)}`;
+}
+
+/**
+ * True when `name` is still the placeholder for this event's first day at one of the given track
+ * names (the track as it is now, and as the event recorded it — a catalog rename must not turn a
+ * placeholder into something that looks chosen).
+ */
+export function isDefaultEventName(
+  name: string,
+  trackNames: ReadonlyArray<string | null | undefined>,
+  startYmd: string,
+): boolean {
+  const n = name.trim();
+  if (!n) return false;
+  return trackNames.some((t) => Boolean(t?.trim()) && n === defaultEventName(t!, startYmd));
+}
