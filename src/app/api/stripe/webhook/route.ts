@@ -202,6 +202,30 @@ async function syncFromPlanCheckout(session: Stripe.Checkout.Session): Promise<v
   }
 }
 
+/**
+ * The currency to make the $0 seat in. Any works money-wise, but a Stripe customer bills every
+ * live subscription in one currency: a member whose Notebook bills in US$ (still live until it
+ * runs out) must get a US$ seat or Stripe refuses it. So the customer's own currency first, then
+ * the one they just paid in; only currencies the seat price carries. Undefined = its A$ default.
+ */
+async function seatCurrencyFor(
+  customerId: string,
+  paidIn: string | null,
+  seatPriceId: string,
+): Promise<string | undefined> {
+  const stripe = getStripe();
+  const [customer, seatPrice] = await Promise.all([
+    stripe.customers.retrieve(customerId),
+    stripe.prices.retrieve(seatPriceId, { expand: ["currency_options"] }),
+  ]);
+  const carried = new Set([seatPrice.currency, ...Object.keys(seatPrice.currency_options ?? {})]);
+  const own = "deleted" in customer && customer.deleted ? null : (customer as Stripe.Customer).currency;
+  if (own && carried.has(own)) return own === seatPrice.currency ? undefined : own;
+  const paid = paidIn?.toLowerCase() ?? null;
+  if (paid && carried.has(paid)) return paid === seatPrice.currency ? undefined : paid;
+  return undefined;
+}
+
 /** The subscription that holds the seat bought in this checkout, if it has been made already. */
 async function findSeatForCheckout(
   customerId: string,
@@ -281,10 +305,12 @@ async function fulfilFoundingSeat(session: Stripe.Checkout.Session): Promise<voi
       planStillBilling(previous) && !isFoundingSeatPrice(previous.priceId)
         ? previous.stripeSubscriptionId
         : "";
+    const seatCurrency = await seatCurrencyFor(customerId, session.currency, seatPriceId);
     seat = await stripe.subscriptions.create(
       {
         customer: customerId,
         items: [{ price: seatPriceId }],
+        ...(seatCurrency ? { currency: seatCurrency } : {}),
         description: "Founding member: Race Engineer for the life of the app",
         metadata: {
           offer: FOUNDING_OFFER,
@@ -292,6 +318,7 @@ async function fulfilFoundingSeat(session: Stripe.Checkout.Session): Promise<voi
           founding_payment_intent: paymentIntentId ?? "",
           batch: session.metadata?.batch ?? "",
           paid_cents: session.amount_total != null ? String(session.amount_total) : "",
+          paid_currency: session.currency ?? "",
           replaces,
         },
       },

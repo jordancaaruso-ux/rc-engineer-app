@@ -71,7 +71,9 @@ export default async function JoinSuccessPage({
             billedLabel: "Paid",
             billed:
               session.amount_total != null
-                ? `${formatFoundingAmount(session.amount_total)} once`
+                ? `${formatFoundingAmount(session.amount_total, session.currency ?? undefined)} ${(
+                    session.currency ?? "aud"
+                  ).toUpperCase()} once`
                 : "Once",
             detail: { label: "Engineer questions", value: `${PRO_ENGINEER_MONTHLY_QUESTIONS} a month` },
           };

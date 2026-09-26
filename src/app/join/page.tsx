@@ -119,9 +119,10 @@ export default async function JoinPage({
 
   // Founding seats (until 31 October 2026): a band under the plans while any are on sale.
   // Priced in the visitor's currency (US$ in the US, € in the euro area, A$ elsewhere).
+  const visitorCurrency = await getVisitorPriceCurrency();
   const [plans, founding] = await Promise.all([
-    getVisitorPriceCurrency().then((currency) => getPricePlansWithAmounts(currency)),
-    getFoundingOfferView(),
+    getPricePlansWithAmounts(visitorCurrency),
+    getFoundingOfferView(visitorCurrency),
   ]);
   const joinPlans: JoinPlan[] = plans
     .filter((p): p is typeof p & { tier: PaidTier } => p.tier !== "none")

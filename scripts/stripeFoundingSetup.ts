@@ -28,6 +28,12 @@ type FoundingPriceDef = {
   unitAmount: number;
   /** Set for the $0 seat price only; the batch prices are one-off. */
   interval?: "year";
+  /**
+   * The price's own US$ and € amounts (Stripe `currency_options`), shown and charged to visitors
+   * whose plans are priced in those currencies. Added once, never changed: Stripe refuses an edit to
+   * an amount already on a price, so a different amount means a new price and new env vars.
+   */
+  currencyOptions: { usd: number; eur: number };
 };
 
 const PRICES: FoundingPriceDef[] = [
@@ -35,12 +41,15 @@ const PRICES: FoundingPriceDef[] = [
     envVar: `STRIPE_PRICE_FOUNDING_${b.batch}`,
     lookupKey: `rc_engineer_founding_batch_${b.batch}`,
     unitAmount: b.amountCents,
+    currencyOptions: b.currencyAmounts,
   })),
   {
     envVar: "STRIPE_PRICE_FOUNDING_SEAT",
     lookupKey: "rc_engineer_founding_seat",
     unitAmount: 0,
     interval: "year",
+    // $0 in every currency: a member whose plan bills in US$ must be able to hold a US$ seat.
+    currencyOptions: { usd: 0, eur: 0 },
   },
 ];
 
@@ -67,17 +76,39 @@ async function ensureFoundingPrice(
   productId: string,
   def: FoundingPriceDef,
 ): Promise<string> {
-  const existing = await stripe.prices.list({ lookup_keys: [def.lookupKey], limit: 1 });
+  const existing = await stripe.prices.list({
+    lookup_keys: [def.lookupKey],
+    limit: 1,
+    expand: ["data.currency_options"],
+  });
   const current = existing.data[0];
   const sameShape =
     current &&
     current.unit_amount === def.unitAmount &&
     (current.recurring?.interval ?? undefined) === def.interval;
-  if (current && sameShape) return current.id;
+  const options = Object.entries(def.currencyOptions) as Array<["usd" | "eur", number]>;
+  if (current && sameShape) {
+    // Add any currency the price doesn't carry yet; one it already carries is never touched.
+    const missing = options.filter(([c]) => current.currency_options?.[c]?.unit_amount == null);
+    for (const [c, amount] of options) {
+      const has = current.currency_options?.[c]?.unit_amount;
+      if (has != null && has !== amount) {
+        console.warn(`  ${def.lookupKey}: ${c} is ${has}, wanted ${amount}; Stripe can't change it (needs a new price)`);
+      }
+    }
+    if (missing.length > 0) {
+      await stripe.prices.update(current.id, {
+        currency_options: Object.fromEntries(missing.map(([c, amount]) => [c, { unit_amount: amount }])),
+      });
+      console.log(`  ${def.lookupKey}: added ${missing.map(([c, a]) => `${c} ${a}`).join(", ")}`);
+    }
+    return current.id;
+  }
   const price = await stripe.prices.create({
     product: productId,
     currency: "aud",
     unit_amount: def.unitAmount,
+    currency_options: Object.fromEntries(options.map(([c, amount]) => [c, { unit_amount: amount }])),
     ...(def.interval ? { recurring: { interval: def.interval } } : {}),
     lookup_key: def.lookupKey,
     ...(current ? { transfer_lookup_key: true } : {}),
@@ -94,7 +125,7 @@ export async function ensureFoundingSeats(stripe: Stripe): Promise<string[]> {
     const priceId = await ensureFoundingPrice(stripe, productId, def);
     const what = def.interval
       ? `$0 AUD/${def.interval} (the seat)`
-      : `$${(def.unitAmount / 100).toFixed(2)} AUD once`;
+      : `$${(def.unitAmount / 100).toFixed(2)} AUD once (US$${(def.currencyOptions.usd / 100).toFixed(2)}, €${(def.currencyOptions.eur / 100).toFixed(2)})`;
     console.log(`${PRODUCT_NAME} — Founding member — ${what}: ${priceId}`);
     lines.push(`${def.envVar}=${priceId}`);
   }

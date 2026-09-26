@@ -717,8 +717,8 @@
           <span style="font-size:0.85rem;color:#78786F">One payment, nothing renews. Full refund in the first 14 days.</span>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-start;gap:0.65rem;flex:0 0 auto">
-          <span id="jrcFoundingCompare" style="font-size:0.85rem;color:#78786F"><span id="jrcFoundingCompareLabel"></span> <s id="jrcFoundingCompareAmount"></s></span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:clamp(1.9rem,3.4vw,2.6rem);letter-spacing:-0.03em;color:#EDE8DF;line-height:1.1"><span id="jrcFoundingPrice"></span> <small style="font-family:'Sora',sans-serif;font-size:12px;letter-spacing:0;color:#78786F">AUD, once</small></span>
+          <span id="jrcFoundingCompare" style="font-size:0.85rem;color:#78786F"><span id="jrcFoundingCompareLabel"></span> <s id="jrcFoundingCompareAmount"></s> <span id="jrcFoundingCompareCurrency"></span></span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:clamp(1.9rem,3.4vw,2.6rem);letter-spacing:-0.03em;color:#EDE8DF;line-height:1.1"><span id="jrcFoundingPrice"></span> <small id="jrcFoundingCurrency" style="font-family:'Sora',sans-serif;font-size:12px;letter-spacing:0;color:#78786F">AUD, once</small></span>
           <a href="/join#founding"><span style="display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;padding:0.8rem 1.4rem;border-radius:9px;background:#FFD60A;border:1px solid #FFD60A;color:#171614;transition:transform .2s ease,box-shadow .3s ease" style-hover="transform:translateY(-1px);box-shadow:0 8px 26px rgba(255,214,10,0.2)">Get a founding seat</span></a>
         </div>
       </div>
@@ -1032,12 +1032,14 @@ class Component extends DCLogic {
     box.style.display = "flex";
     const set = (id, text) => { const el = this.one(id); if (el) el.textContent = text; };
     set("jrcFoundingPrice", o.amount || "");
+    set("jrcFoundingCurrency", (o.currency || "AUD") + ", once");
     set("jrcFoundingSeats", o.seatsLine || "");
     const cmp = this.one("jrcFoundingCompare");
     const hasCompare = Boolean(o.compareLabel && o.compareAmount);
     if (cmp) cmp.style.display = hasCompare ? "" : "none";
     set("jrcFoundingCompareLabel", hasCompare ? o.compareLabel : "");
     set("jrcFoundingCompareAmount", hasCompare ? o.compareAmount : "");
+    set("jrcFoundingCompareCurrency", hasCompare ? o.currency || "" : "");
   }
 
   /* ── reveals ───────────────────────────────────────── */

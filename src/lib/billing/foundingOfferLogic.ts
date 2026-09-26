@@ -16,11 +16,22 @@
  *   - No seat numbers ("#7 of 50") for now: if someone is #1 days after launch they know nobody
  *     else bought. Add them later if the offer is popular.
  *
+ *   - In US dollars and euros too (2026-09-26, founder: "fix before launch day the rough edge"):
+ *     a US visitor whose plan cards say US$12.99 saw the seat in A$ and, at checkout, Stripe's
+ *     own conversion of it. The seat now has its own round US$ and € amounts, shown and charged
+ *     exactly when the plans on the same page are (`pickFoundingCurrency`).
+ *
  * The seat itself is a $0 yearly Stripe subscription on its own product (`metadata.tier` = pro),
  * so every surface that reads the Subscription row (sign-in, entitlement, the run window, teams)
  * treats a founder as Race Engineer with no special case. `foundingOffer.ts` holds the Stripe and
  * database half.
  */
+
+import {
+  DEFAULT_PRICE_CURRENCY,
+  asPriceCurrency,
+  type PriceCurrency,
+} from "@/lib/billing/priceCurrencyLogic";
 
 /** Stamped into `metadata.offer` on the checkout session, its payment and the seat subscription. */
 export const FOUNDING_OFFER = "founding";
@@ -34,13 +45,21 @@ export const FOUNDING_LAST_DAY_LABEL = "31 October";
 export type FoundingBatch = {
   batch: number;
   seats: number;
-  /** AUD cents, charged once. */
+  /** AUD cents, charged once: the batch price's own amount. */
   amountCents: number;
+  /**
+   * The same seat's own round US$ and € amounts, carried by the batch price as Stripe
+   * `currency_options`. Set the way the A$ ones were: the largest whole amount ending in 9 that is
+   * below two years (batch 1) or two and a half years (batch 2) of Race Engineer's yearly price in
+   * that currency (A$199.90, US$129.90, €119.90). Once added to a live price an amount can never
+   * be changed or removed; a different amount means a new price and new STRIPE_PRICE_FOUNDING_*.
+   */
+  currencyAmounts: { usd: number; eur: number };
 };
 
 export const FOUNDING_BATCHES: readonly FoundingBatch[] = [
-  { batch: 1, seats: 25, amountCents: 39_900 },
-  { batch: 2, seats: 25, amountCents: 49_900 },
+  { batch: 1, seats: 25, amountCents: 39_900, currencyAmounts: { usd: 25_900, eur: 23_900 } },
+  { batch: 2, seats: 25, amountCents: 49_900, currencyAmounts: { usd: 31_900, eur: 29_900 } },
 ];
 
 /** The count appears once FEWER than this many seats remain in the batch on sale. */
@@ -148,8 +167,34 @@ export function foundingSeatsLine(o: {
   return `The first batch sold out. ${seats}, until ${o.lastDay}.`;
 }
 
-/** Cents to "$399" or "$999.50": whole dollars drop the cents, as the price cards do. */
-export function formatFoundingAmount(cents: number): string {
-  const dollars = cents / 100;
-  return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
+/**
+ * Cents to "$399", "€239" or "$649.50": whole amounts drop the cents. The short symbol only, as on
+ * the plan cards; the currency is named once beside it ("USD, once").
+ */
+export function formatFoundingAmount(cents: number, currency: string = DEFAULT_PRICE_CURRENCY): string {
+  const whole = cents % 100 === 0;
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: whole ? 0 : 2,
+  }).format(cents / 100);
+}
+
+/**
+ * The currency the founding band shows, and its checkout charges, for one visitor.
+ *
+ * It follows the plans on the same page: `plansCurrency` is the all-or-nothing answer the plan
+ * cards resolved to (`getPricePlansWithAmounts`). US$ or € only when the plans are in it AND every
+ * founding price the band names carries it too; otherwise A$. So a page never shows US$ plans
+ * beside an A$ seat once both are priced, and never prints a figure Stripe would not charge.
+ */
+export function pickFoundingCurrency(
+  plansCurrency: string | null | undefined,
+  foundingCarries: (currency: PriceCurrency) => boolean,
+): PriceCurrency {
+  const wanted = asPriceCurrency(plansCurrency) ?? DEFAULT_PRICE_CURRENCY;
+  if (wanted === DEFAULT_PRICE_CURRENCY) return wanted;
+  return foundingCarries(wanted) ? wanted : DEFAULT_PRICE_CURRENCY;
 }

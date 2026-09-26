@@ -226,7 +226,7 @@ export default async function BillingPage({
 
   // Founding seats (until 31 October 2026) are sold here too, to anyone who pays for their own
   // access; an admin's free access has nothing to replace.
-  const founding = mode === "view" ? null : await getFoundingOfferView();
+  const founding = mode === "view" ? null : await getFoundingOfferView(currency);
 
   return (
     <>
@@ -256,8 +256,13 @@ async function founderReceipt(
   try {
     const seat = await getStripe().subscriptions.retrieve(stripeSubscriptionId);
     const cents = Number(seat.metadata?.paid_cents);
+    const paidIn =
+      asPriceCurrency(seat.metadata?.paid_currency) ?? asPriceCurrency(seat.currency) ?? "aud";
     return {
-      paid: Number.isFinite(cents) && cents > 0 ? formatFoundingAmount(cents) : null,
+      paid:
+        Number.isFinite(cents) && cents > 0
+          ? `${formatFoundingAmount(cents, paidIn)} ${paidIn.toUpperCase()}`
+          : null,
       on: seat.created ? formatRunDateOnly(new Date(seat.created * 1000), timeZone) : null,
     };
   } catch (error) {

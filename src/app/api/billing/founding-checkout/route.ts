@@ -14,9 +14,12 @@ import {
 import { FOUNDING_OFFER, foundingClosedMessage } from "@/lib/billing/foundingOfferLogic";
 import {
   foundingBatchPriceId,
+  foundingCheckoutCurrency,
   getFoundingOfferState,
   holdsFoundingSeat,
+  memberPriceCurrency,
 } from "@/lib/billing/foundingOffer";
+import { getVisitorPriceCurrency } from "@/lib/billing/visitorCurrency";
 
 /** Printed above Stripe's Pay button. The one place a buyer reads what "lifetime" means. */
 const CHECKOUT_NOTE =
@@ -84,9 +87,16 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  // The currency the band showed them: a member's own (what /billing priced), a stranger's from
+  // where they are. US$ and € only when the seat's prices carry it; an A$ session is left to Stripe.
+  const currency = await foundingCheckoutCurrency(
+    user ? await memberPriceCurrency(user.id) : await getVisitorPriceCurrency(),
+  );
+
   const batch = String(state.batch.batch);
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
+    ...(currency ? { currency } : {}),
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: user
       ? `${origin}/billing?changed=1`

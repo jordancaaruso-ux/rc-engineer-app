@@ -107,13 +107,13 @@ export function FoundingBand({
           {offer.compareLabel && offer.compareAmount ? (
             <p className="text-[12px] text-faint">
               {offer.compareLabel}{" "}
-              <s className="tabular-nums decoration-1">{offer.compareAmount}</s>
+              <s className="tabular-nums decoration-1">{offer.compareAmount}</s> {offer.currency}
             </p>
           ) : null}
           <p className="door-price text-foreground">
             {offer.amount}
             <span className="ml-1.5 font-sans text-[12px] font-normal tracking-normal text-faint">
-              AUD, once
+              {offer.currency}, once
             </span>
           </p>
           {button}
@@ -140,12 +140,12 @@ export function FoundingBand({
         {offer.compareLabel && offer.compareAmount ? (
           <p className="text-[12px] text-muted-foreground">
             {offer.compareLabel}{" "}
-            <s className="tabular-nums decoration-1">{offer.compareAmount}</s>
+            <s className="tabular-nums decoration-1">{offer.compareAmount}</s> {offer.currency}
           </p>
         ) : null}
         <p className="flex items-baseline gap-1.5">
           <span className="fig-hero font-bold text-foreground">{offer.amount}</span>
-          <span className="text-[12px] text-muted-foreground">AUD, once</span>
+          <span className="text-[12px] text-muted-foreground">{offer.currency}, once</span>
         </p>
         {button}
         {errorLine}

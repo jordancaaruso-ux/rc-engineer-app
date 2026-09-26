@@ -31,6 +31,28 @@ helpers) because every helper's finish re-read a long conversation. Run big batc
 compacted session, and launch naming in blocking waves (`run_in_background: false`, up to 20 per
 message) so a wave reports once.
 
+## The quick recipe (2026-09-26): no layout step, one namer per tile
+
+For raising many sheets to a floor fast. After prep, `sheet-tiles.cjs <dir>` (close-up tiles),
+`sheets:instructions` (rules + primer), then `node scripts/setup-extract-eval/sheet-tile-boxes.cjs <dir>`
+gives every box to one tile and writes `instructions-quick.md` (no layout briefing). One `sheet-namer` per
+tile with `naming-prompts/TILE-NAMING-TASK.md` (8 tiles on a portrait A4 sheet), then
+`sheets:assemble -- --work=<dir> --one-pass --min-confidence=0.8` as usual.
+
+Measured on the Schumacher Mi10 against Jordan's hand names (same sheet, same scorer):
+
+| Recipe | Wall-clock | Raw tokens | Named at 0.8 | Checked | Really wrong |
+|---|---|---|---|---|---|
+| fast recipe (layout + blocks) | ~30 min | 2.9M | 134 | 83 | 0 (2 wording) |
+| quick, opus | 12 min | 1.2M | 116 | 73 | 0 (same 2 wording) |
+| quick, sonnet | 14 min | 1.3M | 103 | 63 | up to 2 (limiters called "external") |
+
+So the quick recipe keeps the accuracy at about 40% of the cost and time, and names ~13% fewer boxes
+(the layout briefing's front/rear and trap notes lift confidence). Sonnet is slower, dearer in raw
+tokens and weaker here: stay on opus. The slowest tile sets the time (a dense block of "g"-only
+weight boxes took 11.6 min). Not yet checked: a sheet with no instructions.md needs
+`sheets:instructions` to run without a layout.md.
+
 ## The method (v3, 2026-09-23): name whole drawings, not single boxes
 
 Earlier versions cropped each box around itself. On sheets whose boxes print only "SHIMS" or "mm",

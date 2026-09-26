@@ -16,6 +16,7 @@ import {
   foundingClosedMessage,
   foundingOfferState,
   foundingSeatsLine,
+  pickFoundingCurrency,
 } from "@/lib/billing/foundingOfferLogic";
 
 const DURING = new Date("2026-10-15T00:00:00.000Z");
@@ -107,9 +108,40 @@ test("the seats line, in every state the band can be in", () => {
   );
 });
 
-test("amounts read like the price cards", () => {
+test("amounts read like the price cards, in any of the three currencies", () => {
   assert.equal(formatFoundingAmount(39_900), "$399");
   assert.equal(formatFoundingAmount(99_950), "$999.50");
+  assert.equal(formatFoundingAmount(25_900, "usd"), "$259");
+  assert.equal(formatFoundingAmount(64_950, "usd"), "$649.50");
+  assert.equal(formatFoundingAmount(23_900, "eur"), "€239");
+  assert.equal(formatFoundingAmount(59_950, "eur"), "€599.50");
+});
+
+test("US$ and € seats follow the A$ rule: just under 2 and 2.5 years of the yearly price, ending in 9", () => {
+  const yearly = { aud: 19_990, usd: 12_990, eur: 11_990 };
+  const years = [2, 2.5];
+  FOUNDING_BATCHES.forEach((b, i) => {
+    const amounts = { aud: b.amountCents, usd: b.currencyAmounts.usd, eur: b.currencyAmounts.eur };
+    for (const c of ["aud", "usd", "eur"] as const) {
+      const ceiling = yearly[c] * years[i];
+      assert.ok(amounts[c] < ceiling, `${c} batch ${b.batch} under ${years[i]} years`);
+      assert.ok(ceiling - amounts[c] < 1_000, `${c} batch ${b.batch} the nearest such amount`);
+      assert.equal(amounts[c] % 1_000, 900, `${c} batch ${b.batch} ends in 9`);
+    }
+  });
+});
+
+test("the seat is in the plans' currency only when its prices carry it too", () => {
+  const carriesAll = () => true;
+  const carriesNone = () => false;
+  assert.equal(pickFoundingCurrency("usd", carriesAll), "usd");
+  assert.equal(pickFoundingCurrency("eur", carriesAll), "eur");
+  // Plans still in A$ (their US$ amounts not written yet): the seat stays A$ even if it has US$.
+  assert.equal(pickFoundingCurrency("aud", carriesAll), "aud");
+  // Plans in US$ but the seat's prices lack it: A$, never a figure checkout can't charge.
+  assert.equal(pickFoundingCurrency("usd", carriesNone), "aud");
+  assert.equal(pickFoundingCurrency(null, carriesAll), "aud");
+  assert.equal(pickFoundingCurrency("gbp", carriesAll), "aud");
 });
 
 test("a refused checkout says why", () => {
