@@ -96,12 +96,33 @@ export async function ensureAuthorizedSetupSheetCatalog(): Promise<void> {
 /**
  * Keep `Car.setupSheetTemplate` (the community-aggregation bucket key) in sync with the linked
  * model's slug. Backfills cars created before non-A800 models wrote the key.
+ *
+ * One grouped read says which chassis types have a car out of step, and only those get the write.
+ * Almost always that is none: creating or re-linking a car writes the key itself (`/api/cars`).
+ * The write used to run for every chassis type ever created, one after another — most of the 248
+ * queries a cold Garage load made on the test drive, ~12s before it could draw (W1-08,
+ * 2026-09-26) — and the count grows with every sheet a driver uploads.
  */
 async function syncCarTemplateKeysFromModels(): Promise<void> {
-  const models = await prisma.setupSheetModel.findMany({
-    select: { id: true, slug: true },
-  });
+  const [models, keysInUse] = await Promise.all([
+    prisma.setupSheetModel.findMany({
+      select: { id: true, slug: true },
+    }),
+    // One row per (chassis type, key) pair some car carries, however many cars share it.
+    prisma.car.groupBy({
+      by: ["setupSheetModelId", "setupSheetTemplate"],
+      where: { setupSheetModelId: { not: null } },
+    }),
+  ]);
+  const keyByModelId = new Map(models.map((m) => [m.id, templateKeyFromModelSlug(m.slug)]));
+  const outOfStep = new Set<string>();
+  for (const row of keysInUse) {
+    if (!row.setupSheetModelId) continue;
+    const key = keyByModelId.get(row.setupSheetModelId);
+    if (key !== undefined && row.setupSheetTemplate !== key) outOfStep.add(row.setupSheetModelId);
+  }
   for (const model of models) {
+    if (!outOfStep.has(model.id)) continue;
     const key = templateKeyFromModelSlug(model.slug);
     await prisma.car.updateMany({
       where: {

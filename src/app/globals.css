@@ -827,6 +827,62 @@ html[data-native="true"] .web-only {
 }
 
 /*
+ * The install card (`PwaInstallPrompt`, iOS Safari only) never lies over a control
+ * (test drive W1-30, 2026-09-26).
+ *
+ * It sat 1rem off the foot of the screen at z-60, over everything the app draws: the
+ * dock, the Log run step bar (a robot's taps failed with "intercepts pointer events")
+ * and a setup editor's Save, until the driver closed it. Now it sits just above the
+ * dock instead of across it — `--mobile-tab-bar-height` is the dock's published height,
+ * the clearance the setup editor's save bar uses too — and keeps its old 1rem where
+ * there is no dock (md up, and the signed-out pages, `.is-dockless`). Its z-index, under
+ * every bar, sheet and scrim, sits in the component.
+ *
+ * `.pwa-install-room` is the room the page leaves under it, so the last thing on any
+ * page can still be scrolled clear: the card's measured height, plus whatever `<main>`
+ * has not already set aside — over the dock it pads for the dock itself (AppShell).
+ */
+.pwa-install {
+  --pwa-install-bottom: calc(var(--mobile-tab-bar-height) + env(safe-area-inset-bottom, 0px));
+  --pwa-install-under: 0px;
+}
+
+@media (min-width: 768px) {
+  .pwa-install {
+    --pwa-install-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    --pwa-install-under: var(--pwa-install-bottom);
+  }
+}
+
+.pwa-install.is-dockless {
+  --pwa-install-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  --pwa-install-under: var(--pwa-install-bottom);
+}
+
+.pwa-install-card {
+  bottom: var(--pwa-install-bottom);
+}
+
+.pwa-install-room {
+  height: calc(var(--pwa-install-h, 0px) + var(--pwa-install-under));
+}
+
+/*
+ * And it steps aside on the screens whose own bar owns the bottom edge: the Log run
+ * steps (as the dock does, `body[data-logrun-wizard-chrome] .bottom-nav`) and a setup
+ * editor's save bar. Still pending, not dismissed — it is back on the next screen until
+ * the driver closes it. Two rules, not one list, so a browser without `:has()` still
+ * keeps the first.
+ */
+body[data-logrun-wizard-chrome] .pwa-install {
+  display: none;
+}
+
+body:has(.setup-save-panel) .pwa-install {
+  display: none;
+}
+
+/*
  * Elevated panel surface — the shared "lift" that makes cards siblings of the
  * dashboard hero instead of flat near-black rectangles. Warm top sheen + a
  * gradient that lifts the top edge + a soft drop shadow so panels read off the
@@ -1307,6 +1363,36 @@ body[data-logrun-wizard-chrome] .mobile-brand-mark {
 
 .top-rail-logrun.is-quiet:hover {
   color: rgb(var(--color-foreground));
+}
+
+/*
+ * Tablet widths: each tab stands its icon over its word, as the phone's dock does
+ * (test drive W1-22, 2026-09-26).
+ *
+ * The rail as drawn above needs up to 1,042px: five 14px tabs side by side (~556px),
+ * the right-hand cluster (~300px, ~315 when it says "Finish run"), the mark, two 28px
+ * gaps and two 32px gutters. It takes over from the dock at 768, so at every width in
+ * between it overflowed — `.top-rail-nav` shrinks (`min-width: 0`) and the cluster was
+ * drawn over the tabs it ran into. On an iPad held upright (820) Ideas sat on "Paddock"
+ * and the gear on "Tools", and a tap on either one landed on the tab underneath.
+ *
+ * Stacked at 10px (the nav-label size in VISUAL_NORTH_STAR) the whole rail needs at
+ * most ~746px, so it fits from 768 up. The words stay because on the pages the tabs
+ * name they ARE the title: `is-echo` hides the `<h1>` from md up. Ideas stacks too, so
+ * the cluster keeps its word; the gear, Log run and the avatar are unchanged, and from
+ * 1,100px up (58px clear of the widest full rail) nothing here applies.
+ */
+@media (min-width: 768px) and (max-width: 1099.98px) {
+  .top-rail-item,
+  .top-rail-utility.has-label {
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    height: 44px;
+    padding: 0 8px;
+    font-size: 10px;
+    line-height: 1;
+  }
 }
 
 /* ---------------------------------------------------------------------------

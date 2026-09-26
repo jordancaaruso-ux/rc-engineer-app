@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { after } from "next/server";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
@@ -70,8 +71,22 @@ export default async function CarManagerPage({
   const user = await requireCurrentUser();
   const isAdmin = isAuthAdminEmail(user.email);
   const displayTimeZone = await getExplicitTimeZoneForRunFormatting();
-  // Seed must run each load (it may create catalog rows) — keep it out of the cache.
-  await ensureAuthorizedSetupSheetCatalog();
+  /*
+   * The catalog check still runs on every load and stays out of the cache, but AFTER the
+   * response: awaited here, a fresh server's first Garage sat on the loading skeleton for 7-12s
+   * — a new driver's first tap on "Add your car" (test drive W1-08, 2026-09-26).
+   *
+   * Nothing below needs it first. A car gets its template key when it is created or edited, and
+   * the chassis rows already exist; on a brand-new database the add-car picker, handed an empty
+   * list, fetches `/api/setup-sheet-models`, which still waits for the check. Its memo is set
+   * only once a run finishes, so a failed run is retried on the next load, and what it fixes is
+   * in the database for every request after it — through this page's 30s cache, as before.
+   */
+  after(() =>
+    ensureAuthorizedSetupSheetCatalog().catch((err) =>
+      console.error("[setup-sheet-catalog] ensure failed", err)
+    )
+  );
 
   const [[allModels, carsByCreated], librarySetups, sheetCounts, unlinkedSheetCount, lastRunByCar] =
     await Promise.all([

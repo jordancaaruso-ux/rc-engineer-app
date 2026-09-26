@@ -42,6 +42,10 @@ const TICK_HALF = 14;
  * The active tick is the phone's, moved to the bottom edge of the rail: one
  * vocabulary across both platforms, replacing desktop's instant `elevate/0.05`
  * fill-only treatment (`transition-duration: 0ms`).
+ *
+ * From md to 1,100px (a tablet) the row as drawn does not fit, so the tabs and Ideas
+ * stand their icon over their word, the dock's shape — CSS only, see the tablet block
+ * after `.top-rail-logrun` in globals.css. The tick is measured, so it follows.
  */
 export const TopRail = memo(function TopRail() {
   const { activeId } = usePrimaryNav();
