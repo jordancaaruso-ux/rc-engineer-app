@@ -315,6 +315,12 @@ type ImportResultRow = {
   url?: string;
 };
 
+/** A scan's answer before it is words: what `resolveScanStatus` needs besides the live list counts. */
+type ScanFinding = Pick<
+  Parameters<typeof resolveScanStatus>[0],
+  "status" | "scanMessage" | "totalCandidates" | "unimportedCount"
+>;
+
 /** A session already imported once, and what it is currently filed under (`/api/laps/scan-day-url`). */
 type ImportedSessionRow = ScanDayCandidate & {
   importedSessionId: string;
@@ -746,7 +752,7 @@ function ScanStatusActionButton({
     case "settings":
       return (
         <Link href="/settings" className={primary}>
-          Check timing details
+          {action.add ? "Add timing details" : "Check timing details"}
         </Link>
       );
     case "track":
@@ -856,7 +862,15 @@ export function LapTimesIngestPanel({
   /** A MyRCM page pasted into the URL box — it opens the PDF door rather than going to the server. */
   const [myRcmPastedUrl, setMyRcmPastedUrl] = useState<string | null>(null);
   const [dayScanBusy, setDayScanBusy] = useState(false);
+  /** A scan that couldn't answer at all (no timing page, the request failed), as finished copy. */
   const [dayScanStatus, setDayScanStatus] = useState<ScanStatus | null>(null);
+  /**
+   * What the last scan found, kept raw: the empty state is worked out from it at render, against
+   * the lists as they stand. Worded once at scan time it went stale the moment a session was taken
+   * onto the run, and clearing it on import fell through to "check your driver name" over five of
+   * the racer's own sessions (test drive, 2026-09-26).
+   */
+  const [dayScanFinding, setDayScanFinding] = useState<ScanFinding | null>(null);
   const router = useRouter();
   const [dayScanCandidates, setDayScanCandidates] = useState<ScanDayCandidate[] | null>(null);
   const [dayScanIndexKind, setDayScanIndexKind] = useState<"practice" | "results" | null>(null);
@@ -1454,6 +1468,67 @@ export function LapTimesIngestPanel({
       ? Math.max(mergedImportCandidates.length, (scanTotals?.unimported ?? 0) - attachedUrls.size)
       : visibleImportCandidates.length;
 
+  /**
+   * The backlog as it stands now. The server counted it before anything was taken, and a session
+   * taken onto this run since is no longer waiting: its own number said six over a list of five.
+   */
+  const olderRemainingCount = useMemo(() => {
+    const taken = (dayScanOlderCandidates ?? []).filter((c) =>
+      attachedUrls.has(c.sessionUrl.trim())
+    ).length;
+    return Math.max(olderPickerRows.length, dayScanOlderTotal - taken);
+  }, [dayScanOlderCandidates, attachedUrls, olderPickerRows.length, dayScanOlderTotal]);
+
+  /**
+   * What the card says when the list is empty, worked out from the lists as they stand rather than
+   * once when the scan landed.
+   *
+   * "Check your driver name, or add a timing page" is the last resort, for a racer with no sessions
+   * here at all. It was what an import fell through to: after taking one of six sessions it sat over
+   * the other five, at a track with its LiveRC page saved (test drive, 2026-09-26).
+   */
+  const emptyScanStatus = useMemo<ScanStatus>(() => {
+    if (dayScanStatus) return dayScanStatus;
+    const resolved = dayScanFinding
+      ? resolveScanStatus({
+          ...dayScanFinding,
+          candidateCount: mergedImportCandidates.length,
+          olderCount: olderRemainingCount,
+          importedCount: importedCandidates.length,
+          attachedCount: attachedBlocks.length,
+        })
+      : null;
+    if (resolved) return resolved;
+    if (eventRaceHint) return { title: "No sessions to import yet", detail: eventRaceHint, actions: [] };
+    if (attachedBlocks.length > 0 || olderRemainingCount > 0 || importedCandidates.length > 0) {
+      return { title: "No new sessions to import", detail: null, actions: [] };
+    }
+    return {
+      title: "No sessions found yet",
+      detail:
+        "Check your driver name and transponder number in Settings, or add a LiveRC or MYLAPS page to this track.",
+      actions: [{ kind: "settings" }, { kind: "track" }],
+    };
+  }, [
+    dayScanStatus,
+    dayScanFinding,
+    mergedImportCandidates.length,
+    olderRemainingCount,
+    importedCandidates.length,
+    attachedBlocks.length,
+    eventRaceHint,
+  ]);
+  const emptyStateShown = !eventRaceBusy && !dayScanBusy && mergedImportCandidates.length === 0;
+  /**
+   * The timing-details notice, unless the empty state is up and already sends the racer to
+   * Settings: with no details saved the two stacked under one heading, each with its own button
+   * (Knox, Team JOYBOX; test drive 2026-09-26).
+   */
+  const showTimingDetailsNotice =
+    hasTrackDiscovery &&
+    !dayScanHasDriverName &&
+    !(emptyStateShown && emptyScanStatus.actions.some((a) => a.kind === "settings"));
+
   function selectTab(id: IngestTab) {
     setTab(id);
     if (id === "manual") {
@@ -1515,6 +1590,7 @@ export function LapTimesIngestPanel({
     const tid = trackId?.trim() ?? "";
     const useTrack = overrideDayUrl ? false : hasTrackDiscovery;
     if (!useTrack && !url) {
+      setDayScanFinding(null);
       setDayScanStatus({
         title: "This track has no timing page saved",
         detail:
@@ -1525,6 +1601,7 @@ export function LapTimesIngestPanel({
     }
     setDayScanBusy(true);
     setDayScanStatus(null);
+    setDayScanFinding(null);
     setDayScanIndexKind(null);
     setScanTotals(null);
     setShowAllRecentRuns(false);
@@ -1612,17 +1689,7 @@ export function LapTimesIngestPanel({
       setSessionsTodayDayIso(typeof status?.postedDayIso === "string" ? status.postedDayIso : null);
       setImportedCandidates(importedRows);
       setScanTotals({ total: totalCandidates, unimported: unimportedCount });
-      setDayScanStatus(
-        resolveScanStatus({
-          status,
-          scanMessage,
-          totalCandidates,
-          unimportedCount,
-          candidateCount: candidates.length,
-          olderCount,
-          importedCount: importedRows.length,
-        })
-      );
+      setDayScanFinding({ status, scanMessage, totalCandidates, unimportedCount });
     } catch {
       setDayScanStatus({
         title: "Couldn't check the timing site just now",
@@ -1694,7 +1761,8 @@ export function LapTimesIngestPanel({
     }
     setUrlInput(sessionUrl);
     setUrlMessage(null);
-    setDayScanStatus(null);
+    // The scan's answer stays: the empty state is worked out again from the lists as they stand
+    // (see `emptyScanStatus`). Cleared here, it fell through to the no-identity wording.
     await fetchUrlPreviewWithUrl(sessionUrl);
   }
 
@@ -2352,7 +2420,7 @@ export function LapTimesIngestPanel({
                   ]}
                 />
               ) : null}
-              {hasTrackDiscovery && !dayScanHasDriverName ? (
+              {showTimingDetailsNotice ? (
                 // Just-in-time timing gate (docs/ONBOARDING_NORTH_STAR.md, reversal
                 // 2026-07-23): timing isn't required up front, so this is where it
                 // actually bites — no identity, no way to match your sessions. Kept
@@ -2462,17 +2530,9 @@ export function LapTimesIngestPanel({
                   </button>
                 </div>
               ) : null}
-              {!eventRaceBusy && !dayScanBusy && mergedImportCandidates.length === 0 ? (
+              {emptyStateShown ? (
                 (() => {
-                  const status: ScanStatus = dayScanStatus ??
-                    (eventRaceHint
-                      ? { title: "No sessions to import yet", detail: eventRaceHint, actions: [] }
-                      : {
-                          title: "No sessions found yet",
-                          detail:
-                            "Check your driver name and transponder number in Settings, or add a LiveRC or MYLAPS page to this track.",
-                          actions: [{ kind: "settings" }, { kind: "track" }],
-                        });
+                  const status = emptyScanStatus;
                   return (
                     <div className="px-3 py-4 text-center">
                       <p className="text-sm font-semibold text-foreground text-balance">
@@ -2513,10 +2573,10 @@ export function LapTimesIngestPanel({
                   >
                     {showOlderSessions
                       ? "Hide older sessions"
-                      : // `dayScanOlderTotal` is the server's count across every source at once, so
-                        // it can only be quoted while the list is unfiltered.
+                      : // The server's count spans every source at once, so it can only be quoted
+                        // while the list is unfiltered.
                         `Show older sessions (${
-                          sourceFilter === "all" ? dayScanOlderTotal : visibleOlderPickerRows.length
+                          sourceFilter === "all" ? olderRemainingCount : visibleOlderPickerRows.length
                         })`}
                   </button>
                   {showOlderSessions ? (
@@ -2537,9 +2597,9 @@ export function LapTimesIngestPanel({
                           </li>
                         ))}
                       </ul>
-                      {sourceFilter === "all" && dayScanOlderTotal > olderPickerRows.length ? (
+                      {sourceFilter === "all" && olderRemainingCount > olderPickerRows.length ? (
                         <p className="ui-label-meta">
-                          Showing the {olderPickerRows.length} most recent of {dayScanOlderTotal} older sessions.
+                          Showing the {olderPickerRows.length} most recent of {olderRemainingCount} older sessions.
                         </p>
                       ) : null}
                     </>
