@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { Button } from "@/components/ui/Button";
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { ActionToast } from "@/components/ui/ActionToast";
 import { Eyebrow } from "@/components/ui/panel";
 import { TIER_LABELS } from "@/lib/brand/brandNames";
 import type { PaidTier } from "@/lib/entitlementLogic";
 import type { PendingInviteForViewer } from "@/lib/teams/pendingInvites";
+import { TEAMS_LIST_HREF } from "@/lib/teams/teamInviteRules";
 
 type InviteAction = "accept" | "decline";
 
@@ -29,6 +31,9 @@ type InviteAction = "accept" | "decline";
  * team, Notebook one. Then Accept becomes the door to the plan that holds one more, the line says
  * which plan that is, and Decline stays. The invite stays pending, so it can still be accepted
  * after an upgrade.
+ *
+ * Decline says so in a toast: the row just vanishing read as nothing having happened. The page
+ * keeps this card mounted with no invites left, so the toast outlives the refresh that follows.
  */
 export function TeamInvitesCard({
   invites,
@@ -41,9 +46,9 @@ export function TeamInvitesCard({
   const [answeredIds, setAnsweredIds] = useState<string[]>([]);
   const [busy, setBusy] = useState<{ id: string; action: InviteAction } | null>(null);
   const [error, setError] = useState<{ id: string; message: string } | null>(null);
+  const [declined, setDeclined] = useState<string | null>(null);
 
   const rows = invites.filter((invite) => !answeredIds.includes(invite.id));
-  if (rows.length === 0) return null;
 
   async function respond(invite: PendingInviteForViewer, action: InviteAction) {
     if (busy) return;
@@ -67,7 +72,15 @@ export function TeamInvitesCard({
       }
       setAnsweredIds((ids) => [...ids, invite.id]);
       setBusy(null);
-      // The page may now have exactly one team and no invites, which is its cue to open that team.
+      setDeclined(`You declined ${invite.teamName}.`);
+      // Stay on the list while the toast shows. A plain refresh with one team and no invite left
+      // jumped straight to that team (`teamsIndexSkipsTo`) and took the toast with it. `null`
+      // state, per Next's shallow-routing contract, so the refresh reads the new URL.
+      try {
+        window.history.replaceState(null, "", TEAMS_LIST_HREF);
+      } catch {
+        // No history API: the refresh may still open a sole team, as it used to.
+      }
       router.refresh();
     } catch (err) {
       setError({
@@ -78,62 +91,68 @@ export function TeamInvitesCard({
     }
   }
 
+  // The toast keeps its place whether or not a row is left, so the last decline doesn't remount it.
   return (
-    <CardPanel contentClassName="p-0">
-      <div className="eyebrow-band px-4">
-        <Eyebrow className="mb-0">{rows.length === 1 ? "Invite" : "Invites"}</Eyebrow>
-      </div>
-      <ul className="divide-y divide-border/40">
-        {rows.map((invite) => {
-          const rowBusy = busy?.id === invite.id ? busy.action : null;
-          return (
-            <li key={invite.id} className="space-y-2.5 px-4 py-3">
-              <div className="min-w-0">
-                <p className="ui-title truncate text-[13px] font-semibold text-foreground">
-                  {invite.teamName}
-                </p>
-                {invite.invitedByLabel ? (
-                  <p className="type-timestamp truncate">From {invite.invitedByLabel}</p>
-                ) : null}
-              </div>
-              <p className="text-[12px] text-muted-foreground">
-                {joinLock == null
-                  ? "The team sees your runs, past ones too. You see theirs."
-                  : joinLock.includedIn === "pro"
-                    ? `More than one team is included in ${TIER_LABELS.pro}.`
-                    : `Teams are included in ${TIER_LABELS[joinLock.includedIn]}.`}
-              </p>
-              <div className="flex gap-2">
-                {joinLock == null ? (
-                  <Button
-                    disabled={busy != null}
-                    aria-busy={rowBusy === "accept"}
-                    onClick={() => void respond(invite, "accept")}
-                  >
-                    {rowBusy === "accept" ? "Joining…" : "Accept"}
-                  </Button>
-                ) : (
-                  // Hidden inside the app, which sells nothing (`web-only`, globals.css).
-                  <ButtonLink href={`/billing?plan=${joinLock.includedIn}`} className="web-only">
-                    Upgrade to {TIER_LABELS[joinLock.includedIn]}
-                  </ButtonLink>
-                )}
-                <Button
-                  variant="outline"
-                  disabled={busy != null}
-                  aria-busy={rowBusy === "decline"}
-                  onClick={() => void respond(invite, "decline")}
-                >
-                  {rowBusy === "decline" ? "Declining…" : "Decline"}
-                </Button>
-              </div>
-              {error?.id === invite.id ? (
-                <p className="text-[12px] text-destructive">{error.message}</p>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </CardPanel>
+    <>
+      {rows.length > 0 ? (
+        <CardPanel contentClassName="p-0">
+          <div className="eyebrow-band px-4">
+            <Eyebrow className="mb-0">{rows.length === 1 ? "Invite" : "Invites"}</Eyebrow>
+          </div>
+          <ul className="divide-y divide-border/40">
+            {rows.map((invite) => {
+              const rowBusy = busy?.id === invite.id ? busy.action : null;
+              return (
+                <li key={invite.id} className="space-y-2.5 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="ui-title truncate text-[13px] font-semibold text-foreground">
+                      {invite.teamName}
+                    </p>
+                    {invite.invitedByLabel ? (
+                      <p className="type-timestamp truncate">From {invite.invitedByLabel}</p>
+                    ) : null}
+                  </div>
+                  <p className="text-[12px] text-muted-foreground">
+                    {joinLock == null
+                      ? "The team sees your runs, past ones too. You see theirs."
+                      : joinLock.includedIn === "pro"
+                        ? `More than one team is included in ${TIER_LABELS.pro}.`
+                        : `Teams are included in ${TIER_LABELS[joinLock.includedIn]}.`}
+                  </p>
+                  <div className="flex gap-2">
+                    {joinLock == null ? (
+                      <Button
+                        disabled={busy != null}
+                        aria-busy={rowBusy === "accept"}
+                        onClick={() => void respond(invite, "accept")}
+                      >
+                        {rowBusy === "accept" ? "Joining…" : "Accept"}
+                      </Button>
+                    ) : (
+                      // Hidden inside the app, which sells nothing (`web-only`, globals.css).
+                      <ButtonLink href={`/billing?plan=${joinLock.includedIn}`} className="web-only">
+                        Upgrade to {TIER_LABELS[joinLock.includedIn]}
+                      </ButtonLink>
+                    )}
+                    <Button
+                      variant="outline"
+                      disabled={busy != null}
+                      aria-busy={rowBusy === "decline"}
+                      onClick={() => void respond(invite, "decline")}
+                    >
+                      {rowBusy === "decline" ? "Declining…" : "Decline"}
+                    </Button>
+                  </div>
+                  {error?.id === invite.id ? (
+                    <p className="text-[12px] text-destructive">{error.message}</p>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </CardPanel>
+      ) : null}
+      <ActionToast message={declined} onDismiss={() => setDeclined(null)} />
+    </>
   );
 }

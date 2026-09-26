@@ -8,6 +8,7 @@ import { shareCardFonts, FONT_STORY, FONT_UI, type FontWeight } from "@/lib/shar
 import { fitTextSize, textWidth } from "@/lib/share/textMeasure";
 import { BrandTile } from "@/lib/share/paperParts";
 import { BRAND_DOMAIN, PRODUCT_NAME } from "@/lib/brand/brandNames";
+import { meetingNameLessTrack } from "@/lib/events/meetingNameLessTrack";
 import {
   formatPaceGap,
   ordinal,
@@ -355,9 +356,15 @@ function headline(data: StoryData): string {
   return (data.driver ?? data.track ?? data.session).toUpperCase();
 }
 
-/** Where the run was, less whatever the headline already says (a run with no driver name leads with its track). */
+/**
+ * Where the run was, less whatever the headline already says (a run with no driver name leads with its track).
+ * The meeting's name drops the track it starts with: a new meeting is named "<track> · <day>", and
+ * whole it printed "INDOOR RACEWAY | INDOOR RACEWAY · SAT 26 SEP".
+ */
 function placeParts(data: StoryData): string[] {
-  return [data.driver ? data.track : null, data.event].filter((p): p is string => Boolean(p));
+  return [data.driver ? data.track : null, meetingNameLessTrack(data.event, data.track)].filter(
+    (p): p is string => Boolean(p)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +402,9 @@ function GlassLook({ data, g, photo, qr }: { data: StoryData; g: Geometry; photo
   const post = g.h < 1600;
   const white = "#FFFFFF";
   const soft = "rgba(255, 255, 255, 0.72)";
-  const eyebrow = [data.event ?? (data.driver ? data.track : null), data.session].filter(Boolean).join(" · ").toUpperCase();
+  // With no driver name the headline is the track, so the meeting's name drops it (`placeParts`).
+  const event = data.driver ? data.event : meetingNameLessTrack(data.event, data.track);
+  const eyebrow = [event ?? (data.driver ? data.track : null), data.session].filter(Boolean).join(" · ").toUpperCase();
   const name = headline(data);
   const nameSize = fitCond(name, INNER, post ? 150 : 172, 800);
   const panelPadX = post ? 32 : 38;
@@ -547,7 +556,7 @@ function PosterLook({ data, g, photoUri, qr }: { data: StoryData; g: Geometry; p
     .join(" | ")
     .toUpperCase();
   const nlineSize = fitCond(nline, INNER, 64, 700, 0.06);
-  const place = [data.track, data.event].filter(Boolean).join(" · ").toUpperCase();
+  const place = [data.track, meetingNameLessTrack(data.event, data.track)].filter(Boolean).join(" · ").toUpperCase();
   const stats: { v: string; l: string }[] = [
     { v: String(data.lapCount), l: "LAPS" },
     ...(data.time ? [{ v: data.time, l: "TIME" }] : []),

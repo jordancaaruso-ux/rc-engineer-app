@@ -18,8 +18,9 @@ export type TeamMemberDisplay = {
  * roster matches what each member actually set. Falls back to the account name, then the
  * email, then a short id so a row is never blank.
  *
- * Shared by the team Sessions view and the team feed — both label peer rows, and they must
- * agree or the same person appears under two names.
+ * Shared by the team Sessions view, the team feed, Team settings and the invite card — they all
+ * label teammates, and they must agree or the same person appears under two names. Team settings
+ * once read the account name only, so a driver who had set "Noah" was listed by their email.
  */
 export async function loadTeamMemberDisplays(
   memberIds: readonly string[],
@@ -52,6 +53,14 @@ export async function loadTeamMemberDisplays(
     });
   }
   return byUserId;
+}
+
+/**
+ * One driver's name as teammates see it (`name` above), for a line outside a roster: the invite
+ * push, the reply push. Null only when the account is gone.
+ */
+export async function loadTeamMemberName(userId: string): Promise<string | null> {
+  return (await loadTeamMemberDisplays([userId], userId)).get(userId)?.name ?? null;
 }
 
 /** The `Record<userId, label>` shape the existing run-history table expects. */

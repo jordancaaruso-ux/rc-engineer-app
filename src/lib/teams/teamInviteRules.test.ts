@@ -11,10 +11,13 @@ import {
   checkInviteCreate,
   checkInviteResponse,
   checkInviteRevoke,
+  inviteResetFields,
   isInvitePending,
   isInviteTerminal,
   normalizeInviteStatus,
   parseInviteAction,
+  teamPageOffersNewTeam,
+  teamSettingsInvites,
   teamsIndexSkipsTo,
 } from "@/lib/teams/teamInviteRules";
 
@@ -142,4 +145,48 @@ test("the Teams list skips to a sole team, unless an invite is waiting on it", (
   assert.equal(teamsIndexSkipsTo([{ id: "t1" }], 1), null);
   assert.equal(teamsIndexSkipsTo([{ id: "t1" }, { id: "t2" }], 0), null);
   assert.equal(teamsIndexSkipsTo([], 0), null);
+});
+
+test("asked for the list, a one-team driver stays on it", () => {
+  assert.equal(teamsIndexSkipsTo([{ id: "t1" }], 0, true), null);
+  assert.equal(teamsIndexSkipsTo([{ id: "t1" }], 0, false), "t1");
+});
+
+test("the team page offers New team only on a sole team, and only with room for another", () => {
+  assert.equal(teamPageOffersNewTeam({ teamId: "t1", soleTeamId: "t1", canStartAnother: true }), true);
+  // Notebook: one team is its limit.
+  assert.equal(teamPageOffersNewTeam({ teamId: "t1", soleTeamId: "t1", canStartAnother: false }), false);
+  // Two teams: back already leads to the list, where the form is.
+  assert.equal(teamPageOffersNewTeam({ teamId: "t1", soleTeamId: null, canStartAnother: true }), false);
+});
+
+test("a re-invite is sent now: pending again, its sent time reset, the old answer cleared", () => {
+  const now = new Date("2026-09-26T08:13:00Z");
+  assert.deepEqual(inviteResetFields("admin", now), {
+    invitedByUserId: "admin",
+    role: "member",
+    status: "pending",
+    respondedAt: null,
+    createdAt: now,
+  });
+});
+
+test("team settings lists pending invites to everyone, declined ones to admins only", () => {
+  const invites = [
+    { id: "i1", status: "pending", invitedUserId: "u1" },
+    { id: "i2", status: "declined", invitedUserId: "u2" },
+    { id: "i3", status: "revoked", invitedUserId: "u3" },
+    { id: "i4", status: "accepted", invitedUserId: "u4" },
+    // Declined once, on the team now (added some other way): history, not news.
+    { id: "i5", status: "declined", invitedUserId: "u5" },
+  ];
+  const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
+
+  const admin = teamSettingsInvites(invites, { isAdmin: true, memberUserIds: ["admin", "u5"] });
+  assert.deepEqual(ids(admin.pending), ["i1"]);
+  assert.deepEqual(ids(admin.declined), ["i2"]);
+
+  const member = teamSettingsInvites(invites, { isAdmin: false, memberUserIds: ["admin", "u5"] });
+  assert.deepEqual(ids(member.pending), ["i1"]);
+  assert.deepEqual(ids(member.declined), []);
 });

@@ -4,6 +4,7 @@ import type { DashboardHomeModel } from "@/lib/dashboardServer";
 import type { TodayVerdict } from "@/lib/dashboardVerdict";
 import { formatLap } from "@/lib/runLaps";
 import { carRatingBandCaption } from "@/lib/runHandlingAssessment";
+import { meetingNameLessTrack } from "@/lib/events/meetingNameLessTrack";
 import { cn } from "@/lib/utils";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { RatingDial } from "@/components/ui/RatingDial";
@@ -167,7 +168,8 @@ export function DashboardDayVerdictCard({
     `${verdict.runCount} ${verdict.runCount === 1 ? "run" : "runs"}`,
     context?.carName ?? null,
     context?.trackName ?? null,
-    context?.eventName ?? null,
+    // A new meeting is named "<track> · <day>", so whole it printed the track twice.
+    meetingNameLessTrack(context?.eventName, context?.trackName),
   ].filter(Boolean);
 
   /**

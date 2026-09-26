@@ -6,6 +6,7 @@ import { isEmailAuthAllowed } from "@/lib/authAllowlist";
 import { checkInviteResponse, parseInviteAction } from "@/lib/teams/teamInviteRules";
 import { notifyAdminOfTeamInviteReply } from "@/lib/teams/notifyTeamInvite";
 import { teamJoinLock, teamLockMessage } from "@/lib/teams/teamLimit";
+import { loadTeamMemberName } from "@/lib/teams/teamMemberDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -94,7 +95,8 @@ export async function POST(request: Request, ctx: Ctx) {
     await notifyAdminOfTeamInviteReply({
       adminUserId: invite.invitedByUserId,
       teamName: invite.team.name,
-      responderLabel: user.name?.trim() || user.email?.trim() || null,
+      // The name the team shows for them, not their email. Best effort, like the push itself.
+      responderLabel: await loadTeamMemberName(user.id).catch(() => null),
       accepted: decision.nextStatus === "accepted",
     });
   }

@@ -1,13 +1,15 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Settings, Users } from "lucide-react";
+import { Plus, Settings, Users } from "lucide-react";
 import { hasDatabaseUrl } from "@/lib/env";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { loadTeamFeedModel, teamsIndexSkipsToFor } from "@/lib/teams/loadTeamFeed";
+import { teamJoinLock } from "@/lib/teams/teamLimit";
+import { TEAMS_LIST_HREF, teamPageOffersNewTeam } from "@/lib/teams/teamInviteRules";
 import { TeamFeed } from "@/components/teams/TeamFeed";
 import { TeamRosterStrip } from "@/components/teams/TeamRosterStrip";
 import { unitSystemForRequest } from "@/lib/units/unitSystemServer";
@@ -43,7 +45,7 @@ export default async function TeamFeedPage({ params, searchParams }: Props): Pro
   ]);
 
   const units = await unitSystemForRequest(user.id);
-  const [model, soleTeamId] = await Promise.all([
+  const [model, soleTeamId, joinLock] = await Promise.all([
     loadTeamFeedModel({
       viewerId: user.id,
       teamId,
@@ -52,9 +54,18 @@ export default async function TeamFeedPage({ params, searchParams }: Props): Pro
       pinnedRunId: pinnedRunId ?? null,
     }),
     teamsIndexSkipsToFor(user.id),
+    teamJoinLock({ id: user.id, email: user.email ?? null }),
   ]);
   // Non-members get a 404 rather than a 403 — team existence isn't confirmed to outsiders.
   if (!model) notFound();
+
+  // The New team form lives on `/teams`, which a one-team driver never saw: it jumps straight
+  // here. So a plan with room for another team (Race Engineer) gets the way in on this page.
+  const offersNewTeam = teamPageOffersNewTeam({
+    teamId,
+    soleTeamId,
+    canStartAnother: joinLock == null,
+  });
 
   /*
    * Back goes to Teams, except for a driver whose only team this is: `/teams` jumps straight back
@@ -120,6 +131,15 @@ export default async function TeamFeedPage({ params, searchParams }: Props): Pro
             <Settings className="size-3.5" aria-hidden />
             Manage
           </Link>
+          {offersNewTeam ? (
+            <Link
+              href={TEAMS_LIST_HREF}
+              className="tap-active inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition hover:border-primary-ink/40 hover:bg-muted/60"
+            >
+              <Plus className="size-3.5" aria-hidden />
+              New team
+            </Link>
+          ) : null}
         </div>
 
         {model.pinnedEntry && !model.entries.some((e) => e.runId === model.pinnedEntry!.runId) ? (

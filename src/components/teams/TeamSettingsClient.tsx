@@ -8,12 +8,18 @@ import { Eyebrow } from "@/components/ui/panel";
 import { RelativeTime } from "@/components/ui/RelativeTime";
 import { ModerationSheet, MoreButton } from "@/components/moderation/ModerationSheet";
 
+/**
+ * Names are the ones the team page prints (`loadTeamMemberDisplays`): "My name", else the account
+ * name, else the email. So an email shows only for a driver who set no name, and only once.
+ */
 type MemberRow = {
   userId: string;
   role: string;
   joinedAt: string;
-  name: string | null;
-  email: string | null;
+  /** The row's name. The viewer's own reads `You (Noah)`, as on the team page. */
+  label: string;
+  /** The bare name, for the More sheet. */
+  name: string;
   /** The viewer blocked this teammate: their runs and comments are out of the viewer's feed. */
   blockedByViewer?: boolean;
 };
@@ -22,7 +28,15 @@ type MemberRow = {
 type PendingInviteRow = {
   id: string;
   createdAt: string;
-  name: string | null;
+  name: string;
+};
+
+/** Answered no. Sent to admins only. */
+type DeclinedInviteRow = {
+  id: string;
+  respondedAt: string;
+  name: string;
+  /** What Invite again sends, as if typed into the Invite form. */
   email: string | null;
 };
 
@@ -34,6 +48,7 @@ type TeamDetail = {
   viewerRole: string;
   members: MemberRow[];
   pendingInvites: PendingInviteRow[];
+  declinedInvites?: DeclinedInviteRow[];
 };
 
 async function jsonFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -55,7 +70,8 @@ const inputClass =
  *
  * Inviting does NOT add anyone: it sends an invite the other driver answers on `/teams`. So the
  * person lands in "Invited", not "Members", and stays there until they accept — without that card
- * an invite looked like a form that cleared itself and did nothing.
+ * an invite looked like a form that cleared itself and did nothing. A decline stays there too, for
+ * admins, as Declined with Invite again: before, it just vanished and read as a glitch.
  */
 export function TeamSettingsClient({ teamId }: { teamId: string }) {
   const router = useRouter();
@@ -73,6 +89,9 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
 
   const [pendingWithdraw, setPendingWithdraw] = useState<string | null>(null);
   const [withdrawErr, setWithdrawErr] = useState<string | null>(null);
+
+  const [reinviting, setReinviting] = useState<string | null>(null);
+  const [reinviteErr, setReinviteErr] = useState<{ id: string; message: string } | null>(null);
 
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
   const [pendingLeave, setPendingLeave] = useState(false);
@@ -141,6 +160,28 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
     }
   }
 
+  /** The Invite form's own call: it turns their declined invite back to pending, sent now. */
+  async function reinvite(invite: DeclinedInviteRow) {
+    if (!invite.email || reinviting) return;
+    setReinviteErr(null);
+    setReinviting(invite.id);
+    try {
+      await jsonFetch(`/api/teams/${encodeURIComponent(teamId)}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: invite.email }),
+      });
+      await load();
+    } catch (err) {
+      setReinviteErr({
+        id: invite.id,
+        message: err instanceof Error ? err.message : "Could not send invite",
+      });
+    } finally {
+      setReinviting(null);
+    }
+  }
+
   async function withdrawInvite(inviteId: string) {
     setWithdrawErr(null);
     try {
@@ -190,6 +231,7 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
 
   const isAdmin = detail.viewerRole === "admin";
   const pendingInvites = detail.pendingInvites;
+  const declinedInvites = detail.declinedInvites ?? [];
 
   return (
     <div className="space-y-4">
@@ -241,7 +283,7 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
         </CardPanel>
       ) : null}
 
-      {pendingInvites.length > 0 ? (
+      {pendingInvites.length > 0 || declinedInvites.length > 0 ? (
         <CardPanel contentClassName="p-0">
           <div className="eyebrow-band px-4">
             <Eyebrow className="mb-0">Invited</Eyebrow>
@@ -252,11 +294,10 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="ui-title truncate text-[13px] font-semibold text-foreground">
-                      {invite.name ?? invite.email ?? "—"}
+                      {invite.name}
                     </p>
                     <p className="type-timestamp truncate">
-                      {invite.email ? `${invite.email} · ` : ""}sent{" "}
-                      <RelativeTime iso={invite.createdAt} fallback="recently" />
+                      Sent <RelativeTime iso={invite.createdAt} fallback="recently" />
                     </p>
                   </div>
                   {isAdmin ? (
@@ -294,6 +335,33 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
                 ) : null}
               </li>
             ))}
+            {declinedInvites.map((invite) => (
+              <li key={invite.id} className="px-4 py-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="ui-title truncate text-[13px] font-semibold text-foreground">
+                      {invite.name}
+                    </p>
+                    <p className="type-timestamp truncate">
+                      Declined <RelativeTime iso={invite.respondedAt} fallback="recently" />
+                    </p>
+                  </div>
+                  {isAdmin && invite.email ? (
+                    <button
+                      type="button"
+                      className="type-timestamp shrink-0 hover:text-foreground disabled:opacity-60"
+                      disabled={reinviting != null}
+                      onClick={() => void reinvite(invite)}
+                    >
+                      {reinviting === invite.id ? "Sending…" : "Invite again"}
+                    </button>
+                  ) : null}
+                </div>
+                {reinviteErr?.id === invite.id ? (
+                  <p className="mt-1.5 text-[12px] text-destructive">{reinviteErr.message}</p>
+                ) : null}
+              </li>
+            ))}
           </ul>
         </CardPanel>
       ) : null}
@@ -310,13 +378,11 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="ui-title truncate text-[13px] font-semibold text-foreground">
-                      {member.name ?? member.email ?? "—"}
-                      {isSelf ? " (you)" : ""}
+                      {member.label}
                     </p>
                     <p className="type-timestamp truncate">
-                      {/* First, so a long email can't truncate it away. */}
                       {member.blockedByViewer ? "Blocked · " : ""}
-                      {member.email ?? "—"} · {member.role}
+                      {member.role === "admin" ? "Admin" : "Member"}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -342,7 +408,7 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
                     ) : null}
                     {!isSelf && pendingRemoval !== member.userId ? (
                       <MoreButton
-                        label={`More for ${member.name ?? member.email ?? "this teammate"}`}
+                        label={`More for ${member.name}`}
                         onClick={() => setMoreFor(member)}
                       />
                     ) : null}
@@ -362,14 +428,14 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
       <ModerationSheet
         open={moreFor !== null}
         onClose={() => setMoreFor(null)}
-        title={moreFor?.name ?? moreFor?.email ?? "Teammate"}
+        title={moreFor?.name ?? "Teammate"}
         report={
           moreFor
             ? {
                 kind: "driver",
                 targetId: moreFor.userId,
                 teamId: detail.id,
-                label: `Report ${moreFor.name ?? moreFor.email ?? "teammate"}`,
+                label: `Report ${moreFor.name}`,
               }
             : undefined
         }
@@ -377,7 +443,7 @@ export function TeamSettingsClient({ teamId }: { teamId: string }) {
           moreFor
             ? {
                 userId: moreFor.userId,
-                name: moreFor.name ?? moreFor.email ?? "this teammate",
+                name: moreFor.name,
                 blocked: Boolean(moreFor.blockedByViewer),
               }
             : undefined
