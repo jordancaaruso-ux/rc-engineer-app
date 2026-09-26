@@ -15,7 +15,9 @@ import { showGetSetUpCard } from "@/lib/onboarding/visibility";
 import type { DashboardSetups } from "@/lib/setup/getDashboardSetups";
 import { Reveal } from "@/components/ui/Reveal";
 import { DashboardDesktop } from "@/components/dashboard/desktop/DashboardDesktop";
+import { LockedBench } from "@/components/tools/LockedBench";
 import { selectDashboardStarterQuestions } from "@/lib/engineerStarterQuestions";
+import { upgradeTierFor } from "@/lib/entitlementLogic";
 
 /**
  * Adaptive dashboard — two modes, auto-switched (docs/DASHBOARD_NORTH_STAR.md;
@@ -84,10 +86,13 @@ export function DashboardHome({
   onboarding,
   setups,
   showGetMyDay = false,
+  engineerLocked = false,
 }: {
   model: DashboardHomeModel;
   /** The "Get my day" row under the Start-run bar: on a plan, with a LiveRC name or own chip. */
   showGetMyDay?: boolean;
+  /** The plan has no Engineer (Starter): the Ask-the-Engineer card is drawn locked, in its place. */
+  engineerLocked?: boolean;
   /** IANA zone from rc_tz cookie (UTC until cookie exists). */
   displayTimeZone?: string;
   /** Guided-intro view; every card in it derives and self-retires. */
@@ -218,6 +223,20 @@ export function DashboardHome({
     isTrackDay,
   });
 
+  // Starter has no Engineer, so its card is the lock itself, the way Tools and Teams draw theirs:
+  // which plan includes it and the door to it. A ready question that only opened the paywall read as
+  // an open Engineer until the tap (test drive, 2026-09-26).
+  const askEngineerCard = engineerLocked ? (
+    <LockedBench
+      label="Ask the Engineer"
+      stretch={false}
+      includedIn={upgradeTierFor("engineer")}
+      line="Ask what to change next, from your own runs."
+    />
+  ) : (
+    <DashboardAskEngineerCard questions={askQuestions} />
+  );
+
 
   return (
     <>
@@ -317,9 +336,7 @@ export function DashboardHome({
               {/* Where "How you're going" sits on an off day. At the track the last thirty
                   days are not the question — the next change is — so the Engineer takes the
                   slot and the trends wait for the drive home. */}
-              <Reveal index={3}>
-                <DashboardAskEngineerCard questions={askQuestions} />
-              </Reveal>
+              <Reveal index={3}>{askEngineerCard}</Reveal>
 
               <Reveal index={4}>{ideasCard}</Reveal>
 
@@ -338,9 +355,7 @@ export function DashboardHome({
                 <DashboardSummaryCard summary={summary} records={records} newPb={newPb} />
               </Reveal>
 
-              <Reveal index={3}>
-                <DashboardAskEngineerCard questions={askQuestions} />
-              </Reveal>
+              <Reveal index={3}>{askEngineerCard}</Reveal>
 
               <Reveal index={4}>{ideasCard}</Reveal>
 

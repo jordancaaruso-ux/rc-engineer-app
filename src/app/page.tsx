@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { requireCurrentUser } from "@/lib/currentUser";
 import { hasDatabaseUrl } from "@/lib/env";
 import { getCachedDashboardHomeModel } from "@/lib/cachedReads";
-import { getEntitlement } from "@/lib/entitlement";
+import { getEntitlement, isFeatureEntitled } from "@/lib/entitlement";
 import { isDemoIdentity } from "@/lib/demo/demoAccess";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { loadOnboardingView } from "@/lib/onboarding/server";
@@ -68,6 +68,8 @@ export default async function DashboardPage({
   // them by: a LiveRC name or their own transponder — the sweep's rule, looser than the Get-set-up
   // card's. The demo is read-only, so there it would be a dead button.
   const showGetMyDay = entitlement.entitled && canLookUpSessions && !isDemoIdentity(user);
+  // Starter has no Engineer: its dashboard card is drawn locked, the page's own lock one tap nearer.
+  const engineerLocked = !isFeatureEntitled(entitlement.tier, "engineer");
 
   return (
     <>
@@ -80,6 +82,7 @@ export default async function DashboardPage({
         onboarding={onboarding}
         setups={setups}
         showGetMyDay={showGetMyDay}
+        engineerLocked={engineerLocked}
       />
     </>
   );
