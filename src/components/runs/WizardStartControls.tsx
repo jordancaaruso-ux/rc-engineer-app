@@ -1,7 +1,8 @@
 "use client";
 
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, RotateCcw } from "lucide-react";
+import { ChevronDown, RotateCcw } from "lucide-react";
 import { CardPanel } from "@/components/ui/CardPanel";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { Eyebrow } from "@/components/ui/panel";
@@ -9,19 +10,20 @@ import { cn } from "@/lib/utils";
 import type { WizardStepId } from "@/lib/runs/wizardWalk";
 
 /**
- * Wizard Session-step prefill card (v6, founder interview 2026-07-17,
- * artifact round 3: https://claude.ai/code/artifact/a27a8375-f3a1-4ec1-b4e1-7832b36cfed1).
+ * Wizard Session-step prefill card (v7, founder pick "A" 2026-09-26, off the bench at
+ * https://claude.ai/artifact/7y7xFN1D36TbKFQ21VYtoF; v6 was the always-open five-row card with a
+ * full-width yellow button, which took a third of the phone before the Car box).
  *
- * Prefill is a TAP, never automatic — the wizard lands blank and this card is
- * the OFFER: it lists exactly what one tap fills (Session · Track · Tires ·
- * Prep · Setup, with values from the car's last run) above a yellow "Prefill
- * this run" button. After the tap the same five rows gain ✓s (the card never
- * changes shape); Tires/Prep/Setup rows jump to their step for auditing, and
- * "＋ Start blank instead" undoes with a single tap (remounts the form).
+ * Prefill is a TAP, never automatic — the wizard lands blank and this card is the OFFER, closed by
+ * default to one line: "Last run" + when, then where / which session / which tyres / how much
+ * setup, with a small yellow "Prefill" pill on the right. Tapping the line opens the five rows
+ * (Session · Track · Tires · Prep · Setup) that one tap fills. After the tap it reads "✓ Prefilled"
+ * and the pill becomes a grey "Undo", which remounts the form blank; opened, the same five rows
+ * gain ✓s and Tires/Prep/Setup jump to their step for auditing.
  *
- * No staleness cutoff: an old run is still offered, honestly dated in the
- * header's mono slot. No hero/dashboard-CTA DNA here — that styling is
- * reserved for real actions (the founder retired it from this tab).
+ * No staleness cutoff: an old run is still offered, honestly dated in the mono slot. The notes
+ * (venue swap, car swap, setup from an unfinished run) stay outside the fold: they change what the
+ * tap means, so they can't hide behind it.
  */
 
 export type WizardPrefillRow = {
@@ -30,7 +32,33 @@ export type WizardPrefillRow = {
   value: string;
   /** Applied state: tap the row to audit that step (Tires/Prep/Setup only). */
   jump?: WizardStepId;
+  /** The closed card's line uses this instead of `value` (the Tires row minus its prep). */
+  short?: string;
 };
+
+/** Values that say "nothing here", which the closed line leaves out rather than print. */
+const EMPTY_PREFILL_VALUES = new Set(["", "—", "…", "none", "none saved", "not attached", "track needed"]);
+
+/**
+ * The closed card's one line: track · session · tyres · setup size, e.g.
+ * "Bayside · Main · Vaulk 36SK run 5 · 97 setup values". Built from the same rows the open card
+ * lists, so the line and the rows can never disagree.
+ */
+function prefillSummaryLine(rows: WizardPrefillRow[], loading: boolean): string {
+  const pick = (key: string) => {
+    const row = rows.find((r) => r.key === key);
+    return (row?.short ?? row?.value ?? "").trim();
+  };
+  const setupCount = /^(\d+) values?\b/.exec(pick("setup"))?.[1];
+  const parts = [
+    pick("track"),
+    pick("session").replace(/^Event · /, ""),
+    pick("tires").replace(/ · run /g, " run "),
+    setupCount ? `${setupCount} setup values` : "",
+  ].filter((p) => !EMPTY_PREFILL_VALUES.has(p));
+  if (parts.length > 0) return parts.join(" · ");
+  return loading ? "…" : "Nothing saved on it yet";
+}
 
 export function WizardPrefillCard({
   applied,
@@ -66,16 +94,70 @@ export function WizardPrefillCard({
   onStartBlank?: () => void;
   onJump?: (step: WizardStepId) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const foldId = useId();
   return (
     <SurfaceCard variant="panel" overflowHidden={false} contentClassName="space-y-0">
-      <div className="flex items-baseline justify-between gap-3 pb-1">
-        <span className="text-[14px] font-bold tracking-tight text-foreground">
-          {applied ? "Prefilled from your last run" : "Prefill from your last run"}
-        </span>
-        <span className="shrink-0 micro-caps text-faint">
-          {kindLabel} · {relativeWhen(whenIso)}
-        </span>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-controls={foldId}
+          className="tap-active grid min-w-0 flex-1 gap-1.5 text-left"
+        >
+          <span className="flex min-w-0 items-baseline gap-2">
+            {applied ? (
+              <span aria-hidden className="text-[13px] font-bold text-gain">
+                ✓
+              </span>
+            ) : null}
+            <span className="whitespace-nowrap text-[13.5px] font-bold tracking-tight text-foreground">
+              {applied ? "Prefilled" : "Last run"}
+            </span>
+            <span className="min-w-0 truncate micro-caps text-faint">
+              {kindLabel} · {relativeWhen(whenIso)}
+            </span>
+          </span>
+          <span className="flex min-w-0 items-center gap-1 text-[12px] text-muted-foreground">
+            <span className="min-w-0 truncate">{prefillSummaryLine(rows, loading)}</span>
+            <ChevronDown
+              aria-hidden
+              className={cn("size-[14px] shrink-0 transition-transform duration-200", open && "rotate-180")}
+              strokeWidth={2.2}
+            />
+          </span>
+        </button>
+        {applied ? (
+          onStartBlank ? (
+            <button
+              type="button"
+              onClick={onStartBlank}
+              className="tap-active h-[34px] shrink-0 rounded-full border border-border bg-secondary px-3.5 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground"
+            >
+              Undo
+            </button>
+          ) : null
+        ) : (
+          <button
+            type="button"
+            onClick={onPrefill}
+            disabled={loading}
+            aria-label="Prefill this run"
+            className={cn(
+              "tap-active flex h-[34px] shrink-0 items-center gap-1.5 rounded-full primary-face bg-primary px-3.5 text-[12.5px] font-semibold text-primary-foreground",
+              loading && "opacity-60"
+            )}
+          >
+            <RotateCcw aria-hidden className="size-[14px]" strokeWidth={2.4} />
+            Prefill
+          </button>
+        )}
       </div>
+      {setupNote ? <PrefillNote text={setupNote} /> : null}
+      {note ? <PrefillNote text={note} /> : null}
+      {subNote ? <PrefillNote text={subNote} /> : null}
+      <div id={foldId} hidden={!open} className="mt-2.5 border-t border-border/60 pt-0.5">
       {rows.map((r) => {
         const rowInner = (
           <>
@@ -111,34 +193,7 @@ export function WizardPrefillCard({
           </div>
         );
       })}
-      {setupNote ? <PrefillNote text={setupNote} /> : null}
-      {note ? <PrefillNote text={note} /> : null}
-      {subNote ? <PrefillNote text={subNote} /> : null}
-      {applied ? (
-        onStartBlank ? (
-          <button
-            type="button"
-            onClick={onStartBlank}
-            className="tap-active mt-1 flex w-full items-center justify-center gap-1.5 border-t border-border/60 pb-0.5 pt-2.5 text-[12px] font-semibold text-muted-foreground hover:text-foreground"
-          >
-            <Plus aria-hidden className="size-[13px]" strokeWidth={2.2} />
-            Start blank instead
-          </button>
-        ) : null
-      ) : (
-        <button
-          type="button"
-          onClick={onPrefill}
-          disabled={loading}
-          className={cn(
-            "tap-active mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg primary-face bg-primary px-4 py-2.5 text-[13px] font-semibold text-primary-foreground",
-            loading && "opacity-60"
-          )}
-        >
-          <RotateCcw aria-hidden className="size-[14px]" strokeWidth={2.4} />
-          Prefill this run
-        </button>
-      )}
+      </div>
     </SurfaceCard>
   );
 }

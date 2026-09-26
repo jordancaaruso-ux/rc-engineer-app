@@ -4561,6 +4561,8 @@ export function NewRunForm(props: {
             key: "tires",
             label: "Tires",
             value: wizardSummaryRows.find((r) => r.key === "tires")?.value ?? "—",
+            // The closed card's line names the tyre alone; prep has its own row.
+            short: tireSummaryLine || undefined,
             jump: "equipment",
           },
           {
@@ -4867,11 +4869,15 @@ export function NewRunForm(props: {
       onSubmit={(e) => e.preventDefault()}
       noValidate
     >
-      {wizardActive ? (
+      {wizardActive && isEditing ? (
         /* F2 slim recap (founder 2026-07-18): the run's identity in one
            non-interactive line — state, never nav. The old summary card's
            meter/rows/jumps live in the bottom bar + map sheet now; the rail
-           is gone on desktop too (the bar serves both). */
+           is gone on desktop too (the bar serves both). Editing only since
+           2026-09-26: on a new run it read "Testing · track needed · A800RR"
+           under the title, which the founder called irrelevant — the Car and
+           Track boxes right below already say it. Editing keeps it: it names
+           the run being changed and carries Unconfirmed / Complete. */
         <div className="flex items-center gap-2 px-0.5">
           {confirmingRun ? (
             /* The state the driver came to change. "COMPLETE" here was true and useless —
