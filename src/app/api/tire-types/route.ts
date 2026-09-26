@@ -8,6 +8,7 @@ import { notifyAdminsOfUnverifiedAsset } from "@/lib/assets/notifyAdminReview";
 import { isAuthAdminEmail } from "@/lib/authAdmin";
 import { parseTireBucket } from "@/lib/tires/tireCatalogFilter";
 import { TIRE_CATALOG_MAX, tireCatalogScopeWhere } from "@/lib/tires/tireCatalogScope";
+import { tireSizeFor } from "@/lib/tires/tireSizes";
 import { objectionableTextError } from "@/lib/moderation/wordFilter";
 
 /**
@@ -31,6 +32,11 @@ const TIRE_TYPE_SELECT = {
   position: true,
 } as const;
 
+/** The size its list printed ("1/12 donut"), which the picker searches and never shows. */
+function withSize<T extends { modelCode: string }>(row: T): T & { size: string | null } {
+  return { ...row, size: tireSizeFor(row.modelCode) };
+}
+
 export async function GET(request: Request) {
   if (!hasDatabaseUrl()) {
     return NextResponse.json({ error: "DATABASE_URL is not set" }, { status: 500 });
@@ -46,7 +52,7 @@ export async function GET(request: Request) {
   const id = searchParams.get("id")?.trim() ?? "";
   if (id) {
     const one = await prisma.tireType.findUnique({ where: { id }, select: TIRE_TYPE_SELECT });
-    return NextResponse.json({ tireTypes: one ? [one] : [] });
+    return NextResponse.json({ tireTypes: one ? [withSize(one)] : [] });
   }
 
   // The picker filters locally so its search is instant, which only holds if it
@@ -85,7 +91,7 @@ export async function GET(request: Request) {
   // Verified-first (stable sort keeps the alphabetical order within each group); unverified sinks
   // below so junk rarely surfaces in the picker. At launch all rows are null → order unchanged.
   tireTypes.sort((a, b) => (a.verifiedAt ? 0 : 1) - (b.verifiedAt ? 0 : 1));
-  return NextResponse.json({ tireTypes });
+  return NextResponse.json({ tireTypes: tireTypes.map(withSize) });
 }
 
 export async function POST(request: Request) {
