@@ -15,6 +15,7 @@ import {
   isInviteTerminal,
   normalizeInviteStatus,
   parseInviteAction,
+  teamsIndexSkipsTo,
 } from "@/lib/teams/teamInviteRules";
 
 const ALLOWED_TARGET = {
@@ -134,4 +135,11 @@ test("only exact accept/decline actions parse", () => {
   assert.equal(parseInviteAction("ACCEPT"), null);
   assert.equal(parseInviteAction(undefined), null);
   assert.equal(parseInviteAction({ action: "accept" }), null);
+});
+
+test("the Teams list skips to a sole team, unless an invite is waiting on it", () => {
+  assert.equal(teamsIndexSkipsTo([{ id: "t1" }], 0), "t1");
+  assert.equal(teamsIndexSkipsTo([{ id: "t1" }], 1), null);
+  assert.equal(teamsIndexSkipsTo([{ id: "t1" }, { id: "t2" }], 0), null);
+  assert.equal(teamsIndexSkipsTo([], 0), null);
 });

@@ -130,3 +130,18 @@ export function checkInviteRevoke(input: {
 export function parseInviteAction(raw: unknown): TeamInviteAction | null {
   return raw === "accept" || raw === "decline" ? raw : null;
 }
+
+/**
+ * The team `/teams` jumps straight to, or null when it shows its list. With one team there is
+ * nothing to choose; an unanswered invite keeps the list, because the list is where it is answered.
+ *
+ * Shared with the team page, whose back arrow must not point at a list that only bounces the
+ * driver straight back to the team (founder, 2026-09-26: a one-team driver who opened the team
+ * from a comment notification could not leave it with back).
+ */
+export function teamsIndexSkipsTo(
+  teams: readonly { id: string }[],
+  pendingInviteCount: number
+): string | null {
+  return teams.length === 1 && pendingInviteCount === 0 ? (teams[0]?.id ?? null) : null;
+}

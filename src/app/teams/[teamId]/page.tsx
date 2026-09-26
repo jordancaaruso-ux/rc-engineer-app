@@ -7,7 +7,7 @@ import { requireCurrentUser } from "@/lib/currentUser";
 import { getExplicitTimeZoneForRunFormatting } from "@/lib/requestTimeZone";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { RelativeTime } from "@/components/ui/RelativeTime";
-import { loadTeamFeedModel } from "@/lib/teams/loadTeamFeed";
+import { loadTeamFeedModel, teamsIndexSkipsToFor } from "@/lib/teams/loadTeamFeed";
 import { TeamFeed } from "@/components/teams/TeamFeed";
 import { TeamRosterStrip } from "@/components/teams/TeamRosterStrip";
 import { unitSystemForRequest } from "@/lib/units/unitSystemServer";
@@ -42,15 +42,27 @@ export default async function TeamFeedPage({ params, searchParams }: Props): Pro
     getExplicitTimeZoneForRunFormatting(),
   ]);
 
-  const model = await loadTeamFeedModel({
-    viewerId: user.id,
-    teamId,
-    timeZone,
-    units: await unitSystemForRequest(user.id),
-    pinnedRunId: pinnedRunId ?? null,
-  });
+  const units = await unitSystemForRequest(user.id);
+  const [model, soleTeamId] = await Promise.all([
+    loadTeamFeedModel({
+      viewerId: user.id,
+      teamId,
+      timeZone,
+      units,
+      pinnedRunId: pinnedRunId ?? null,
+    }),
+    teamsIndexSkipsToFor(user.id),
+  ]);
   // Non-members get a 404 rather than a 403 — team existence isn't confirmed to outsiders.
   if (!model) notFound();
+
+  /*
+   * Back goes to Teams, except for a driver whose only team this is: `/teams` jumps straight back
+   * here for them (`teamsIndexSkipsTo`), so the arrow went nowhere, and a team opened from a
+   * comment notification could not be left with back. Settings is where Teams lives (founder,
+   * 2026-09-26).
+   */
+  const backHref = soleTeamId === teamId ? "/settings" : "/teams";
 
   const lastActivity = Object.values(model.lastActivityByUserId)
     .filter((iso): iso is string => !!iso)
@@ -60,7 +72,7 @@ export default async function TeamFeedPage({ params, searchParams }: Props): Pro
   return (
     <>
       <header className="page-header">
-        <PageBackLink href="/teams" />
+        <PageBackLink href={backHref} />
         {/* Title block is the header's ONLY in-flow child, which is what centres it.
             `Manage` used to sit in here beside it on an `ml-auto` and the pair centred
             as a unit, pushing the team name left until the back arrow overlapped it; it

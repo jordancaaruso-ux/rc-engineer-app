@@ -10,6 +10,7 @@ import {
   type TeamFeedRunInput,
 } from "@/lib/teams/teamFeedModel";
 import { loadTeamMemberDisplays, type TeamMemberDisplay } from "@/lib/teams/teamMemberDisplay";
+import { teamsIndexSkipsTo } from "@/lib/teams/teamInviteRules";
 import type { UnitSystem } from "@/lib/units/unitSystem";
 
 /** One page of the feed. Small on purpose — this is a glanceable surface, not an archive. */
@@ -517,6 +518,21 @@ export async function listTeamsWithActivity(userId: string): Promise<
   );
 
   return rows.sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
+}
+
+/**
+ * The team `/teams` jumps straight to for this driver, or null when it shows its list: the index
+ * page's own rule (`teamsIndexSkipsTo`), from two cheap reads instead of the whole list.
+ */
+export async function teamsIndexSkipsToFor(userId: string): Promise<string | null> {
+  const [memberships, pendingInviteCount] = await Promise.all([
+    prisma.teamMembership.findMany({ where: { userId }, select: { teamId: true }, take: 2 }),
+    prisma.teamInvite.count({ where: { invitedUserId: userId, status: "pending" } }),
+  ]);
+  return teamsIndexSkipsTo(
+    memberships.map((m) => ({ id: m.teamId })),
+    pendingInviteCount
+  );
 }
 
 export { listTeamMemberUserIds };

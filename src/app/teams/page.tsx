@@ -9,6 +9,7 @@ import { RelativeTime } from "@/components/ui/RelativeTime";
 import { listTeamsWithActivity } from "@/lib/teams/loadTeamFeed";
 import { listPendingInvitesForUser } from "@/lib/teams/pendingInvites";
 import { teamJoinLock } from "@/lib/teams/teamLimit";
+import { teamsIndexSkipsTo } from "@/lib/teams/teamInviteRules";
 import { CreateTeamForm } from "@/components/teams/CreateTeamForm";
 import { TeamInvitesCard } from "@/components/teams/TeamInvitesCard";
 import { LockedBench } from "@/components/tools/LockedBench";
@@ -45,7 +46,8 @@ export default async function TeamsPage(): Promise<ReactNode> {
     listPendingInvitesForUser(user.id),
   ]);
 
-  if (teams.length === 1 && invites.length === 0) redirect(`/teams/${teams[0].id}`);
+  const soleTeamId = teamsIndexSkipsTo(teams, invites.length);
+  if (soleTeamId) redirect(`/teams/${soleTeamId}`);
 
   const joinLock = await teamJoinLock({ id: user.id, email: user.email ?? null }, teams.length);
 
