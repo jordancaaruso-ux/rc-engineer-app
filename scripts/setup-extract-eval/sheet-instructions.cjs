@@ -1,7 +1,7 @@
 /**
  * Build the briefing every naming helper reads for one sheet.
  *
- *   node scripts/setup-extract-eval/sheet-instructions.cjs <workDir> [--mode=blocks|boxes]
+ *   node scripts/setup-extract-eval/sheet-instructions.cjs <workDir> [--mode=blocks|boxes|tiles]
  *
  * Reads <workDir>/sheet.json and <workDir>/layout.md, writes <workDir>/instructions.md:
  * the naming rules (same for every sheet) + the drawing primer (naming-prompts/PRIMER.md) + this
@@ -9,23 +9,32 @@
  *
  * mode=blocks (default when <workDir>/blocks/index.json exists): helpers name a whole block at once
  * from one tagged high-resolution picture. mode=boxes: one composite picture per box (v2).
+ * mode=tiles (the quick recipe, no layout step): helpers name one close-up tile of the page each;
+ * needs no layout.md and writes <workDir>/instructions-quick.md, leaving instructions.md alone.
  */
 const fs = require("fs");
 const path = require("path");
 
 const dir = process.argv[2];
-if (!dir) throw new Error("usage: sheet-instructions.cjs <workDir> [--mode=blocks|boxes]");
+if (!dir) throw new Error("usage: sheet-instructions.cjs <workDir> [--mode=blocks|boxes|tiles]");
 const modeArg = (process.argv.find((a) => a.startsWith("--mode=")) || "").slice(7);
 const mode = modeArg || (fs.existsSync(path.join(dir, "blocks", "index.json")) ? "blocks" : "boxes");
+const tiles = mode === "tiles";
 
 const sheet = JSON.parse(fs.readFileSync(path.join(dir, "sheet.json"), "utf8"));
 const layoutPath = path.join(dir, "layout.md");
-if (!fs.existsSync(layoutPath)) throw new Error(`no layout.md in ${dir} — run the layout helper first`);
-const layout = fs.readFileSync(layoutPath, "utf8");
+if (!tiles && !fs.existsSync(layoutPath)) throw new Error(`no layout.md in ${dir} — run the layout helper first`);
+const layout = tiles ? "" : fs.readFileSync(layoutPath, "utf8");
 const primer = fs.readFileSync(path.join(__dirname, "naming-prompts", "PRIMER.md"), "utf8");
 const ids = (sheet.universalParameters || []).map((p) => p.id);
 
-const pictures = mode === "blocks"
+const pictures = tiles
+  ? `You name the boxes in one TILE of the sheet: a close-up of part of the page, cut from a
+high-resolution render. Every box you must name is outlined in pink and labelled with its PDF field
+name; a tick group's boxes are labelled name#0, name#1, … and that number IS the box's widgetIndex.
+Outlines and labels are ours, not printed on the sheet. The whole page (\`page-grid-boxes.jpg\`) shows
+which drawing a box belongs to and which way the car faces in it.`
+  : mode === "blocks"
   ? `You name one BLOCK of the sheet at a time. Its picture is cut from a high-resolution render of the
 whole block — the drawing and every box around it. Every box you must name is outlined in pink and
 carries a pink tag with its number; a tick group's boxes are tagged 4.1, 4.2, … (the number after the
@@ -49,9 +58,12 @@ ${pictures}
   that prints only a generic word, follow its leader line to the part it lands on (the primer below
   says how, and what each shim position is called). A positional name ("top row, 2nd box") is a last
   resort with confidence 0.4 or less.
-- **Which end of the car**: from the layout briefing, the drawing's orientation and where the box sits.
+${tiles
+  ? `- **Which end of the car**: from the whole page, the drawing's orientation and where the box sits on
+  it. A close-up lies — a rear hub looks like a front hub — so check the whole page before naming an end.`
+  : `- **Which end of the car**: from the layout briefing, the drawing's orientation and where the box sits.
   A close-up lies — a rear hub looks like a front hub. The briefing's coordinates and its "Traps" section
-  outrank your impression of a close-up.
+  outrank your impression of a close-up.`}
 - **The PDF's own field name** (the \`name\` in the JSON) sometimes carries the answer and sometimes lies.
   Where it names an end ("fr_", "re_", "rear_") and the picture agrees, use it. Where the print beside the
   box contradicts it, the PRINT wins; say so in \`printedLabel\`.
@@ -64,12 +76,12 @@ ${pictures}
 - \`displayLabel\`: what a driver would call it WITHOUT the sheet in front of them: end, corner or pivot
   (FF / FR / RF / RR), the part, units in brackets. **Two different boxes must never share a
   displayLabel.** Use the house words in the primer.
-- \`section\`: the printed section heading in Title Case, from the briefing's block list. Where the sheet
+- \`section\`: the printed section heading in Title Case, ${tiles ? "over the box's drawing or table" : "from the briefing's block list"}. Where the sheet
   prints no heading over the block, name the area of the car instead ("Front Suspension", "Rear
   Suspension", "Shocks", "Chassis", "Drivetrain", "Electronics", "Header"). Never leave it empty.
 - \`fieldKind\`: "text" for a written value; for tick boxes "choice" when exactly one gets marked,
   "multi" when several commonly do (screw positions, weight positions, top-deck cuts).
-- \`options\`: for tick groups ONLY (\`widgets\` > 1): one entry per box, \`{"widgetIndex": <k − 1>,
+- \`options\`: for tick groups ONLY (\`widgets\` > 1): one entry per box, \`{"widgetIndex": ${tiles ? "<the number after # in its label>" : "<k − 1>"},
   "label": "<printed word beside THAT box>"}\`, every box exactly once. Where a tick sits on a drawing with
   no printed word, describe its position tersely and uniquely ("front screw, left", "hole 2 of 4").
 - A LONE tick box (\`widgets\` = 1) is usually one option of a set drawn as separate PDF fields ("YES" and
@@ -96,11 +108,12 @@ given, in the given order. No prose in the file.
 ---
 
 ${primer}
-
+${tiles ? "" : `
 ---
 
 ${layout}
-`;
+`}`;
 
-fs.writeFileSync(path.join(dir, "instructions.md"), md);
-console.log(`instructions.md written for ${sheet.name} (${sheet.fields} boxes, mode=${mode})`);
+const out = tiles ? "instructions-quick.md" : "instructions.md";
+fs.writeFileSync(path.join(dir, out), md);
+console.log(`${out} written for ${sheet.name} (${sheet.fields} boxes, mode=${mode})`);

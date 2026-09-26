@@ -1,26 +1,19 @@
 // The quick naming recipe (2026-09-26): no layout step. After sheet-tiles.cjs has cut a sheet into
 // overlapping close-up tiles, give every box to the tile whose core (overlaps split at their midpoints)
-// holds its centre, and write the rules + primer without a layout briefing. One namer per tile then
-// runs naming-prompts/TILE-NAMING-TASK.md.
+// holds its centre. One namer per tile then runs naming-prompts/TILE-NAMING-TASK.md, reading the rules
+// + primer from `sheets:instructions -- <workDir> --mode=tiles` (instructions-quick.md).
 //
 //   node scripts/setup-extract-eval/sheet-tile-boxes.cjs <workDir>
 //
-// Writes <workDir>/tiles/<tile>-boxes.txt and <workDir>/instructions-quick.md (instructions.md cut
-// before its "layout briefing" heading; if a sheet has no instructions.md yet, build it first).
+// Writes <workDir>/tiles/<tile>-boxes.txt.
 const fs = require("fs");
 const path = require("path");
 
 const dir = process.argv[2];
 if (!dir) throw new Error("usage: sheet-tile-boxes.cjs <workDir>");
 const manifest = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8"));
-
-const insPath = path.join(dir, "instructions.md");
-if (fs.existsSync(insPath)) {
-  const ins = fs.readFileSync(insPath, "utf8");
-  const heading = ins.split("\n").find((l) => l.startsWith("# ") && /layout briefing/i.test(l));
-  fs.writeFileSync(path.join(dir, "instructions-quick.md"), (heading ? ins.slice(0, ins.indexOf(heading)) : ins).trimEnd() + "\n");
-} else {
-  console.warn("no instructions.md: build the rules + primer first (sheets:instructions)");
+if (!fs.existsSync(path.join(dir, "instructions-quick.md"))) {
+  console.warn("no instructions-quick.md yet: run sheets:instructions -- <workDir> --mode=tiles");
 }
 
 const tiles = fs.readFileSync(path.join(dir, "tiles", "index.txt"), "utf8").split("\n")

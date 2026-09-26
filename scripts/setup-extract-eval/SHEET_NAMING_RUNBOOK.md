@@ -33,11 +33,18 @@ message) so a wave reports once.
 
 ## The quick recipe (2026-09-26): no layout step, one namer per tile
 
-For raising many sheets to a floor fast. After prep, `sheet-tiles.cjs <dir>` (close-up tiles),
-`sheets:instructions` (rules + primer), then `node scripts/setup-extract-eval/sheet-tile-boxes.cjs <dir>`
-gives every box to one tile and writes `instructions-quick.md` (no layout briefing). One `sheet-namer` per
-tile with `naming-prompts/TILE-NAMING-TASK.md` (8 tiles on a portrait A4 sheet), then
-`sheets:assemble -- --work=<dir> --one-pass --min-confidence=0.8` as usual.
+For raising many sheets to a floor fast. After prep:
+
+```bash
+node scripts/setup-extract-eval/sheet-tiles.cjs <dir>               # close-up tiles
+npm run sheets:instructions -- <dir> --mode=tiles                   # instructions-quick.md, no layout needed
+node scripts/setup-extract-eval/sheet-tile-boxes.cjs <dir>          # every box given to one tile
+```
+
+One `sheet-namer` per tile with `naming-prompts/TILE-NAMING-TASK.md` (8 tiles on a portrait A4 sheet), then
+`sheets:assemble -- --work=<dir> --one-pass --min-confidence=0.8` as usual. **At most 20 helpers run at
+once** (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`); calls past that fail with "Concurrent subagent limit
+reached", so launch two sheets (16 tiles) per blocking wave.
 
 Measured on the Schumacher Mi10 against Jordan's hand names (same sheet, same scorer):
 
@@ -50,8 +57,24 @@ Measured on the Schumacher Mi10 against Jordan's hand names (same sheet, same sc
 So the quick recipe keeps the accuracy at about 40% of the cost and time, and names ~13% fewer boxes
 (the layout briefing's front/rear and trap notes lift confidence). Sonnet is slower, dearer in raw
 tokens and weaker here: stay on opus. The slowest tile sets the time (a dense block of "g"-only
-weight boxes took 11.6 min). Not yet checked: a sheet with no instructions.md needs
-`sheets:instructions` to run without a layout.md.
+weight boxes took 11.6 min). The Mi10 run read the blocks-mode rules with the briefing cut off;
+`--mode=tiles` (added 2026-09-26) says the same rules in tile terms.
+
+**Four fresh sheets at once (2026-09-26, `--mode=tiles`, no answer key):** 32 helpers, 7.96M raw with output
+counted (the Mi10 figures above counted almost no output; the same undercount gives 6.48M here), plus 2.95M
+in the main session. 33 min, because only 20 helpers ran at once.
+
+| Sheet | Boxes | Named at 0.8 | Helper tokens | Slowest tile |
+|---|---|---|---|---|
+| Schumacher Cat PB | 120 | 107 (89%) | 1.39M | 10 min |
+| Schumacher Mi9 | 158 | 129 (82%) | 1.55M | 14 min |
+| Xray XB2'26 | 167 | 121 (72%) | 2.55M | 15 min |
+| Mugen MTC2R | 123 | 74 (60%) | 2.47M | 16 min |
+
+The MTC2R prints Mugen part numbers (A2148, A2529) where other sheets print a part name, so many boxes stay
+under 0.8. The PetitRC number check (`scripts/tmp/petitrc-pull/petitrc-check.cjs`) found 40 names whose
+numbers fit and none that contradict them. Its two Cat PB vetoes were a unit mix-up: drivers write diff
+oil in thousands ("20" for 20,000 cSt).
 
 ## The method (v3, 2026-09-23): name whole drawings, not single boxes
 
