@@ -17,21 +17,26 @@
  * points at?" Yes → history back, scroll restored. No — shared link, cold launch, arrived from
  * somewhere else — → the plain link it always was, so the arrow always has somewhere to go.
  *
- * ============================== THE POP HEURISTIC, AND WHAT IT ACCEPTS =======================
+ * ============================== PUSH OR HISTORY BACK? ========================================
  *
- * The browser doesn't tell us whether a route change was a push or a back/forward, so the trail
- * guesses: a change to the entry UNDER the top is treated as going back and pops the trail. That
- * makes chains work — Analysis → teammates list → run, then two history-backs, each restoring
- * scroll. The false positive is ping-ponging A→B→A via links, which the trail misreads as a
- * return. The consequence is bounded and mild either way: the arrow either falls back to a plain
- * link (today's behaviour everywhere) or walks history to where the driver genuinely was one
- * step ago. Nothing here can strand them — `PageBackLink` renders the real href for new tabs,
- * crawlers, and every case the trail doesn't recognise.
+ * A route change is either a push (a link, a pushing back control) or a move through history
+ * (back / forward: the browser's buttons, a swipe, `router.back()`). Only the second pops the
+ * trail, which is what makes chains work — Analysis → teammates list → run, then two
+ * history-backs, each restoring scroll. `ReturnTrailTracker` hears the difference from the
+ * browser: history moves fire `popstate` (`noteTraversal`), and a page loaded fresh by
+ * back/forward says so in its navigation entry.
  *
- * One ping-pong we cause ourselves: a back control that PUSHES its destination (the phone's
- * corner pill over Sessions always does). Misread as a return, the parent's own arrow then walks
- * history back into the page just left, and the driver bounces between the two. So a back
- * control that pushes says so first (`recordPush`).
+ * It used to GUESS instead: any change to the entry under the top counted as going back. A link
+ * that happens to point two pages back then erased the page in between. Team page → Team
+ * sessions → Analysis → a teammate of that team (Team sessions again, by a link) read as
+ * stepping back to Team sessions, Analysis vanished from the trail, and the corner back took the
+ * driver to the team page instead of Analysis (review, 2026-09-26). Nothing here can strand a
+ * driver either way — `PageBackLink` renders the real href for new tabs, crawlers, and every
+ * case the trail doesn't recognise.
+ *
+ * A back control that PUSHES its destination (the phone's corner pill over Sessions always does)
+ * still says so first (`recordPush`): it records the push before the destination's own back
+ * control asks the trail, and it asks for the driver's place back (below).
  *
  * ============================== A PUSHED RETURN KEEPS THE PLACE TOO ==========================
  *
@@ -57,14 +62,26 @@ export const RETURN_SCROLL_PENDING_KEY = "rc:return-scroll-pending";
 const MAX_TRAIL_LENGTH = 40;
 const MAX_SCROLL_ENTRIES = 40;
 
-/** Pure: fold the next visited pathname into the trail. Exported for tests. */
-export function foldPathname(trail: readonly string[], pathname: string): string[] {
+/**
+ * Pure: fold the next visited pathname into the trail. `traversal`: the driver moved through
+ * history (back / forward) rather than being pushed to a page. Exported for tests.
+ */
+export function foldPathname(
+  trail: readonly string[],
+  pathname: string,
+  traversal = false
+): string[] {
   const last = trail[trail.length - 1];
   // Same pathname again — a query-only change (`?openGroup=`, filters) or a replace.
   // Not a move between pages, so not a trail entry.
   if (last === pathname) return [...trail];
-  // Looks like history back (or the ping-pong false positive — see above): pop.
-  if (trail.length >= 2 && trail[trail.length - 2] === pathname) return trail.slice(0, -1);
+  if (traversal) {
+    // History back to a page on the trail: pop to it — one step, or several at once from the
+    // browser's long-press menu. Not on the trail (forward again, or past where it starts): a
+    // new top, like a push.
+    const at = trail.lastIndexOf(pathname);
+    if (at >= 0) return trail.slice(0, at + 1);
+  }
   return [...trail, pathname].slice(-MAX_TRAIL_LENGTH);
 }
 
@@ -94,15 +111,16 @@ export function trailSaysCameFrom(
  * used ("takes me to analysis, not back to where I was", founder 2026-09-26).
  *
  * Folds the current page in first, so the answer is the same before and after the tracker has
- * recorded it, and on a history return from a child page (the trail still ends at the child) as
- * much as on a first visit. Exported for tests.
+ * recorded it, and on a history return from a child page (the trail still ends at the child,
+ * `traversal`) as much as on a first visit. Exported for tests.
  */
 export function trailParentAmong(
   trail: readonly string[],
   currentPathname: string,
-  candidates: readonly string[]
+  candidates: readonly string[],
+  traversal = false
 ): string | null {
-  const folded = foldPathname(trail, currentPathname);
+  const folded = foldPathname(trail, currentPathname, traversal);
   const under = folded.length >= 2 ? folded[folded.length - 2] : null;
   if (under == null) return null;
   return candidates.find((href) => hrefPathname(href) === under) ?? null;
@@ -166,10 +184,37 @@ function readTrail(): string[] {
   }
 }
 
+/**
+ * The page a move through history (back / forward) has just landed on, noted by the tracker's
+ * `popstate` listener before the route change reaches any effect. Memory, not storage: it only
+ * ever answers for the route change in flight.
+ */
+let traversalTo: { pathname: string; at: number } | null = null;
+/** A history move whose page never got recorded (a hash-only change) must not colour a later push. */
+const TRAVERSAL_WINDOW_MS = 10_000;
+
+/** Called by `ReturnTrailTracker` on `popstate`, and on a page the browser loaded by back/forward. */
+export function noteTraversal(pathname: string): void {
+  traversalTo = { pathname, at: Date.now() };
+}
+
+function arrivedByTraversal(pathname: string): boolean {
+  return (
+    traversalTo != null &&
+    traversalTo.pathname === pathname &&
+    Date.now() - traversalTo.at < TRAVERSAL_WINDOW_MS
+  );
+}
+
 /** Called by `ReturnTrailTracker` on every route change. */
 export function recordPathname(pathname: string): void {
+  const traversal = arrivedByTraversal(pathname);
+  traversalTo = null;
   try {
-    sessionStorage.setItem(RETURN_TRAIL_KEY, JSON.stringify(foldPathname(readTrail(), pathname)));
+    sessionStorage.setItem(
+      RETURN_TRAIL_KEY,
+      JSON.stringify(foldPathname(readTrail(), pathname, traversal))
+    );
   } catch {
     // Non-fatal — the trail is only ever an optimisation.
   }
@@ -185,15 +230,20 @@ export function returnParentAmong(
   currentPathname: string,
   candidates: readonly string[]
 ): string | null {
-  return trailParentAmong(readTrail(), currentPathname, candidates);
+  return trailParentAmong(
+    readTrail(),
+    currentPathname,
+    candidates,
+    arrivedByTraversal(currentPathname)
+  );
 }
 
 /**
  * Called by a back control the moment it PUSHES its destination instead of going back through
- * history. To the pop heuristic, a push to the page underneath looks exactly like a history back,
- * so it pops, and that page's own arrow then walks history straight back into the page the driver
- * just left: the team page's arrow bouncing into team sessions, over and over. Recorded here
- * first, the tracker's fold sees the same pathname again and leaves the trail alone.
+ * history. Recorded here first, the destination's own back control reads a trail that already
+ * holds the push (its effects can run before the tracker's), and the tracker's fold then sees the
+ * same pathname again and leaves the trail alone. Without it, the team page's arrow once walked
+ * history straight back into team sessions, over and over.
  */
 export function recordPush(href: string): void {
   const pathname = hrefPathname(href);

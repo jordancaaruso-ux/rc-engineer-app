@@ -2,7 +2,12 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { recordPathname, rememberScroll, takeReturnScroll } from "@/lib/navigation/returnTrail";
+import {
+  noteTraversal,
+  recordPathname,
+  rememberScroll,
+  takeReturnScroll,
+} from "@/lib/navigation/returnTrail";
 
 /**
  * Records every pathname the driver walks through into the return trail
@@ -20,6 +25,27 @@ import { recordPathname, rememberScroll, takeReturnScroll } from "@/lib/navigati
  */
 export function ReturnTrailTracker() {
   const pathname = usePathname();
+  /*
+   * Which route changes are moves through history, the only ones that pop the trail. Declared
+   * before the recording effect, so a page the browser loaded by back/forward (a reload in
+   * between, or back into the app from another site) is known before its first record.
+   */
+  useEffect(() => {
+    try {
+      const entry = performance.getEntriesByType("navigation")[0] as
+        | PerformanceNavigationTiming
+        | undefined;
+      if (entry?.type === "back_forward") noteTraversal(window.location.pathname);
+    } catch {
+      // No navigation timing: every change then reads as a push, which is never wrong, only
+      // slower (a plain link instead of history back).
+    }
+    // Capture, so it is heard before the router's own popstate handler starts the route change.
+    const onPop = () => noteTraversal(window.location.pathname);
+    window.addEventListener("popstate", onPop, true);
+    return () => window.removeEventListener("popstate", onPop, true);
+  }, []);
+
   useEffect(() => {
     if (pathname) recordPathname(pathname);
   }, [pathname]);

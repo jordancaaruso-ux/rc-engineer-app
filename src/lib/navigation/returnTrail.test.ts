@@ -10,8 +10,13 @@ import {
   withScroll,
 } from "./returnTrail";
 
+/** "back:/x" is a move through history to /x (browser back, swipe, `router.back()`); the rest are pushes. */
 function walk(paths: string[]): string[] {
-  return paths.reduce<string[]>((trail, p) => foldPathname(trail, p), []);
+  return paths.reduce<string[]>(
+    (trail, p) =>
+      p.startsWith("back:") ? foldPathname(trail, p.slice(5), true) : foldPathname(trail, p),
+    []
+  );
 }
 
 test("walking forward builds the trail in order", () => {
@@ -30,10 +35,34 @@ test("a query-only change is not a move", () => {
   ]);
 });
 
-test("returning to the entry underneath pops (history back)", () => {
-  const trail = walk(["/analysis", "/runs/history", "/runs/abc", "/runs/history"]);
+test("history back to the entry underneath pops", () => {
+  const trail = walk(["/analysis", "/runs/history", "/runs/abc", "back:/runs/history"]);
   assert.deepEqual(trail, ["/analysis", "/runs/history"]);
   // …so the next back knows Analysis is one step down: chains restore all the way up.
+  assert.equal(trailSaysCameFrom(trail, "/analysis", "/runs/history"), true);
+  assert.deepEqual(walk([...trail, "back:/analysis"]), ["/analysis"]);
+});
+
+test("history back several steps at once pops to that page; forward again is a new top", () => {
+  // The browser's long-press back menu, straight from a run to Analysis.
+  assert.deepEqual(walk(["/analysis", "/runs/history", "/runs/abc", "back:/analysis"]), ["/analysis"]);
+  // Back, then forward: the page popped comes back on top.
+  assert.deepEqual(walk(["/analysis", "/runs/history", "back:/analysis", "back:/runs/history"]), [
+    "/analysis",
+    "/runs/history",
+  ]);
+});
+
+test("a link to the page two steps back is a push, not a return", () => {
+  // Team page → Team sessions → Analysis → a teammate of that team: Team sessions again, by a
+  // link. Read as history back, this erased Analysis and the corner back went to the team page
+  // (review, 2026-09-26).
+  const trail = walk(["/teams", "/teams/t1", "/runs/history", "/analysis", "/runs/history"]);
+  assert.deepEqual(trail, ["/teams", "/teams/t1", "/runs/history", "/analysis", "/runs/history"]);
+  const parents = ["/analysis", "/teams/t1"];
+  assert.equal(trailParentAmong(trail, "/runs/history", parents), "/analysis");
+  // Before the tracker has recorded the push, too.
+  assert.equal(trailParentAmong(trail.slice(0, -1), "/runs/history", parents), "/analysis");
   assert.equal(trailSaysCameFrom(trail, "/analysis", "/runs/history"), true);
 });
 
@@ -69,9 +98,9 @@ test("a page with two parents returns to the one the driver came from", () => {
     trailParentAmong(["/settings", "/teams", "/teams/t1", "/runs/history"], "/runs/history", parents),
     "/teams/t1"
   );
-  // Back from a run: the trail still ends at the run until the tracker catches up.
+  // History back from a run: the trail still ends at the run until the tracker catches up.
   assert.equal(
-    trailParentAmong(["/teams/t1", "/runs/history", "/runs/abc"], "/runs/history", parents),
+    trailParentAmong(["/teams/t1", "/runs/history", "/runs/abc"], "/runs/history", parents, true),
     "/teams/t1"
   );
   // Opened from Analysis, from another team's page, or cold: none of the candidates.
@@ -82,15 +111,16 @@ test("a page with two parents returns to the one the driver came from", () => {
 
 test("a pushed return is not read as history back, so the parent's arrow can't bounce", () => {
   const onSessions = ["/teams", "/teams/t1", "/runs/history"];
-  // Read as history back, the push pops, and the team page's arrow would walk history straight
-  // back into team sessions.
-  const misread = foldPathname(onSessions, "/teams/t1");
+  // Read as history back, the push would pop, and the team page's arrow would walk history
+  // straight back into team sessions.
+  const misread = foldPathname(onSessions, "/teams/t1", true);
   assert.equal(trailSaysCameFrom(misread, "/teams", "/teams/t1"), true);
   // Recorded as a push, the team page knows it was reached from Sessions and links to Teams.
   const pushed = pushPathname(onSessions, "/teams/t1");
   assert.deepEqual(pushed, ["/teams", "/teams/t1", "/runs/history", "/teams/t1"]);
   assert.equal(trailSaysCameFrom(pushed, "/teams", "/teams/t1"), false);
-  // …and the tracker's own fold afterwards changes nothing.
+  // The tracker's own fold of that push agrees, whether or not the pill recorded it first.
+  assert.deepEqual(foldPathname(onSessions, "/teams/t1"), pushed);
   assert.deepEqual(foldPathname(pushed, "/teams/t1"), pushed);
 });
 
