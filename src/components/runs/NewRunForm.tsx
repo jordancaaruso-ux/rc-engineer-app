@@ -23,6 +23,7 @@ import {
 import { applyDerivedFieldsToSnapshot } from "@/lib/setup/deriveRenderValues";
 import { chassisValueCount, setupHasChassisValue } from "@/lib/setup/runContextSetupKeys";
 import { setupChangesSinceLoaded, setupHasUnsavedChanges } from "@/lib/setup/setupChangesSinceLoaded";
+import type { SheetWords } from "@/lib/setup/sheetWords";
 import { SetupSheetView } from "@/components/runs/SetupSheetView";
 import { RunSheetSetupFill } from "@/components/runs/RunSheetSetupFill";
 import { haptic } from "@/lib/haptics";
@@ -1943,11 +1944,21 @@ export function NewRunForm(props: {
   } | null>(null);
   /** Which car the sheet section auto-expanded for — once each, see the fetch below. */
   const sheetAutoExpandedForRef = useRef<string | null>(null);
+  /**
+   * What this car's sheet calls its boxes and printed choices (`sheetWords.ts`), from the same
+   * request. Kept with the car it came for, so a car change never prints one chassis's words on
+   * another's setup while the new car's answer is on its way.
+   */
+  const [sheetWordsFor, setSheetWordsFor] = useState<{ carId: string; words: SheetWords | null } | null>(
+    null
+  );
+  const sheetWords = sheetWordsFor != null && sheetWordsFor.carId === carId ? sheetWordsFor.words : null;
 
   useEffect(() => {
     if (!carId) {
       setModelTemplate(null);
       setSheetChassis(null);
+      setSheetWordsFor(null);
       return;
     }
     let cancelled = false;
@@ -1959,9 +1970,11 @@ export function NewRunForm(props: {
           templateKey?: string | null;
           sheetMode?: boolean;
           setupSheetModelId?: string | null;
+          words?: SheetWords | null;
         }) => {
           if (cancelled) return;
           if (d.template) setModelTemplate(d.template);
+          setSheetWordsFor({ carId, words: d.words ?? null });
           setSheetChassis(
             d.sheetMode && d.setupSheetModelId
               ? {
@@ -2116,8 +2129,9 @@ export function NewRunForm(props: {
    * putting it back clears it (see `setupChangesSinceLoaded`).
    */
   const setupChangedRowsSinceBaseline = useMemo(
-    () => setupChangesSinceLoaded(setupData, setupBaselineData),
-    [setupData, setupBaselineData]
+    // In the sheet's own words, for the "Setup is from … with the following changes" list.
+    () => setupChangesSinceLoaded(setupData, setupBaselineData, sheetWords),
+    [setupData, setupBaselineData, sheetWords]
   );
   const setupChangeCountSinceBaseline = setupChangedRowsSinceBaseline.length;
   /**

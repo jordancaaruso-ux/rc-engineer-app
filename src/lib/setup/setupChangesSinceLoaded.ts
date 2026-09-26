@@ -1,6 +1,7 @@
 import { normalizeSetupData, type SetupSnapshotData } from "@/lib/runSetup";
 import { isDerivedSetupKey } from "@/lib/setupCalculations/a800rrDerived";
 import { isRunContextSetupKey } from "@/lib/setup/runContextSetupKeys";
+import type { SheetWords } from "@/lib/setup/sheetWords";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
 
 /**
@@ -28,10 +29,16 @@ import { buildSetupDiffRows } from "@/lib/setupDiff";
  */
 export function setupChangesSinceLoaded(
   current: SetupSnapshotData,
-  loaded: SetupSnapshotData | null
+  loaded: SetupSnapshotData | null,
+  /**
+   * The car's own sheet words, for a list that PRINTS the rows ("Setup is from … with the
+   * following changes"): "Anti Roll Bar (Front) 1.3 → 1.4", not "anti roll bar front f_1_3 →
+   * f_1_4". What counts as a change is still decided on the stored values.
+   */
+  words?: SheetWords | null
 ): ReturnType<typeof buildSetupDiffRows> {
   if (!loaded) return [];
-  return buildSetupDiffRows(normalizeSetupData(current), normalizeSetupData(loaded)).filter(
+  return buildSetupDiffRows(normalizeSetupData(current), normalizeSetupData(loaded), words).filter(
     (r) => r.changed && !isRunContextSetupKey(r.key) && !isDerivedSetupKey(r.key)
   );
 }

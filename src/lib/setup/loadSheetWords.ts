@@ -1,6 +1,31 @@
 import { prisma } from "@/lib/prisma";
 import { resolveSetupSheetModelForCar } from "@/lib/setupSheetModels/resolveModelForCar";
 import { sheetWordsFromFields, type SheetWords } from "@/lib/setup/sheetWords";
+import type { SetupSheetModelFieldDef } from "@/lib/setupSheetModels/types";
+
+/**
+ * One car's sheet words, for a caller that has already read the car and decided the viewer may
+ * see it — Log run's template for the driver's own car, the Engineer's setup-change page.
+ *
+ * `editionFields` are an EDITION's own fields when the setup is written on one: they come after
+ * the chassis's, so an edition's names win for its own keys (the rule `sheet-boxes` follows). Null
+ * when there is no sheet to read words from, or it can't be read; the rows keep their names.
+ */
+export async function loadSheetWordsForCar(
+  userId: string,
+  car: { setupSheetModelId: string | null; setupSheetTemplate: string | null },
+  opts?: { editionFields?: readonly SetupSheetModelFieldDef[]; onlyKeys?: ReadonlySet<string> }
+): Promise<SheetWords | null> {
+  try {
+    const model = await resolveSetupSheetModelForCar(userId, car);
+    const fields = [...(model?.schema.fields ?? []), ...(opts?.editionFields ?? [])];
+    return fields.length > 0 ? sheetWordsFromFields(fields, opts?.onlyKeys) : null;
+  } catch (e) {
+    // A nicety on a page that already works, as below.
+    console.warn("[sheet-words] could not read the chassis sheet", e);
+    return null;
+  }
+}
 
 /**
  * Each car's sheet words (`sheetWords.ts`), for the lists of setup changes drawn on the server — the

@@ -7,6 +7,9 @@ import { chassisFillsAsSheet, parseStoredBoxes } from "@/lib/setupSheetModels/sh
 import { pickSheetBlankForData } from "@/lib/setupSheetModels/sheetBlankResolve";
 import { sheetChangeRows } from "@/lib/engineer/sheetChanges";
 import { readCarSheetNames } from "@/lib/engineer/carSheetNames";
+import { parseSetupSheetModelSchema } from "@/lib/setupSheetModels/types";
+import { loadSheetWordsForCar } from "@/lib/setup/loadSheetWords";
+import { sheetValue } from "@/lib/setup/sheetWords";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +95,7 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
 
   const car = await prisma.car.findFirst({
     where: { id: after.carId, userId },
-    select: { id: true, setupSheetModelId: true, sheetBoxNamesJson: true },
+    select: { id: true, setupSheetModelId: true, setupSheetTemplate: true, sheetBoxNamesJson: true },
   });
   if (!car) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -110,12 +113,34 @@ export async function GET(request: Request, ctx: RouteCtx): Promise<NextResponse
   const afterDay = dayOf(after, zoneOf(after));
   const beforeDay = dayOf(before, zoneOf(before));
 
-  const changes = sheetChangeRows({
+  const moved = sheetChangeRows({
     before: beforeData,
     after: afterData,
     boxes: sheetMode ? parseStoredBoxes(blank?.boxesJson) : [],
     savedNames: readCarSheetNames(car.sheetBoxNamesJson),
   });
+
+  /*
+   * Each value as the sheet prints it: the Mi10's front bar reads 1.2 → 1.4 here, not the stored
+   * f_1_2 → f_1_4 (test drive 2026-09-26). The Engineer's own data already writes a chip that way
+   * (setupDiff `chipLabel`), so the names "Tell the Engineer" sends still line up with what it has.
+   * Display only: which boxes moved was decided above, on the stored values. The chassis's field
+   * list, then an EDITION's own after it, as `sheet-boxes` reads them.
+   */
+  const editionFields =
+    blank?.isEdition && Array.isArray(blank.schemaFieldsJson)
+      ? (parseSetupSheetModelSchema({ version: 1, label: "", structuredSections: [], fields: blank.schemaFieldsJson })
+          ?.fields ?? [])
+      : [];
+  const words =
+    moved.length > 0
+      ? await loadSheetWordsForCar(userId, car, { editionFields, onlyKeys: new Set(moved.map((c) => c.key)) })
+      : null;
+  const changes = moved.map((c) => ({
+    ...c,
+    before: c.before == null ? null : sheetValue(words, c.key, c.before),
+    after: c.after == null ? null : sheetValue(words, c.key, c.after),
+  }));
 
   return NextResponse.json({
     sheetMode,

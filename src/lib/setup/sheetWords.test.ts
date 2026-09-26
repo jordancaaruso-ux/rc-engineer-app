@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { inSheetWords, sheetLabel, sheetValue, sheetWordsFromFields } from "./sheetWords";
 import { buildSetupDiffRows } from "@/lib/setupDiff";
+import { setupChangesSinceLoaded } from "@/lib/setup/setupChangesSinceLoaded";
 import type { SetupSheetModelFieldDef } from "@/lib/setupSheetModels/types";
 
 function field(input: Partial<SetupSheetModelFieldDef> & { key: string; displayLabel: string }): SetupSheetModelFieldDef {
@@ -154,4 +155,17 @@ test("a key the sheet does not name keeps the names the diff always had", () => 
   const [camber] = buildSetupDiffRows({ camber_front: -1.5 }, { camber_front: -1 }, words);
   const [camberBare] = buildSetupDiffRows({ camber_front: -1.5 }, { camber_front: -1 });
   assert.deepEqual(camber, camberBare);
+});
+
+test("Log run's \"Setup is from … with the following changes\" reads the car's sheet", () => {
+  const words = sheetWordsFromFields([MI10_ARB_FRONT, RIDE_HEIGHT]);
+  const loaded = { anti_roll_bar_front: "f_1_3", ride_height_front: 5.5 };
+  const now = { anti_roll_bar_front: "f_1_4", ride_height_front: 5.5 };
+  const rows = setupChangesSinceLoaded(now, loaded, words);
+  assert.deepEqual(
+    rows.map((r) => `${r.label} ${r.previous} → ${r.current}`),
+    ["Anti Roll Bar (Front) 1.3 → 1.4"]
+  );
+  // The count is the same with or without the words: a change is decided on the stored values.
+  assert.equal(setupChangesSinceLoaded(now, loaded).length, rows.length);
 });
