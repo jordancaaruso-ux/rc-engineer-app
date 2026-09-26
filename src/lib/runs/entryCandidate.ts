@@ -21,9 +21,30 @@ export type EntryCandidate = {
   whenIso: string;
 };
 
+/**
+ * When a run was on track, for the "4h ago" beside it: its session time, else the time it is filed
+ * under, and only then when its log was started. Read off `createdAt`, a run raced on 25 Sep and
+ * logged this morning read "Practice · 4h ago" (test drive 2026-09-26). Empty with no usable stamp.
+ */
+export function runOnTrackIso(run: {
+  createdAt: Date | string;
+  sessionCompletedAt?: Date | string | null;
+  sortAt?: Date | string | null;
+}): string {
+  for (const stamp of [run.sessionCompletedAt, run.sortAt, run.createdAt]) {
+    if (stamp == null) continue;
+    const at = new Date(stamp);
+    if (!Number.isNaN(at.getTime())) return at.toISOString();
+  }
+  return "";
+}
+
 type CandidateRow = {
   id: string;
   createdAt: Date;
+  /** Read by `runOnTrackIso`; a loader that leaves them out falls back to `createdAt`. */
+  sessionCompletedAt?: Date | null;
+  sortAt?: Date | null;
   carId: string | null;
   carNameSnapshot?: string | null;
   trackId: string | null;
@@ -52,6 +73,6 @@ export function toEntryCandidate(row: CandidateRow | null | undefined): EntryCan
     sessionType: row.sessionType ?? null,
     meetingSessionType: row.meetingSessionType ?? null,
     sessionLabel: row.sessionLabel ?? null,
-    whenIso: row.createdAt.toISOString(),
+    whenIso: runOnTrackIso(row),
   };
 }

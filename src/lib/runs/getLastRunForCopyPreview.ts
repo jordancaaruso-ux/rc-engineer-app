@@ -9,6 +9,9 @@ export async function getLastRunForCopyPreview(userId: string) {
     select: {
       id: true,
       createdAt: true,
+      // When it was on track, for the Log run card's "4h ago" (`runOnTrackIso`).
+      sessionCompletedAt: true,
+      sortAt: true,
       sessionLabel: true,
       sessionType: true,
       meetingSessionType: true,

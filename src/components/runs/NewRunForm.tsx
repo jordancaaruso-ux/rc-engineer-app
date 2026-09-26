@@ -109,7 +109,7 @@ import {
   setupListState,
   type SetupSource,
 } from "@/lib/runs/setupSourceDefault";
-import type { EntryCandidate } from "@/lib/runs/entryCandidate";
+import { runOnTrackIso, type EntryCandidate } from "@/lib/runs/entryCandidate";
 import {
   WizardPrefillCard,
   WizardDraftsCard,
@@ -272,6 +272,9 @@ type EventOption = {
 type LastRun = {
   id: string;
   createdAt: string;
+  /** When the car was on track: the Last run card's "4h ago" reads these (`runOnTrackIso`). */
+  sessionCompletedAt?: string | null;
+  sortAt?: string | null;
   sessionLabel?: string | null;
   sessionType?: "TESTING" | "PRACTICE" | "RACE_MEETING";
   meetingSessionType?: string | null;
@@ -4657,7 +4660,7 @@ export function NewRunForm(props: {
         props.wizardCandidate.meetingSessionType !== "TESTING"
       ? meetingSessionKind(props.wizardCandidate.meetingSessionType, props.wizardCandidate.sessionLabel)
       : props.wizardCandidate?.sessionLabel?.trim() || "Testing";
-  const wizardPrefillWhenIso = lastRun?.createdAt ?? props.wizardCandidate?.whenIso ?? "";
+  const wizardPrefillWhenIso = lastRun ? runOnTrackIso(lastRun) : (props.wizardCandidate?.whenIso ?? "");
   const wizardPrefillRows: WizardPrefillRow[] = wizardActive
     ? wizardPrefillApplied
       ? [
