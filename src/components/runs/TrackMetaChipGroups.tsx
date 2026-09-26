@@ -8,17 +8,12 @@ import {
   TRACK_LAYOUT_TAG_IDS,
   normalizeGripTags,
   normalizeLayoutTags,
+  pickOneTag,
   type TrackGripTagId,
   type TrackLayoutTagId,
 } from "@/lib/trackMetaTags";
 
-function toggleInOrder<T extends string>(ordered: readonly T[], current: string[], id: T): T[] {
-  const set = new Set(current);
-  if (set.has(id)) set.delete(id);
-  else set.add(id);
-  return ordered.filter((x) => set.has(x));
-}
-
+/** Grip and layout are one value each: a tap replaces the lit chip (see `trackMetaTags.ts`). */
 export function TrackMetaChipGroups({
   gripTags,
   layoutTags,
@@ -47,7 +42,8 @@ export function TrackMetaChipGroups({
                 key={id}
                 type="button"
                 disabled={disabled}
-                onClick={() => onGripChange(toggleInOrder(TRACK_GRIP_TAG_IDS, g, id))}
+                aria-pressed={on}
+                onClick={() => onGripChange(pickOneTag(g, id))}
                 className={cn(
                   "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
                   on
@@ -72,7 +68,8 @@ export function TrackMetaChipGroups({
                 key={id}
                 type="button"
                 disabled={disabled}
-                onClick={() => onLayoutChange(toggleInOrder(TRACK_LAYOUT_TAG_IDS, l, id))}
+                aria-pressed={on}
+                onClick={() => onLayoutChange(pickOneTag(l, id))}
                 className={cn(
                   "rounded-md border px-2.5 py-1 text-[11px] font-medium transition",
                   on
